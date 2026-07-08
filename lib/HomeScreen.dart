@@ -13,7 +13,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],//lighter
-      body: Column(
+      body: SingleChildScrollView(
+        child: Column(
         children: [
           header(),
           Padding(
@@ -40,11 +41,63 @@ class _HomeScreenState extends State<HomeScreen> {
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
                 ),
+                _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),
+                _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),
+                _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),  _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),  _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),  _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),
+                _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
+                ),
+
+
+
+
+
               ],
             ),
           ),
         ],
       ),
+      )
     );
   }
   Widget _buildReportCard({
@@ -55,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String time,
   }) {
     return Card(
-      margin: EdgeInsets.zero,
+      margin: EdgeInsets.fromLTRB(0, 0, 0, 10),
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -243,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.directions_bike, size: 30, color: Colors.blue),
+                        CircleAvatar(child: Icon(Icons.warning_amber,size: 20,color: Colors.red,),radius: 15,backgroundColor: Colors.red.withValues(alpha: 0.2)),
                         Text('6', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.black)),
                         Text('Nearby issues', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Colors.grey[600])),
                       ],
@@ -264,7 +317,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.directions_bike, size: 30, color: Colors.blue),
+                        CircleAvatar(
+                          radius: 15,
+                          backgroundColor: Colors.orange.withValues(alpha: 0.2),
+                          child: Icon(Icons.build, size: 20, color: Colors.orange),
+                        ),
                         Text('6', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.black)),
                         Text('In Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Colors.grey[600])),
                       ],
@@ -284,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.directions_bike, size: 30, color: Colors.blue),
+                        CircleAvatar(child: Icon(Icons.check,size: 20,color: Colors.green,),radius: 15,backgroundColor: Colors.green.withValues(alpha: 0.2)),
                         Text('6', style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.black)),
                         Text('Resolved', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Colors.grey[600])),
                       ],
