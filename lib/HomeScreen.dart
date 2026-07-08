@@ -22,10 +22,17 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               children: [
                 threecard(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Quick actions ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 twocardsection(context),
                 //insert map here,
-                SizedBox(height: 30,),
+                SizedBox(height: 10,),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -56,17 +63,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   time: '12 min ago',
                 ),
                 _buildReportCard(
-                  icon: Icons.construction,
+                  icon: Icons.warning_amber,
                   severityColor: Colors.red,
                   name: 'Large pothole',
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
                 ),  _buildReportCard(
                   icon: Icons.construction,
-                  severityColor: Colors.red,
+                  severityColor: Colors.green,
                   name: 'Large pothole',
                   location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
+                  time: '32 min ago',
+                  bgColor: Colors.green
                 ),  _buildReportCard(
                   icon: Icons.construction,
                   severityColor: Colors.red,
@@ -87,11 +95,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
                 ),
-
-
-
-
-
               ],
             ),
           ),
@@ -106,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String location,
     required String name,
     required String time,
+    Color bgColor = Colors.brown,
   }) {
     return Card(
       margin: EdgeInsets.fromLTRB(0, 0, 0, 10),
@@ -120,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: Colors.pink[100],
+              backgroundColor: bgColor,
               child: Icon(icon, size: 28, color: Colors.grey[700]),
             ),
             const SizedBox(width: 12),
