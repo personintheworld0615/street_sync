@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _buildReportCard(
                   icon: Icons.warning_amber,
                   severityColor: Colors.red,
-                  name: 'Large pothole',
+                  name: 'Krish is big',
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
                 ),  _buildReportCard(
@@ -109,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String location,
     required String name,
     required String time,
-    Color bgColor = Colors.brown,
+    Color bgColor = Colors.red,
   }) {
     return Card(
       margin: EdgeInsets.fromLTRB(0, 0, 0, 10),
