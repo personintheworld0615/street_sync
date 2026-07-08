@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.green,
                   icon: Icons.camera_alt,
                   title: 'Community Report',
-                  subtitle: 'Take a picture',
+                  subtitle: 'Take a picture',//hi
                   onTap: () {
                     Navigator.push(
                       context,
