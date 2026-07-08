@@ -16,46 +16,158 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           header(),
-          threecard(),
           Padding(
             padding: const EdgeInsets.fromLTRB(15, 10, 15, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
               children: [
-                _buildActionCard(
-                  color: Colors.blue,
-                  icon: Icons.mic,
-                  title: 'Voice report',
-                  subtitle: 'Speak to report',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const VoiceReportScreen(),
-                      ),
-                    );
-                  },
+                threecard(),
+                const SizedBox(height: 20),
+                twocardsection(context),
+                //insert map here,
+                SizedBox(height: 30,),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Recent reports ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
+                    Text('Near you ', style: TextStyle(fontSize: 15,fontStyle: FontStyle.italic),)
+                  ],
                 ),
-                const SizedBox(width: 12),
-                _buildActionCard(
-                  color: Colors.green,
-                  icon: Icons.camera_alt,
-                  title: 'Community Report',
-                  subtitle: 'Take a picture',//hi
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const VoiceReportScreen(),
-                      ),
-                    );
-                  },
+                const SizedBox(height: 12),
+                _buildReportCard(
+                  icon: Icons.construction,
+                  severityColor: Colors.red,
+                  name: 'Large pothole',
+                  location: 'Nassau St & Mercer St',
+                  time: '12 min ago',
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
+    );
+  }
+  Widget _buildReportCard({
+    required IconData icon,
+    required Color severityColor,
+    required String location,
+    required String name,
+    required String time,
+  }) {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: Colors.pink[100],
+              child: Icon(icon, size: 28, color: Colors.grey[700]),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          location,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: severityColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Row twocardsection(BuildContext context) {
+    return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+              _buildActionCard(
+                color: Colors.blue,
+                icon: Icons.mic,
+                title: 'Voice report',
+                subtitle: 'Speak to report',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const VoiceReportScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              _buildActionCard(
+                color: Colors.green,
+                icon: Icons.camera_alt,
+                title: 'Community Report',
+                subtitle: 'Take a picture',//hi
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const VoiceReportScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
     );
   }
 
@@ -114,17 +226,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Container threecard() {
-    return Container(
-          padding: EdgeInsets.fromLTRB(15, 10, 15, 10),
-          child: Row(
+  Row threecard() {
+    return Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Expanded(
                 child: Card(
                   margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
                   color: Colors.white,
-                  elevation: 8,
+                  elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)
                   ),
@@ -145,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                  child: Card(
                    margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
                    color: Colors.white,
-                  elevation: 8,
+                  elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)
                   ),
@@ -165,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                  child: Card(
                    margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
                   color: Colors.white,
-                  elevation: 8,
+                  elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)
                   ),
@@ -183,8 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                ),
 
             ],
-          ),
-        );
+          );
   }
 
   Container header() {
