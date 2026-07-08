@@ -285,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: Card(
-                  margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
+                  margin: EdgeInsets.fromLTRB(0, 0, 10, 0),
                   color: Colors.white,
                   elevation: 3,
                   shape: RoundedRectangleBorder(
@@ -330,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                ),
                Expanded(
                  child: Card(
-                   margin: EdgeInsets.fromLTRB(10, 0, 10, 0),
+                   margin: EdgeInsets.fromLTRB(10, 0, 0, 0),
                   color: Colors.white,
                   elevation: 3,
                   shape: RoundedRectangleBorder(
