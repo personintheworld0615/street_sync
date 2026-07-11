@@ -47,53 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   name: 'Large pothole',
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
-                ),
-                _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.red,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
-                ),
-                _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.red,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
-                ),
-                _buildReportCard(
-                  icon: Icons.warning_amber,
-                  severityColor: Colors.red,
-                  name: 'Krish is big',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
-                ),  _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.green,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '32 min ago',
-                  bgColor: Colors.green
-                ),  _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.red,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
-                ),  _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.red,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
-                ),
-                _buildReportCard(
-                  icon: Icons.construction,
-                  severityColor: Colors.red,
-                  name: 'Large pothole',
-                  location: 'Nassau St & Mercer St',
-                  time: '12 min ago',
+                  bgColor: Colors.pink[200]!
+
                 ),
               ],
             ),
