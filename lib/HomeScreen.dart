@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
+import 'package:street_sync/CommunityReportScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -174,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const VoiceReportScreen(),
+                      builder: (context) => const CommunityReportScreen(),
                     ),
                   );
                 },
