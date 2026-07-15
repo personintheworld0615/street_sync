@@ -12,8 +12,10 @@ class CommunityReportScreen extends StatefulWidget {
 }
 
 class _CommunityReportScreenState extends State<CommunityReportScreen> {
-  static const _green = Color(0xFF4CAF50);
-  static const _pageBg = Color(0xFFF0F5F1);
+  static const _blue = Color(0xFF2196F3);
+  static const _pageBg = Color(0xFFF4F7FB);
+  static const _ink = Color(0xFF152033);
+  static const _muted = Color(0xFF5B677A);
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
   String? _selectedCategory;
@@ -36,47 +38,50 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       backgroundColor: _pageBg,
       appBar: AppBar(
         centerTitle: true,
-        toolbarHeight: 80,
         elevation: 0,
-
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: IconButton(
-            onPressed:(){
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.arrow_back_ios_new_outlined),
+        scrolledUnderElevation: 0,
+        backgroundColor: _pageBg,
+        foregroundColor: _ink,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+        ),
+        title: const Text(
+          'Report',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
           ),
         ),
-  
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Camera Report',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              'Capture and report issues as you walk',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            ),
-          ],
-        ),
-        backgroundColor: _green,
-        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text(
+                    'Camera report',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                      letterSpacing: -0.6,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Capture and report issues as you walk',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _muted,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   _buildPhotoCard(),
                   const SizedBox(height: 14),
                   _buildCategoryCard(),
@@ -90,24 +95,22 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               ),
             ),
           ),
-
           _buildSubmitBar(),
-
         ],
       ),
     );
   }
 
   Widget _buildPhotoCard() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          children: [
-            if (_image == null) ...[
+    if (_image == null) {
+      return Card(
+        color: Colors.white,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            children: [
               _Pressable(
                 onTap: _captureImage,
                 child: Column(
@@ -115,13 +118,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: _green.withValues(alpha: 0.1),
+                        color: _blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
                         Icons.add_a_photo_outlined,
                         size: 40,
-                        color: _green,
+                        color: _blue,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -146,7 +149,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                  Expanded(
+                    child: Divider(color: Colors.grey[300], thickness: 1),
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
@@ -158,7 +163,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                       ),
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                  Expanded(
+                    child: Divider(color: Colors.grey[300], thickness: 1),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -168,61 +175,106 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: _green.withValues(alpha: 0.08),
+                    color: _blue.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _green.withValues(alpha: 0.25)),
+                    border: Border.all(color: _blue.withValues(alpha: 0.25)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.file_upload_outlined, size: 22, color: _green),
+                      Icon(Icons.file_upload_outlined, size: 22, color: _blue),
                       SizedBox(width: 8),
                       Text(
                         'Upload from library',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: _green,
+                          color: _blue,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ] else ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.file(
-                  File(_image!.path),
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  cacheWidth: 800,
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Stack(
+        children: [
+          Image.file(
+            File(_image!.path),
+            height: 280,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            cacheWidth: 900,
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 40, 12, 12),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xCC0F1724)],
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
+              child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _captureImage,
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Retake'),
+                    child: _Pressable(
+                      onTap: _captureImage,
+                      child: _overlayBtn(Icons.camera_alt_outlined, 'Retake'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _image = null),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Remove'),
+                    child: _Pressable(
+                      onTap: () => setState(() => _image = null),
+                      child: _overlayBtn(
+                        Icons.delete_outline_rounded,
+                        'Remove',
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _overlayBtn(IconData icon, String label) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -238,7 +290,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Issue Category',
+              "What's wrong?",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -251,16 +303,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 Expanded(
                   child: _buildCategoryChip(
                     label: 'Road Damage',
-                    color: Colors.red,
-                    selectedBg: const Color(0xFFFFECEC),
+                    icon: Icons.construction_rounded,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
                     label: 'Public Works',
-                    color: Colors.orange,
-                    selectedBg: const Color(0xFFFFF2DD),
+                    icon: Icons.handyman_outlined,
                   ),
                 ),
               ],
@@ -271,26 +321,22 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 Expanded(
                   child: _buildCategoryChip(
                     label: 'Environmental',
-                    color: Colors.green,
-                    selectedBg: const Color(0xFFD4FFD6),
+                    icon: Icons.eco_outlined,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
                     label: 'Accessibility',
-                    color: Colors.purple,
-                    selectedBg: const Color(0xFFFADFFF),
+                    icon: Icons.accessible_forward_rounded,
                   ),
                 ),
-
               ],
             ),
             const SizedBox(height: 10),
             _buildCategoryChip(
               label: 'Other',
-              color: Colors.blueGrey,
-              selectedBg: const Color(0xFFECEFF1),
+              icon: Icons.more_horiz_rounded,
             ),
             if (_selectedCategory == 'Other') ...[
               const SizedBox(height: 10),
@@ -299,7 +345,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.blueGrey),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
                 child: TextField(
                   controller: _otherCategoryController,
@@ -319,8 +365,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
 
   Widget _buildCategoryChip({
     required String label,
-    required Color color,
-    required Color selectedBg,
+    required IconData icon,
   }) {
     final selected = _selectedCategory == label;
 
@@ -328,26 +373,42 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       onTap: () {
         setState(() => _selectedCategory = label);
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
         height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? selectedBg : Colors.grey[50],
+          color: selected ? _blue.withValues(alpha: 0.1) : Colors.grey[50],
           border: Border.all(
-            color: selected ? color : Colors.grey[300]!,
-            width: selected ? 2 : 1,
+            color: selected ? _blue : Colors.grey[300]!,
+            width: selected ? 1.8 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Center(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? color : Colors.grey[700],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: selected ? _blue : _muted,
             ),
-          ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? _blue : Colors.grey[700],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -388,7 +449,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   _descirption = value;
                 },
                 decoration: const InputDecoration(
-                  hintText: 'Describe the issue...',
+                  hintText: 'What should the city worker know on arrival...',
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
                 ),
@@ -524,6 +585,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ],
       ),
       child: _Pressable(
+
         onTap: () async {
           final errors = <String>[];
           if (_image == null) errors.add('photo');
@@ -561,11 +623,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           height: 52,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _green,
+            color: _blue,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: _green.withValues(alpha: 0.35),
+                color: _blue.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
