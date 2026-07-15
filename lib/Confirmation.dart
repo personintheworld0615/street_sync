@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class Confirmation extends StatefulWidget {
-  const Confirmation({
+   Confirmation({
     super.key,
     this.category = 'Pothole',
     this.location = 'Nassau St & Mercer St',
     this.description = 'Large pothole causing traffic slowdown',
     this.severity = 'High',
+    required this.image,
   });
 
   final String category;
   final String location;
   final String description;
   final String severity;
+  final XFile image;
 
   @override
   State<Confirmation> createState() => _ConfirmationState();
@@ -341,8 +344,8 @@ class _ConfirmationState extends State<Confirmation> {
             height: 48,
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: Icon(Icons.map_outlined, size: 20, color: Colors.grey[800]),
+              onPressed: () => Navigator.pop(context, true),
+              icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[800]),
               label: Text(
                 'Edit',
                 style: TextStyle(

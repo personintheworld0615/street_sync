@@ -4,7 +4,6 @@ import 'Confirmation.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 class CommunityReportScreen extends StatefulWidget {
-  String? _selectedSeverity;
   
   CommunityReportScreen({super.key});
 
@@ -22,10 +21,12 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   final _descriptionController = TextEditingController();
   String? _descirption;
   String? _selectedSeverity;
+  bool _showSeverity = false;
 
   @override
   void dispose() {
     _otherCategoryController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -81,8 +82,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   _buildCategoryCard(),
                   const SizedBox(height: 14),
                   _buildDescriptionCard(),
-                  const SizedBox(height: 14),
-                  if (_selectedSeverity != null) _buildSeverityCard(),
+                  if (_showSeverity) ...[
+                    const SizedBox(height: 14),
+                    _buildSeverityCard(),
+                  ],
                 ],
               ),
             ),
@@ -300,9 +303,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 ),
                 child: TextField(
                   controller: _otherCategoryController,
-                  onChanged: (value) {
-                   _selectedCategory = value;
-                    },
                   decoration: const InputDecoration(
                     hintText: 'Enter other category',
                     border: InputBorder.none,
@@ -524,8 +524,38 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ],
       ),
       child: _Pressable(
-        onTap: () {
-          Navigator.push(context,MaterialPageRoute(builder: (context)=> const Confirmation()));
+        onTap: () async {
+          final errors = <String>[];
+          if (_image == null) errors.add('photo');
+          if (_selectedCategory == null) errors.add('category');
+          if (_descriptionController.text.trim().isEmpty) {
+            errors.add('description');
+          }
+
+          if (errors.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Please add: ${errors.join(', ')}'),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+
+          final edited = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Confirmation(
+                category: _selectedCategory!,
+                description: _descriptionController.text.trim(),
+                image: _image!,
+              ),
+            ),
+          );
+          if (edited == true && mounted) {
+            setState(() => _showSeverity = true);
+          }
         },
         child: Container(
           height: 52,
