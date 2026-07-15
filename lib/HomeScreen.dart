@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const CommunityReportScreen(),
+                      builder: (context) => CommunityReportScreen(),
                     ),
                   );
                 },

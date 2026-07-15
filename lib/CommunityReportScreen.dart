@@ -1,302 +1,589 @@
 import 'package:flutter/material.dart';
 
+import 'Confirmation.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 class CommunityReportScreen extends StatefulWidget {
-  const CommunityReportScreen({super.key});
+  String? _selectedSeverity;
+  
+  CommunityReportScreen({super.key});
 
   @override
   State<CommunityReportScreen> createState() => _CommunityReportScreenState();
 }
 
 class _CommunityReportScreenState extends State<CommunityReportScreen> {
+  static const _green = Color(0xFF4CAF50);
+  static const _pageBg = Color(0xFFF0F5F1);
+  final ImagePicker _picker = ImagePicker();
+  XFile? _image;
   String? _selectedCategory;
+  final _otherCategoryController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  String? _descirption;
+  String? _selectedSeverity;
+
+  @override
+  void dispose() {
+    _otherCategoryController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: _pageBg,
       appBar: AppBar(
         centerTitle: true,
         toolbarHeight: 80,
-        title: Column(
+        elevation: 0,
+
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: IconButton(
+            onPressed:(){
+              Navigator.pop(context);
+            },
+            icon: const Icon(Icons.arrow_back_ios_new_outlined),
+          ),
+        ),
+  
+        title: const Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Text(
-              'Community Report', 
+              'Camera Report',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                )
               ),
+            ),
             SizedBox(height: 2),
-            Text('Capture and report issues as you walk', style: TextStyle(fontSize: 15)),
+            Text(
+              'Capture and report issues as you walk',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            ),
           ],
         ),
-        backgroundColor: const Color.fromARGB(255, 76, 175, 80),
+        backgroundColor: _green,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                Container(
-                  height: 270,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.add_a_photo_outlined,
-                            size: 40,
-                            color: Colors.blue,
-                          ),
-                          onPressed: () {
-                            // Handle photo capture button press
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Take a photo',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Text (
-                        'Tap to capture or upload',
-                        style : TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: const Text (
-                          '----------or----------',
-                        ),
-                      ),
-                      Row (
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.file_upload_outlined,
-                              size: 30,
-                              color: Colors.blue,
-                            ),
-                            onPressed: () {
-                              // Handle file upload button press
-                            },
-                          ),
-                          const Text(
-                            'Upload from library',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.blue,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  ),
-                ),
-                Container (
-                  height: 150,
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text (
-                        'Issue Category',
-                        style: TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                      Row (
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                // Handle tap on Road Damage category
-                                setState(() {
-                                  _selectedCategory = 'Road Damage';
-                                });
-                              },
-                              child: Container(
-                                height: 50,
-                                margin: const EdgeInsets.only(top: 10, right: 5),
-                                decoration: BoxDecoration(
-                                  color: _selectedCategory == 'Road Damage' ? const Color.fromARGB(255, 255, 236, 236) : Colors.white,
-                                  border: Border.all(color: _selectedCategory == 'Road Damage' ? Colors.red : Colors.white, width: 2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Text('Road Damage'),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                // Handle tap on Public Works category
-                                setState(() {
-                                  _selectedCategory = 'Public Works';
-                                });
-                              },
-                              child: Container(
-                                height: 50,
-                                margin: const EdgeInsets.only(top: 10, right: 5),
-                                decoration: BoxDecoration(
-                                  color: _selectedCategory == 'Public Works' ? const Color.fromARGB(255, 255, 242, 221) : Colors.white,
-                                  border: Border.all(color: _selectedCategory == 'Public Works' ? Colors.orange : Colors.white, width: 2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Text('Public Works'),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row (
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                // Handle tap on Environmental category
-                                setState(() {
-                                  _selectedCategory = 'Environmental';
-                                });
-                              },
-                              child: Container(
-                                height: 50,
-                                margin: const EdgeInsets.only(top: 10, right: 5),
-                                decoration: BoxDecoration(
-                                  color: _selectedCategory == 'Environmental' ? const Color.fromARGB(255, 212, 255, 214) : Colors.white,
-                                  border: Border.all(color: _selectedCategory == 'Environmental' ? Colors.green : Colors.white, width: 2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Text('Environmental'),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                // Handle tap on Accessibility category
-                                setState(() {
-                                  _selectedCategory = 'Accessibility';
-                                });
-                              },
-                              child: Container(
-                                height: 50,
-                                margin: const EdgeInsets.only(top: 10, right: 5),
-                                decoration: BoxDecoration(
-                                  color: _selectedCategory == 'Accessibility' ? const Color.fromARGB(255, 250, 223, 255) : Colors.white,
-                                  border: Border.all(color: _selectedCategory == 'Accessibility' ? Colors.purple : Colors.white, width: 2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Text('Accessibility'),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container (
-                  height: 200,
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text (
-                        'Description',
-                        style: TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                      Container(
-                        height: 150,
-                        margin: const EdgeInsets.only(top: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey),
-                        ),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: TextField(
-                            maxLines: null,
-                            expands: true,
-                            decoration: InputDecoration(
-                              hintText: 'Describe the issue...',
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container (
-                  height: 50,
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(top: 20),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Handle submit button press
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 76, 175, 80),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Submit Report',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                )
-              ],
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                children: [
+                  _buildPhotoCard(),
+                  const SizedBox(height: 14),
+                  _buildCategoryCard(),
+                  const SizedBox(height: 14),
+                  _buildDescriptionCard(),
+                  const SizedBox(height: 14),
+                  if (_selectedSeverity != null) _buildSeverityCard(),
+                ],
+              ),
             ),
           ),
+
+          _buildSubmitBar(),
+
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        child: Column(
+          children: [
+            if (_image == null) ...[
+              _Pressable(
+                onTap: _captureImage,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: _green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.add_a_photo_outlined,
+                        size: 40,
+                        color: _green,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Take a photo',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to capture or upload',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'or',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[500],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _Pressable(
+                onTap: _selectImageFromGalary,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _green.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _green.withValues(alpha: 0.25)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.file_upload_outlined, size: 22, color: _green),
+                      SizedBox(width: 8),
+                      Text(
+                        'Upload from library',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: _green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(
+                  File(_image!.path),
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  cacheWidth: 800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _captureImage,
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: const Text('Retake'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => _image = null),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Remove'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Issue Category',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCategoryChip(
+                    label: 'Road Damage',
+                    color: Colors.red,
+                    selectedBg: const Color(0xFFFFECEC),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildCategoryChip(
+                    label: 'Public Works',
+                    color: Colors.orange,
+                    selectedBg: const Color(0xFFFFF2DD),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCategoryChip(
+                    label: 'Environmental',
+                    color: Colors.green,
+                    selectedBg: const Color(0xFFD4FFD6),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildCategoryChip(
+                    label: 'Accessibility',
+                    color: Colors.purple,
+                    selectedBg: const Color(0xFFFADFFF),
+                  ),
+                ),
+
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildCategoryChip(
+              label: 'Other',
+              color: Colors.blueGrey,
+              selectedBg: const Color(0xFFECEFF1),
+            ),
+            if (_selectedCategory == 'Other') ...[
+              const SizedBox(height: 10),
+              Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.blueGrey),
+                ),
+                child: TextField(
+                  controller: _otherCategoryController,
+                  onChanged: (value) {
+                   _selectedCategory = value;
+                    },
+                  decoration: const InputDecoration(
+                    hintText: 'Enter other category',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.fromLTRB(18, 12, 16, 12),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip({
+    required String label,
+    required Color color,
+    required Color selectedBg,
+  }) {
+    final selected = _selectedCategory == label;
+
+    return _Pressable(
+      onTap: () {
+        setState(() => _selectedCategory = label);
+      },
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: selected ? selectedBg : Colors.grey[50],
+          border: Border.all(
+            color: selected ? color : Colors.grey[300]!,
+            width: selected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? color : Colors.grey[700],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDescriptionCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Description',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 140,
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: TextField(
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                controller: _descriptionController,
+                onChanged: (value){
+                  _descirption = value;
+                },
+                decoration: const InputDecoration(
+                  hintText: 'Describe the issue...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  Future<void> _captureImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 70,
+    );
+    if (image != null) {
+      setState(() {
+        _image = image;
+      });
+    }
+  }
+
+  Future<void> _selectImageFromGalary() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 70,
+    );
+    if (image != null) {
+      setState(() {
+        _image = image;
+      });
+    }
+  }
+  Widget _buildSeverityCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Severity',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSeverityChip(
+                    label: 'Low',
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildSeverityChip(
+                    label: 'Medium',
+                    color: Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildSeverityChip(
+                    label: 'High',
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSeverityChip({
+    required String label,
+    required Color color,
+  }) {
+    final selected = _selectedSeverity == label;
+
+    return _Pressable(
+      onTap: () {
+        setState(() => _selectedSeverity = label);
+      },
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : Colors.grey[50],
+          border: Border.all(
+            color: selected ? color : Colors.grey[300]!,
+            width: selected ? 2.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? color : Colors.grey[700],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitBar() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: _Pressable(
+        onTap: () {
+          Navigator.push(context,MaterialPageRoute(builder: (context)=> const Confirmation()));
+        },
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _green,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: _green.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Text(
+            'Submit Report',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Pressable extends StatefulWidget {
+  const _Pressable({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.88 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          child: widget.child,
+        ),
       ),
     );
   }
