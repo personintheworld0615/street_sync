@@ -28,8 +28,14 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>StreetSync needs camera access to report street issues.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>StreetSync needs your location to tag reports.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>StreetSync needs the microphone for voice reports.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>StreetSync needs photo library access to upload issue photos.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>StreetSync needs speech recognition for voice reports.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
