@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:street_sync/ConfirmationVoiceReport.dart';
 
 class VoiceReportScreen extends StatefulWidget {
   const VoiceReportScreen({super.key});
@@ -13,6 +15,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     with SingleTickerProviderStateMixin {
   final SpeechToText _speech = SpeechToText();
   bool _isRecording = false;
+  bool _isSubmitting = false;
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
   double? _lat;
@@ -59,7 +62,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     final pos = await Geolocator.getCurrentPosition();
     _lat  = pos.latitude;
     _long = pos.longitude;
-  
+
     setState(() {
       _transcript = '';
       _isRecording = true;
@@ -72,6 +75,52 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         setState(() => _transcript = result.recognizedWords);
       },
     );
+  }
+
+  Future<String> _addressFromCoords(double lat, double lng) async {
+    try {
+      final places = await placemarkFromCoordinates(lat, lng);
+      if (places.isEmpty) {
+        return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+      }
+      final p = places.first;
+      final parts = [
+        if (p.street?.isNotEmpty == true) p.street!,
+        if (p.locality?.isNotEmpty == true) p.locality!,
+        if (p.administrativeArea?.isNotEmpty == true) p.administrativeArea!,
+      ];
+      return parts.isEmpty
+          ? '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}'
+          : parts.join(', ');
+    } catch (_) {
+      return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+    }
+  }
+
+  Future<void> _goToConfirmation() async {
+    if (_transcript.isEmpty || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final lat = _lat;
+      final lng = _long;
+      final location = (lat != null && lng != null)
+          ? await _addressFromCoords(lat, lng)
+          : 'Location unavailable';
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConfirmationVoiceReport(
+            category: 'Voice',
+            severity: 'medium',
+            description: _transcript,
+            location: location,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -150,16 +199,8 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                           children: [
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Report submitted successfully!',
-                                      ),
-                                    ),
-                                  );
-                                  Navigator.pop(context);
-                                },
+                                onPressed:
+                                    _isSubmitting ? null : _goToConfirmation,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   foregroundColor: Colors.white,
@@ -170,10 +211,21 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Submit Report',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                                child: _isSubmitting
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Submit Report',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],

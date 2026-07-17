@@ -34,8 +34,8 @@ class MyPendingReportsScreen extends StatelessWidget {
                   bgColor: report['bgColor'] as Color,
                 );
               },
-            ),
-    );
+              ),
+            );
   }
 
 
