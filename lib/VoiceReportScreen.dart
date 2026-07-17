@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:geolocator/geolocator.dart';
 
 class VoiceReportScreen extends StatefulWidget {
   const VoiceReportScreen({super.key});
@@ -8,9 +9,14 @@ class VoiceReportScreen extends StatefulWidget {
   State<VoiceReportScreen> createState() => _VoiceReportScreenState();
 }
 
-class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTickerProviderStateMixin {
+class _VoiceReportScreenState extends State<VoiceReportScreen>
+    with SingleTickerProviderStateMixin {
+  final SpeechToText _speech = SpeechToText();
   bool _isRecording = false;
   String _statusText = 'Tap the microphone to start recording';
+  String _transcript = '';
+  double? _lat;
+  double? _long;
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
 
@@ -24,6 +30,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    _speech.initialize();
   }
 
   @override
@@ -32,18 +39,39 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
     super.dispose();
   }
 
-  void _toggleRecording() {
-    setState(() {
-      _isRecording = !_isRecording;
-      if (_isRecording) {
-        _statusText = 'Listening...';
-        _animationController.repeat(reverse: true);
-      } else {
-        _statusText = 'Recording complete! Tap to re-record';
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      await _speech.stop();
+      setState(() {
+        _isRecording = false;
+        _statusText = _transcript.isEmpty
+            ? 'Sorry we couldnt hear you. \n Please try again.\n Tap the microphone to start recording'
+            : 'Recording complete! Tap to re-record';
         _animationController.stop();
         _animationController.reset();
-      }
+      });
+      return;
+    }
+    var permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    final pos = await Geolocator.getCurrentPosition();
+    _lat  = pos.latitude;
+    _long = pos.longitude;
+  
+    setState(() {
+      _transcript = '';
+      _isRecording = true;
+      _statusText = 'Listening...';
+      _animationController.repeat(reverse: true);
     });
+
+    await _speech.listen(
+      onResult: (result) {
+        setState(() => _transcript = result.recognizedWords);
+      },
+    );
   }
 
   @override
@@ -80,7 +108,8 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: (_isRecording ? Colors.red : Colors.blue).withOpacity(0.3),
+                              color: (_isRecording ? Colors.red : Colors.blue)
+                                  .withOpacity(0.3),
                               blurRadius: 20,
                               spreadRadius: 10,
                             ),
@@ -95,7 +124,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
                     ),
                   ),
                   const SizedBox(height: 60),
-                  if (!_isRecording && _statusText.contains('complete'))
+                  if (!_isRecording && _transcript.isNotEmpty)
                     Column(
                       children: [
                         Container(
@@ -103,11 +132,13 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.2),
+                            ),
                           ),
-                          child: const Text(
-                            "\"There's a large pothole on Nassau St near the intersection of Mercer St. It's causing traffic to slow down significantly.\"",
-                            style: TextStyle(
+                          child: Text(
+                            '"$_transcript"',
+                            style: const TextStyle(
                               fontStyle: FontStyle.italic,
                               color: Colors.black87,
                             ),
@@ -121,19 +152,28 @@ class _VoiceReportScreenState extends State<VoiceReportScreen> with SingleTicker
                               child: ElevatedButton(
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Report submitted successfully!')),
+                                    const SnackBar(
+                                      content: Text(
+                                        'Report submitted successfully!',
+                                      ),
+                                    ),
                                   );
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: const Text('Submit Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                                child: const Text(
+                                  'Submit Report',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
                           ],

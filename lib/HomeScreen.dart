@@ -13,7 +13,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],//lighter
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SingleChildScrollView(
         child: Column(
         children: [
@@ -49,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   location: 'Nassau St & Mercer St',
                   time: '12 min ago',
                   bgColor: Colors.pink[200]!
-
                 ),
               ],
             ),
@@ -175,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const CommunityReportScreen(),
+                      builder: (context) => CommunityReportScreen(),
                     ),
                   );
                 },
