@@ -26,10 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-<<<<<<< HEAD
 	<key>GOOGLE_MAPS_API_KEY</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
-=======
 	<key>NSCameraUsageDescription</key>
 	<string>StreetSync needs camera access to report street issues.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -40,7 +38,6 @@
 	<string>StreetSync needs photo library access to upload issue photos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>StreetSync needs speech recognition for voice reports.</string>
->>>>>>> a0a6494e724e268e0176596a6f3977ac609c26bc
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

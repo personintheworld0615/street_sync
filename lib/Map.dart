@@ -20,6 +20,9 @@ class _MapScreenState extends State<MapScreen> {
           target: LatLng(40.3573, -74.6672),
           zoom: 14,
         ),
+        myLocationButtonEnabled: false,
+        zoomControlsEnabled: false,
+        mapType: MapType.normal,
       ),
     );
   }
