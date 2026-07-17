@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'Confirmation.dart';
 import 'dart:io';
@@ -12,6 +15,8 @@ class CommunityReportScreen extends StatefulWidget {
 }
 
 class _CommunityReportScreenState extends State<CommunityReportScreen> {
+  LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
+  Set<Marker> _markers = {};
   static const _blue = Color(0xFF2196F3);
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
@@ -23,7 +28,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   final _descriptionController = TextEditingController();
   String? _descirption;
   String? _selectedSeverity;
+
   bool _showSeverity = false;
+   GoogleMapController? _controller;
+   bool _ready =false;
 
   @override
   void dispose() {
@@ -87,6 +95,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   _buildCategoryCard(),
                   const SizedBox(height: 14),
                   _buildDescriptionCard(),
+                  const SizedBox(height: 14),
+                  _buildLocationCard(),
                   if (_showSeverity) ...[
                     const SizedBox(height: 14),
                     _buildSeverityCard(),
@@ -99,6 +109,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ],
       ),
     );
+  }
+  @override
+  void initState(){
+    super.initState();
+    _gotouser();
   }
 
   Widget _buildPhotoCard() {
@@ -246,6 +261,53 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Future<void> _gotouser() async{
+    final userLocation = await Geolocator.getCurrentPosition();
+    setState(() {
+       position = LatLng(userLocation.latitude, userLocation.longitude);
+       _ready = true;
+    });
+    await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
+
+
+  }
+
+  Widget _buildLocationCard(){
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Location', style: TextStyle(fontWeight: FontWeight.w700)),
+          SizedBox(height: 10,),
+          SizedBox(
+            height: 220,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(target: position, zoom: 15),
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              zoomControlsEnabled: true,
+              markers: _markers,
+              onMapCreated: (c) async {
+                _controller = c;
+                if (_ready) {
+                  await c.animateCamera(CameraUpdate.newLatLngZoom(position, 15));
+                }
+              },
+              onTap: (latLng) {
+                setState(() {
+                  position = latLng;
+                  _markers = {
+                    Marker(markerId: const MarkerId('report'), position: latLng),
+                  };
+                });
+              },
             ),
           ),
         ],
@@ -593,6 +655,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           if (_descriptionController.text.trim().isEmpty) {
             errors.add('description');
           }
+          if (_markers.isEmpty) errors.add('location');
 
           if (errors.isNotEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -605,18 +668,58 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
             return;
           }
 
-          final edited = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => Confirmation(
-                category: _selectedCategory!,
-                description: _descriptionController.text.trim(),
-                image: _image!,
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            barrierLabel: "Processing your report",
+            builder: (_) => const Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(color: _blue),
+                ),
               ),
             ),
           );
-          if (edited == true && mounted) {
-            setState(() => _showSeverity = true);
+
+          try {
+            final address = await _addressFromLatLng(position);
+            String severity = "";
+            if(!_showSeverity) {
+               severity = await _autoSeverityCalc(_selectedCategory!);
+               _selectedSeverity = severity;
+            }
+            else{
+              severity = _selectedSeverity!;
+            }
+            if (!mounted) return;
+            Navigator.pop(context);
+
+            final edited = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Confirmation(
+                  category: _selectedCategory!,
+                  description: _descriptionController.text.trim(),
+                  image: _image!,
+                  severity: severity,
+                  location: address,
+                ),
+              ),
+            );
+            if (edited == true && mounted) {
+              setState(() => _showSeverity = true);
+            }
+          } catch (_) {
+            if (mounted) Navigator.pop(context); // close loading on error
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not get address. Try again.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
           }
         },
         child: Container(
@@ -644,6 +747,42 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ),
       ),
     );
+  }
+}
+Future<String> _autoSeverityCalc(String category) async {
+  switch (category) {
+    case 'Accessibility':
+      return 'high';
+    case 'Road Damage':
+    case 'Public Works':
+      return 'medium';
+    case 'Environmental':
+      return 'low';
+    case 'Other':
+    default:
+      return 'medium';
+  }
+}
+Future<String> _addressFromLatLng(LatLng pos) async {
+  try {
+    final places = await placemarkFromCoordinates(
+      pos.latitude,
+      pos.longitude,
+    );
+    if (places.isEmpty) {
+      return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+    }
+    final p = places.first;
+    final parts = [
+      if (p.street?.isNotEmpty == true) p.street!,
+      if (p.locality?.isNotEmpty == true) p.locality!,
+      if (p.administrativeArea?.isNotEmpty == true) p.administrativeArea!,
+    ];
+    return parts.isEmpty
+        ? '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}'
+        : parts.join(', ');
+  } catch (_) {
+    return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
   }
 }
 

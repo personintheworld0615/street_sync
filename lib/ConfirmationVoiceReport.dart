@@ -1,33 +1,29 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:street_sync/HomeScreen.dart';
 import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/pending_reports.dart';
 
-class Confirmation extends StatefulWidget {
-   Confirmation({
+class ConfirmationVoiceReport extends StatefulWidget {
+  const ConfirmationVoiceReport({
     super.key,
     required this.category,
-     required this.location,
-     required this.description,
+    required this.location,
+    required this.description,
     required this.severity,
-    required this.image,
-     this.othercat = ""
+    this.othercat = '',
   });
 
   final String category;
   final String location;
   final String description;
   final String severity;
-  final XFile image;
   final String othercat;
 
   @override
-  State<Confirmation> createState() => _ConfirmationState();
+  State<ConfirmationVoiceReport> createState() =>
+      _ConfirmationVoiceReportState();
 }
 
-class _ConfirmationState extends State<Confirmation> {
+class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   static const _primaryBlue = Color(0xFF2196F3);
 
   Color get _severityColor {
@@ -42,7 +38,92 @@ class _ConfirmationState extends State<Confirmation> {
         return Colors.grey;
     }
   }
-  
+
+  Map<String, dynamic> _reportMap({required String status}) {
+    return {
+      'category': widget.category,
+      'location': widget.location,
+      'description': widget.description,
+      'severity': widget.severity,
+      'othercat': widget.othercat,
+      'status': status,
+      'time': DateTime.now().toIso8601String(),
+      'source': 'voice',
+    };
+  }
+
+  Future<void> _showSubmittedThenGoHome() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: _primaryBlue.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: _primaryBlue,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Report submitted!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Thanks — your report is on its way.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    Navigator.pop(context);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (route) => false,
+    );
+  }
+
+  void _saveToPending() {
+    pendingReports.add(_reportMap(status: 'Pending'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Saved to pending reports'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +137,13 @@ class _ConfirmationState extends State<Confirmation> {
           'Confirm Report',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        leading: IconButton(onPressed: () => Navigator.pop(context, true), icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white,)),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -66,11 +153,9 @@ class _ConfirmationState extends State<Confirmation> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Column(
                 children: [
-                  _buildPicture(),
-                  const SizedBox(height: 12),
                   _buildSummaryCard(),
                   const SizedBox(height: 12),
-                  _buildWhatHappensNext()
+                  _buildWhatHappensNext(),
                 ],
               ),
             ),
@@ -81,22 +166,6 @@ class _ConfirmationState extends State<Confirmation> {
     );
   }
 
-  Widget _buildPicture(){
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Stack(
-        children: [
-          Image.file(
-            File(widget.image.path),
-            height: 280,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            cacheWidth: 900,
-          ),
-        ],
-      ),
-    );
-  }
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -104,7 +173,15 @@ class _ConfirmationState extends State<Confirmation> {
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
-          CircleAvatar(backgroundColor: Colors.white.withOpacity(0.2),radius: 26,child: Icon(Icons.check_circle_outline,size: 36,color: Colors.white,),),
+          CircleAvatar(
+            backgroundColor: Colors.white.withOpacity(0.2),
+            radius: 26,
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 8),
           const Text(
             'Review your report',
@@ -198,7 +275,6 @@ class _ConfirmationState extends State<Confirmation> {
     required Color iconColor,
     required String label,
     required String value,
-    Widget? trailing,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -238,7 +314,6 @@ class _ConfirmationState extends State<Confirmation> {
       ),
     );
   }
-
 
   Widget _buildWhatHappensNext() {
     return Container(
@@ -323,10 +398,9 @@ class _ConfirmationState extends State<Confirmation> {
     );
   }
 
-
   Widget _buildActionButtons() {
     return Container(
-      width: double.infinity ,
+      width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -344,66 +418,9 @@ class _ConfirmationState extends State<Confirmation> {
             height: 52,
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => Dialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check_circle_rounded,
-                              color: _primaryBlue,
-                              size: 44,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Report submitted!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Thanks — your report is on its way.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-                await Future.delayed(const Duration(seconds: 2));
-                if (!context.mounted) return;
-                Navigator.pop(context);
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const MainShell()),
-                  (route) => false,
-                );
-              },
-              icon:  Icon(Icons.send_rounded, size: 20),
-              label:  Text(
+              onPressed: _showSubmittedThenGoHome,
+              icon: const Icon(Icons.send_rounded, size: 20),
+              label: const Text(
                 'Confirm and Submit',
                 style: TextStyle(
                   fontSize: 16,
@@ -425,10 +442,14 @@ class _ConfirmationState extends State<Confirmation> {
             height: 48,
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context, true),
-              icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[800]),
+              onPressed: _saveToPending,
+              icon: Icon(
+                Icons.bookmark_add_outlined,
+                size: 20,
+                color: Colors.grey[800],
+              ),
               label: Text(
-                'Go Back to Camera report to edit',
+                'Save to pending',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

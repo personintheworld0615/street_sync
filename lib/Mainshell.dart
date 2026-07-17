@@ -17,8 +17,8 @@ class _MainShellState extends State<MainShell> {
         final _screens = [
             const HomeScreen(),
             const MapScreen(),
-            const Profile(),
             const Leaderboard(),
+            const Profile(),
         ];
     @override
     Widget build(BuildContext context) {
@@ -36,8 +36,8 @@ class _MainShellState extends State<MainShell> {
                 items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
                     BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
                     BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: 'Leaderboard'),
+                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
                 ],
             ),
         );
