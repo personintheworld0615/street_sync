@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -62,51 +64,54 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Camera report',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: _ink,
-                      letterSpacing: -0.6,
-                      height: 1.15,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Camera report',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: _ink,
+                        letterSpacing: -0.6,
+                        height: 1.15,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Capture and report issues as you walk',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _muted,
-                      height: 1.35,
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Capture and report issues as you walk',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: _muted,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildPhotoCard(),
-                  const SizedBox(height: 14),
-                  _buildCategoryCard(),
-                  const SizedBox(height: 14),
-                  _buildDescriptionCard(),
-                  const SizedBox(height: 14),
-                  _buildLocationCard(),
+                    const SizedBox(height: 16),
+                    _buildPhotoCard(),
                     const SizedBox(height: 14),
-                    if(_selectedSeverity != null)_buildSeverityCard(),
-                    if(_selectedSeverity == null)_buildSeverityCardNew(),
-
-                ],
+                    _buildCategoryCard(),
+                    const SizedBox(height: 14),
+                    _buildDescriptionCard(),
+                    const SizedBox(height: 14),
+                    _buildLocationCard(),
+                    const SizedBox(height: 14),
+                    if (_selectedSeverity != null) _buildSeverityCard(),
+                    if (_selectedSeverity == null) _buildSeverityCardNew(),
+                  ],
+                ),
               ),
             ),
-          ),
-          _buildSubmitBar(),
-        ],
+            _buildSubmitBar(),
+          ],
+        ),
       ),
     );
   }
@@ -288,26 +293,43 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           SizedBox(height: 10,),
           SizedBox(
             height: 220,
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(target: position, zoom: 15),
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              zoomControlsEnabled: true,
-              markers: _markers,
-              onMapCreated: (c) async {
-                _controller = c;
-                if (_ready) {
-                  await c.animateCamera(CameraUpdate.newLatLngZoom(position, 15));
-                }
-              },
-              onTap: (latLng) {
-                setState(() {
-                  position = latLng;
-                  _markers = {
-                    Marker(markerId: const MarkerId('report'), position: latLng),
-                  };
-                });
-              },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: GoogleMap(
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<OneSequenceGestureRecognizer>(
+                    () => EagerGestureRecognizer(),
+                  ),
+                },
+                initialCameraPosition:
+                    CameraPosition(target: position, zoom: 15),
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                zoomControlsEnabled: true,
+                zoomGesturesEnabled: true,
+                scrollGesturesEnabled: true,
+                markers: _markers,
+                onMapCreated: (c) async {
+                  _controller = c;
+                  if (_ready) {
+                    await c.animateCamera(
+                      CameraUpdate.newLatLngZoom(position, 15),
+                    );
+                  }
+                },
+                onTap: (latLng) {
+                  FocusScope.of(context).unfocus();
+                  setState(() {
+                    position = latLng;
+                    _markers = {
+                      Marker(
+                        markerId: const MarkerId('report'),
+                        position: latLng,
+                      ),
+                    };
+                  });
+                },
+              ),
             ),
           ),
         ],
@@ -506,10 +528,12 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 maxLines: null,
                 expands: true,
                 textAlignVertical: TextAlignVertical.top,
+                textInputAction: TextInputAction.done,
                 controller: _descriptionController,
-                onChanged: (value){
+                onChanged: (value) {
                   _descirption = value;
                 },
+                onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
                   hintText: 'What should the city worker know on arrival...',
                   border: InputBorder.none,

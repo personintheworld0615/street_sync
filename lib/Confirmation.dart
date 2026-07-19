@@ -381,7 +381,7 @@ class _ConfirmationState extends State<Confirmation> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Thanks — your report is on its way.',
+                            'Thanks your report is on its way.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,

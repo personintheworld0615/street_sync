@@ -89,7 +89,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Thanks — your report is on its way.',
+                'Thanks your report is on its way.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
