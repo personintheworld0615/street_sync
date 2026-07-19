@@ -97,10 +97,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   _buildDescriptionCard(),
                   const SizedBox(height: 14),
                   _buildLocationCard(),
-                  if (_showSeverity) ...[
                     const SizedBox(height: 14),
-                    _buildSeverityCard(),
-                  ],
+                    if(_selectedSeverity != null)_buildSeverityCard(),
+                    if(_selectedSeverity == null)_buildSeverityCardNew(),
+
                 ],
               ),
             ),
@@ -549,7 +549,55 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       });
     }
   }
-  Widget _buildSeverityCard() {
+    Widget _buildSeverityCard() {
+      return Card(
+        color: Colors.white,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Severity',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSeverityChip(
+                      label: 'Low',
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSeverityChip(
+                      label: 'Medium',
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildSeverityChip(
+                      label: 'High',
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  Widget _buildSeverityCardNew() {
     return Card(
       color: Colors.white,
       elevation: 2,
@@ -571,25 +619,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildSeverityChip(
-                    label: 'Low',
-                    color: Colors.green,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _blue,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () async{
+                      String severity = await _autoSeverityCalc(_selectedCategory!);
+                      setState(() => _selectedSeverity = severity);
+                    },
+                    child: Text('Calculate Severity',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold,color: Colors.white),),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildSeverityChip(
-                    label: 'Medium',
-                    color: Colors.orange,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildSeverityChip(
-                    label: 'High',
-                    color: Colors.red,
-                  ),
-                ),
+                  )
               ],
             ),
           ],
@@ -684,32 +725,21 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
 
           try {
             final address = await _addressFromLatLng(position);
-            String severity = "";
-            if(!_showSeverity) {
-               severity = await _autoSeverityCalc(_selectedCategory!);
-               _selectedSeverity = severity;
-            }
-            else{
-              severity = _selectedSeverity!;
-            }
             if (!mounted) return;
             Navigator.pop(context);
 
-            final edited = await Navigator.push<bool>(
+            final edited = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => Confirmation(
                   category: _selectedCategory!,
                   description: _descriptionController.text.trim(),
                   image: _image!,
-                  severity: severity,
+                  severity: _selectedSeverity!,
                   location: address,
                 ),
               ),
             );
-            if (edited == true && mounted) {
-              setState(() => _showSeverity = true);
-            }
           } catch (_) {
             if (mounted) Navigator.pop(context); // close loading on error
             if (mounted) {
@@ -755,12 +785,12 @@ Future<String> _autoSeverityCalc(String category) async {
       return 'high';
     case 'Road Damage':
     case 'Public Works':
-      return 'medium';
+      return 'Medium';
     case 'Environmental':
-      return 'low';
+      return 'Low';
     case 'Other':
     default:
-      return 'medium';
+      return 'Medium';
   }
 }
 Future<String> _addressFromLatLng(LatLng pos) async {
