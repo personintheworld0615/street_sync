@@ -26,12 +26,11 @@ class MyReportsScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final report = reports[index];
                 return _reportCard(
-                  icon: report['icon'] as IconData,
-                  status: report['status'] as String,
-                  name: report['name'] as String,
-                  location: report['location'] as String,
-                  time: report['time'] as String,
-                  bgColor: report['bgColor'] as Color,
+                  icon: report['icon'] as IconData? ?? Icons.assignment_outlined,
+                  status: report['status'] as String? ?? 'Open',
+                  name: report['name'] as String? ?? 'Report',
+                  location: report['location'] as String? ?? '',
+                  time: report['time'] as String? ?? '',
                 );
               },
             ),
@@ -57,8 +56,10 @@ class MyReportsScreen extends StatelessWidget {
     required String location,
     required String name,
     required String time,
-    required Color bgColor,
   }) {
+    const iconBg = Color(0xFFE8F4FD);
+    const blue = Color(0xFF2196F3);
+    const ink = Color(0xFF152033);
     final statusColor = _statusColor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -70,8 +71,8 @@ class MyReportsScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: bgColor.withOpacity(0.55),
-            child: Icon(icon, size: 22, color: Colors.grey[800]),
+            backgroundColor: iconBg,
+            child: Icon(icon, size: 22, color: blue),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -83,7 +84,7 @@ class MyReportsScreen extends StatelessWidget {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: Color(0xFF1A237E),
+                    color: ink,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -110,7 +111,7 @@ class MyReportsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -133,7 +134,7 @@ class MyReportsScreen extends StatelessWidget {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'Pending':
+      case 'Draft':
         return const Color(0xFFB86B2A);
       case 'Open':
         return Colors.blue[700]!;

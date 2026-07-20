@@ -25,17 +25,17 @@ def get_most_recent_reports(amount: int = Query(default=10, ge=1, le=100)):
 
 @router.get("/reports/user/{user_id}", response_model=List[ReportsFull])
 def get_all_user_reports(user_id: int):
-    return reports_service.def_getalluserReports(user_id)
+    return reports_service.get_all_user_reports(user_id)
 
 
-@router.get("/reports/user/{user_id}/pending", response_model=List[ReportsFull])
-def get_user_pending_reports(user_id: int):
-    return reports_service.get_all_reportsbyUser_pending(user_id)
+@router.get("/reports/user/{user_id}/drafts", response_model=List[ReportsFull])
+def get_user_draft_reports(user_id: int):
+    return reports_service.get_all_reports_by_user_draft(user_id)
 
 
 @router.get("/reports/user/{user_id}/submitted", response_model=List[ReportsFull])
 def get_user_submitted_reports(user_id: int):
-    return reports_service.get_all_reportsbyUser_notPending(user_id)
+    return reports_service.get_all_reports_by_user_submitted(user_id)
 
 
 @router.get("/reports/{report_id}", response_model=ReportsFull)

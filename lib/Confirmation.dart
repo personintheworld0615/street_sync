@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/HomeScreen.dart';
 import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/draft_reports.dart';
 
 class Confirmation extends StatefulWidget {
    Confirmation({
@@ -42,7 +43,33 @@ class _ConfirmationState extends State<Confirmation> {
         return Colors.grey;
     }
   }
-  
+
+  void _saveAsDraft() {
+    draftReports.add({
+      'category': widget.category,
+      'location': widget.location,
+      'description': widget.description,
+      'severity': widget.severity,
+      'othercat': widget.othercat,
+      'imagePath': widget.image.path,
+      'status': 'Draft',
+      'time': DateTime.now().toIso8601String(),
+      'source': 'camera',
+      'icon': Icons.camera_alt_outlined,
+      'name': widget.category,
+      'bgColor': Colors.orange[100]!,
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Saved as draft'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -414,6 +441,33 @@ class _ConfirmationState extends State<Confirmation> {
                 backgroundColor: _primaryBlue,
                 foregroundColor: Colors.white,
                 elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _saveAsDraft,
+              icon: Icon(
+                Icons.bookmark_add_outlined,
+                size: 20,
+                color: Colors.grey[800],
+              ),
+              label: Text(
+                'Save as draft',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.grey[400]!),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

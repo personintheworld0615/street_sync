@@ -3,6 +3,8 @@ from typing import Optional
 from pydantic import BaseModel
 from typing import Literal
 from typing import List
+
+
 class Reports(BaseModel):
     description: str
     category: str
@@ -13,7 +15,8 @@ class Reports(BaseModel):
     time: datetime
     severity: Literal["low", "medium", "high"]
     user_id: int
-    isPending: bool = False
+    isDraft: bool = False
+
 
 class ReportsFull(BaseModel):
     id: int
@@ -25,13 +28,16 @@ class ReportsFull(BaseModel):
     image: Optional[str] = None
     time: datetime
     severity: Literal["low", "medium", "high"]
-    status: Literal["pending", "approved", "rejected"]
+    status: Literal["draft", "submitted", "approved", "rejected"]
     user_id: int
-    isPending: bool = False
+    isDraft: bool = False
+
 
 class Users(BaseModel):
     name: str
     total_reports: int
+
+
 class UsersDetailed(BaseModel):
     id: int
     name: str

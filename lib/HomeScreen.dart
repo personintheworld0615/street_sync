@@ -10,6 +10,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final List<String> cat = ['Road damage','Public works','Environment','ADA','Other'];
+  String? _selectedCat;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,6 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                _buildDropdown(),
+                const SizedBox(height: 12),
                 _buildReportCard(
                   icon: Icons.construction,
                   severityColor: Colors.red,
@@ -58,6 +62,44 @@ class _HomeScreenState extends State<HomeScreen> {
       )
     );
   }
+Widget _buildDropdown() {
+  const blue = Color(0xFF2196F3);
+  final options = ['All', ...cat];
+
+  return SizedBox(
+    height: 40,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: options.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (context, i) {
+        final label = options[i];
+        final selected = (_selectedCat ?? 'All') == label;
+
+        return ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) {
+            setState(() => _selectedCat = label == 'All' ? null : label);
+          },
+          selectedColor: blue.withValues(alpha: 0.15),
+          labelStyle: TextStyle(
+            color: selected ? blue : const Color(0xFF5B677A),
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 13,
+          ),
+          side: BorderSide(color: selected ? blue : Colors.grey.shade300),
+          backgroundColor: Colors.white,
+          showCheckmark: false,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        );
+      },
+    ),
+  );
+}
+
   Widget _buildReportCard({
     required IconData icon,
     required Color severityColor,

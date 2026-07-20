@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
-import 'package:street_sync/pending_reports.dart';
+import 'package:street_sync/draft_reports.dart';
 
 class ConfirmationVoiceReport extends StatefulWidget {
   const ConfirmationVoiceReport({
@@ -49,6 +49,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       'status': status,
       'time': DateTime.now().toIso8601String(),
       'source': 'voice',
+      'icon': Icons.mic_outlined,
+      'name': widget.category,
+      'bgColor': Colors.orange[100]!,
     };
   }
 
@@ -111,11 +114,11 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     );
   }
 
-  void _saveToPending() {
-    pendingReports.add(_reportMap(status: 'Pending'));
+  void _saveAsDraft() {
+    draftReports.add(_reportMap(status: 'Draft'));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Saved to pending reports'),
+        content: Text('Saved as draft'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -442,14 +445,14 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             height: 48,
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _saveToPending,
+              onPressed: _saveAsDraft,
               icon: Icon(
                 Icons.bookmark_add_outlined,
                 size: 20,
                 color: Colors.grey[800],
               ),
               label: Text(
-                'Save to pending',
+                'Save as draft',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

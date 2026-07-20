@@ -6,19 +6,54 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'Confirmation.dart';
-import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:street_sync/draft_reports.dart';
-class CommunityReportScreen extends StatefulWidget {
-  
-  CommunityReportScreen({super.key});
+class Updatething extends StatefulWidget {
+  Updatething({
+    super.key,
+    this.category,
+    this.description,
+    this.severity,
+    this.otherCategory,
+    this.imagePath,
+    this.latitude,
+    this.longitude,
+  });
+
+  final String? category;
+  final String? description;
+  final String? severity;
+  final String? otherCategory;
+  final String? imagePath;
+  final double? latitude;
+  final double? longitude;
+
+  factory Updatething.fromDraft(Map<String, dynamic> draft) {
+    return Updatething(
+      category: draft['category'] as String?,
+      description: draft['description'] as String?,
+      severity: draft['severity'] as String?,
+      otherCategory: draft['othercat'] as String?,
+      imagePath: draft['imagePath'] as String?,
+      latitude: (draft['latitude'] as num?)?.toDouble(),
+      longitude: (draft['longitude'] as num?)?.toDouble(),
+    );
+  }
+
+  bool get hasDraftData =>
+      category != null ||
+      description != null ||
+      severity != null ||
+      otherCategory != null ||
+      imagePath != null ||
+      latitude != null ||
+      longitude != null;
 
   @override
-  State<CommunityReportScreen> createState() => _CommunityReportScreenState();
+  State<Updatething> createState() => _UpdateThingState();
 }
 
-class _CommunityReportScreenState extends State<CommunityReportScreen> {
+class _UpdateThingState extends State<Updatething> {
   LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
   Set<Marker> _markers = {};
   static const _blue = Color(0xFF2196F3);
@@ -58,9 +93,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
         ),
-        title: const Text(
-          'Report',
-          style: TextStyle(
+        title: Text(
+          widget.hasDraftData ? 'Continue draft' : 'Report',
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
@@ -118,9 +153,78 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     );
   }
   @override
-  void initState(){
+  void initState() {
     super.initState();
-    _gotouser();
+    _applyDraftFields();
+    _initLocation();
+  }
+
+  static const _knownCategories = {
+    'Road Damage',
+    'Public Works',
+    'Environmental',
+    'Accessibility',
+    'Other',
+  };
+
+  void _applyDraftFields() {
+    final cat = widget.category;
+    if (cat != null && _knownCategories.contains(cat)) {
+      _selectedCategory = cat;
+    } else if (cat != null && cat != 'Voice') {
+      _selectedCategory = 'Other';
+      _otherCategoryController.text = cat;
+    }
+
+    final other = widget.otherCategory;
+    if (other != null && other.isNotEmpty) {
+      _selectedCategory = 'Other';
+      _otherCategoryController.text = other;
+    }
+
+    final description = widget.description;
+    if (description != null && description.isNotEmpty) {
+      _descriptionController.text = description;
+      _descirption = description;
+    }
+
+    final severity = widget.severity;
+    if (severity != null && severity.isNotEmpty) {
+      _selectedSeverity = _normalizeSeverity(severity);
+    }
+
+    final imagePath = widget.imagePath;
+    if (imagePath != null && File(imagePath).existsSync()) {
+      _image = XFile(imagePath);
+    }
+  }
+
+  String _normalizeSeverity(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'low':
+        return 'Low';
+      case 'medium':
+        return 'Medium';
+      case 'high':
+        return 'High';
+      default:
+        return severity;
+    }
+  }
+
+  Future<void> _initLocation() async {
+    final lat = widget.latitude;
+    final lng = widget.longitude;
+    if (lat != null && lng != null) {
+      position = LatLng(lat, lng);
+      _markers = {
+        Marker(markerId: const MarkerId('report'), position: position),
+      };
+      setState(() => _ready = true);
+      await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position, 15));
+      return;
+    }
+    await _gotouser();
   }
 
   Widget _buildPhotoCard() {
@@ -698,65 +802,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       ),
     );
   }
-  IconData _iconFromCat(String category) {
-    switch (category) {
-      case 'Road Damage':
-        return Icons.construction_rounded;
-      case 'Public Works':
-        return Icons.handyman_outlined;
-      case 'Environmental':
-        return Icons.eco_outlined;
-      case 'Accessibility':
-        return Icons.accessible_forward_rounded;
-      case 'Other':
-      default:
-        return Icons.more_horiz_rounded;
-    }
-  }
-
-  Future<void> _saveAsDraft() async {
-    String location = 'Location not set';
-    try {
-      location = await _addressFromLatLng(position);
-    } catch (_) {}
-
-    final category = _selectedCategory == 'Other'
-        ? (_otherCategoryController.text.trim().isEmpty
-            ? 'Other'
-            : _otherCategoryController.text.trim())
-        : _selectedCategory;
-
-    draftReports.add({
-      'category': category,
-      'location': location,
-      'description': _descriptionController.text.trim(),
-      'severity': _selectedSeverity,
-      'othercat': _selectedCategory == 'Other'
-          ? _otherCategoryController.text.trim()
-          : '',
-      'imagePath': _image?.path,
-      'latitude': position.latitude,
-      'longitude': position.longitude,
-      'status': 'Draft',
-      'time': DateTime.now().toIso8601String(),
-      'source': 'camera',
-      'icon': _iconFromCat(_selectedCategory ?? 'Other'),
-      'name': category ?? 'Draft report',
-      'bgColor': Colors.orange[100]!,
-    });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved as draft'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainShell()),
-      (route) => false,
-    );
-  }
 
   Widget _buildSubmitBar() {
     return Container(
@@ -772,125 +817,94 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _Pressable(
-            onTap: () async {
-              final errors = <String>[];
-              if (_image == null) errors.add('photo');
-              if (_selectedCategory == null) errors.add('category');
-              if (_descriptionController.text.trim().isEmpty) {
-                errors.add('description');
-              }
-              if (_markers.isEmpty) errors.add('location');
+      child: _Pressable(
 
-              if (errors.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Please add: ${errors.join(', ')}'),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-                return;
-              }
+        onTap: () async {
+          final errors = <String>[];
+          if (_image == null) errors.add('photo');
+          if (_selectedCategory == null) errors.add('category');
+          if (_descriptionController.text.trim().isEmpty) {
+            errors.add('description');
+          }
+          if (_markers.isEmpty) errors.add('location');
 
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                barrierLabel: "Processing your report",
-                builder: (_) => const Center(
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(color: _blue),
-                    ),
-                  ),
+          if (errors.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Please add: ${errors.join(', ')}'),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            barrierLabel: "Processing your report",
+            builder: (_) => const Center(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(color: _blue),
+                ),
+              ),
+            ),
+          );
+
+          try {
+            final address = await _addressFromLatLng(position);
+            if (!mounted) return;
+            Navigator.pop(context);
+
+            final edited = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Confirmation(
+                  category: _selectedCategory!,
+                  description: _descriptionController.text.trim(),
+                  image: _image!,
+                  severity: _selectedSeverity!,
+                  location: address,
+                ),
+              ),
+            );
+          } catch (_) {
+            if (mounted) Navigator.pop(context); // close loading on error
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not get address. Try again.'),
+                  behavior: SnackBarBehavior.floating,
                 ),
               );
-
-              try {
-                final address = await _addressFromLatLng(position);
-                if (!mounted) return;
-                Navigator.pop(context);
-
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => Confirmation(
-                      category: _selectedCategory!,
-                      description: _descriptionController.text.trim(),
-                      image: _image!,
-                      severity: _selectedSeverity!,
-                      location: address,
-                    ),
-                  ),
-                );
-              } catch (_) {
-                if (mounted) Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not get address. Try again.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Container(
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _blue,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: _blue.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+            }
+          }
+        },
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _blue,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: _blue.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: const Text(
-                'Submit Report',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+            ],
+          ),
+          child: const Text(
+            'Submit Report',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 48,
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _saveAsDraft,
-              icon: Icon(
-                Icons.bookmark_add_outlined,
-                size: 20,
-                color: Colors.grey[800],
-              ),
-              label: Text(
-                'Save as draft',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey[400]!),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

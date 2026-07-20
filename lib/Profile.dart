@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
+import 'package:street_sync/draft_reports.dart';
 
-import 'MyPendingReportsScreen.dart';
+import 'MyDraftReportsScreen.dart';
+import 'UpdateThing.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -15,15 +17,20 @@ class _ProfileState extends State<Profile> {
   bool pushNotifications = true;
   bool locationSharing = true;
 
-  // Empty list shows the blank slate. Add maps here to show report cards.
+  static const _pageBg = Color(0xFFF4F7FB);
+  static const _ink = Color(0xFF152033);
+  static const _muted = Color(0xFF5B677A);
+  static const _blue = Color(0xFF2196F3);
+  static const _iconBg = Color(0xFFE8F4FD);
+
+  // Submitted reports only (not drafts).
   final List<Map<String, dynamic>> _myReports = [
     {
       'icon': Icons.construction,
-      'status': 'Pending',
+      'status': 'Open',
       'name': 'Large pothole',
       'location': 'Nassau St & Mercer St',
       'time': '12 min ago',
-      'bgColor': Colors.pink[200]!,
     },
     {
       'icon': Icons.traffic,
@@ -31,7 +38,6 @@ class _ProfileState extends State<Profile> {
       'name': 'Broken streetlight',
       'location': 'Witherspoon St',
       'time': '2 hrs ago',
-      'bgColor': Colors.amber[200]!,
     },
     {
       'icon': Icons.delete_outline,
@@ -39,7 +45,6 @@ class _ProfileState extends State<Profile> {
       'name': 'Overflowing trash',
       'location': 'Palmer Square',
       'time': '1 day ago',
-      'bgColor': Colors.green[200]!,
     },
     {
       'icon': Icons.water_drop_outlined,
@@ -47,94 +52,79 @@ class _ProfileState extends State<Profile> {
       'name': 'Sidewalk flooding',
       'location': 'University Place',
       'time': '3 days ago',
-      'bgColor': Colors.lightBlue[100]!,
     },
     {
       'icon': Icons.park_outlined,
-      'status': 'Pending',
+      'status': 'Open',
       'name': 'Fallen tree branch',
       'location': 'Marquand Park',
       'time': '5 days ago',
-      'bgColor': Colors.orange[100]!,
     },
   ];
+
+  TextStyle get _sectionTitle => const TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: _ink,
+      );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
+      backgroundColor: _pageBg,
       body: SingleChildScrollView(
         child: Column(
           children: [
             header(),
             Padding(
-              padding: const EdgeInsets.fromLTRB(15, 20, 15, 10),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
               child: Column(
                 children: [
-                  // impactScoreCard(),
-                  // const SizedBox(height: 25),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Badges', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('3 of 6 earned', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                    ],
-                  ),
-                  badgesGrid(),
-                  const SizedBox(height: 20),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('My Reports', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      if (_myReports.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
+                  _sectionHeader(
+                    title: 'My Drafts',
+                    seeAll: draftReports.isNotEmpty
+                        ? () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => MyReportsScreen(reports: _myReports),
+                                builder: (context) => MyDraftReportsScreen(
+                                  reports: draftReports,
+                                ),
                               ),
                             );
-                          },
-                          child: Row(
-                            children: [
-                              Text('See all', style: TextStyle(color: Colors.blue[600], fontSize: 13)),
-
-                            ],
-                          ),
-                        ),
-                    ],
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  myDraftReportsList(),
+                  const SizedBox(height: 20),
+                  _sectionHeader(
+                    title: 'My Reports',
+                    seeAll: _myReports.isNotEmpty
+                        ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    MyReportsScreen(reports: _myReports),
+                              ),
+                            );
+                          }
+                        : null,
                   ),
                   const SizedBox(height: 10),
                   myReportsList(),
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('My Pending Reports', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      if (_myReports.isNotEmpty)
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MyPendingReportsScreen(reports: _myReports),
-                              ),
-                            );
-                          },
-                          child: Row(
-                            children: [
-                              Text('See all', style: TextStyle(color: Colors.blue[600], fontSize: 13)),
-                            ]
-                          ),
-                        ),
-                    ],
+                  const SizedBox(height: 20),
+                  prefrencesCard(),
+                  const SizedBox(height: 20),
+                  _sectionHeader(
+                    title: 'Badges',
+                    trailing: Text(
+                      '3 of 6 earned',
+                      style: TextStyle(color: _muted, fontSize: 13),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  myPendingReportsList(),
-                  prefrencesCard()
+                  badgesGrid(),
                 ],
               ),
             ),
@@ -143,11 +133,39 @@ class _ProfileState extends State<Profile> {
       ),
     );
   }
+
+  Widget _sectionHeader({
+    required String title,
+    VoidCallback? seeAll,
+    Widget? trailing,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: _sectionTitle),
+        if (seeAll != null)
+          GestureDetector(
+            onTap: seeAll,
+            child: Text(
+              'See all',
+              style: TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          )
+        else if (trailing != null)
+          trailing,
+      ],
+    );
+  }
   Widget prefrencesCard() {
     return Card(
-      margin: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.white,
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(
@@ -159,27 +177,27 @@ class _ProfileState extends State<Profile> {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.8,
-                color: Colors.grey[500],
+                color: _muted,
               ),
             ),
             const SizedBox(height: 8),
             _prefRow(
               icon: Icons.notifications_none,
-              iconBg: Colors.blue[50]!,
-              iconColor: Colors.blue[600]!,
+              iconBg: _iconBg,
+              iconColor: _blue,
               title: 'Push Notifications',
               subtitle: 'Report updates & nearby alerts',
               trailing: Switch(
                 value: pushNotifications,
-                activeColor: Colors.blue,
+                activeThumbColor: _blue,
                 onChanged: (value) => setState(() => pushNotifications = value),
               ),
             ),
             Divider(color: Colors.grey[200], height: 1),
             _prefRow(
               icon: Icons.shield_outlined,
-              iconBg: Colors.blue[50]!,
-              iconColor: const Color(0xFF1565C0),
+              iconBg: _iconBg,
+              iconColor: _blue,
               title: 'Privacy Policy',
               trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
               onTap: () {},
@@ -230,7 +248,7 @@ class _ProfileState extends State<Profile> {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: titleColor ?? const Color(0xFF1A237E),
+                      color: titleColor ?? _ink,
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -249,41 +267,74 @@ class _ProfileState extends State<Profile> {
       ),
     );
   }
-  Widget myPendingReportsList() {
-    if (_myReports.isEmpty) {
-      return _emptyReportsState("You dont have any pending reports yet");
-    }
-
-    final count = _myReports.length.clamp(0, 3);//replace with pending reports
-    return Container(
-      decoration: BoxDecoration(
+  BoxDecoration get _listDecoration => BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+        border: Border.all(color: Colors.grey.shade200),
+      );
+
+  Widget myDraftReportsList() {
+    if (draftReports.isEmpty) {
+      return _emptyReportsState(
+        'Save a report as a draft to finish it later',
+      );
+    }
+
+    final count = draftReports.length.clamp(0, 3);
+    return Container(
+      decoration: _listDecoration,
       child: Column(
         children: [
           for (int i = 0; i < count; i++) ...[
             if (i > 0) Divider(color: Colors.grey[200], height: 1),
-            _buildReportCard(
-              icon: _myReports[i]['icon'] as IconData,
-              status: _myReports[i]['status'] as String,
-              name: _myReports[i]['name'] as String,
-              location: _myReports[i]['location'] as String,
-              time: _myReports[i]['time'] as String,
-              bgColor: _myReports[i]['bgColor'] as Color,
-            ),
+            _buildDraftCard(draftReports[i]),
           ],
         ],
       ),
     );
   }
+
+  Widget _buildDraftCard(Map<String, dynamic> report) {
+    final name = report['name'] as String? ??
+        report['category'] as String? ??
+        'Draft report';
+    final location = report['location'] as String? ?? '';
+    final status = report['status'] as String? ?? 'Draft';
+    final icon = report['icon'] as IconData? ?? Icons.edit_note_outlined;
+    final time = _formatDraftTime(report['time']);
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => Updatething.fromDraft(report)),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: _buildReportCard(
+        icon: icon,
+        status: status,
+        name: name,
+        location: location,
+        time: time,
+      ),
+    );
+  }
+
+  String _formatDraftTime(dynamic time) {
+    if (time is String) {
+      final parsed = DateTime.tryParse(time);
+      if (parsed != null) {
+        final diff = DateTime.now().difference(parsed);
+        if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+        if (diff.inHours < 24) return '${diff.inHours} hrs ago';
+        return '${diff.inDays} days ago';
+      }
+      return time;
+    }
+    return '';
+  }
+
   Widget myReportsList() {
     if (_myReports.isEmpty) {
       return _emptyReportsState("Create a new report");
@@ -291,17 +342,7 @@ class _ProfileState extends State<Profile> {
 
     final count = _myReports.length.clamp(0, 3);
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: _listDecoration,
       child: Column(
         children: [
           for (int i = 0; i < count; i++) ...[
@@ -312,7 +353,6 @@ class _ProfileState extends State<Profile> {
               name: _myReports[i]['name'] as String,
               location: _myReports[i]['location'] as String,
               time: _myReports[i]['time'] as String,
-              bgColor: _myReports[i]['bgColor'] as Color,
             ),
           ],
         ],
@@ -324,38 +364,28 @@ class _ProfileState extends State<Profile> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: _listDecoration,
       child: Column(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.blue[50],
-            child: Icon(Icons.assignment_outlined, size: 28, color: Colors.blue[400]),
+            backgroundColor: _iconBg,
+            child: Icon(Icons.assignment_outlined, size: 28, color: _blue),
           ),
           const SizedBox(height: 14),
-          Text(
-            'No reports yet',
+          const Text(
+            'No drafts yet',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: _ink,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 13, color: _muted),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
@@ -366,7 +396,7 @@ class _ProfileState extends State<Profile> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue[600],
+              backgroundColor: _blue,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -387,7 +417,6 @@ class _ProfileState extends State<Profile> {
     required String location,
     required String name,
     required String time,
-    Color bgColor = Colors.red,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -395,8 +424,8 @@ class _ProfileState extends State<Profile> {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: bgColor.withOpacity(0.55),
-            child: Icon(icon, size: 22, color: Colors.grey[800]),
+            backgroundColor: _iconBg,
+            child: Icon(icon, size: 22, color: _blue),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -406,20 +435,21 @@ class _ProfileState extends State<Profile> {
                 Text(
                   name,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: Color(0xFF1A237E),
+                    color: _ink,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, size: 13, color: Colors.grey[500]),
+                    Icon(Icons.location_on_outlined,
+                        size: 13, color: Colors.grey[500]),
                     const SizedBox(width: 2),
                     Expanded(
                       child: Text(
                         location,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: const TextStyle(fontSize: 12, color: _muted),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -450,7 +480,7 @@ class _ProfileState extends State<Profile> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -466,7 +496,7 @@ class _ProfileState extends State<Profile> {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'Pending':
+      case 'Draft':
         return const Color(0xFFB86B2A);
       case 'Open':
         return Colors.blue[700]!;
@@ -481,73 +511,84 @@ class _ProfileState extends State<Profile> {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1E88E5), Color(0xFF1565C0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: _blue,
       ),
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text(
+                'Profile',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
               CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: IconButton(onPressed: () {}, icon: const Icon(Icons.settings, color: Colors.white)),
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: IconButton(
+                  onPressed: () {},
+                  icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 25),
+          const SizedBox(height: 20),
           Row(
             children: [
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 90, height: 90,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://i.pravatar.cc/150?u=alex'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    width: 2,
                   ),
-                  const CircleAvatar(radius: 12, backgroundColor: Colors.white, child: CircleAvatar(radius: 9, backgroundColor: Colors.green)),
-                ],
+                  image: const DecorationImage(
+                    image: NetworkImage('https://i.pravatar.cc/150?u=alex'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Krish Sinha', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white)),
-                    Text('krishworld432@gmail.com', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 15)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _infoChip(Icons.location_on, 'West Windsor, NJ'),
-                        const SizedBox(width: 8),
-                        _infoChip(null, 'Aura King', color: const Color(0xFF26C6DA)),
-                      ],
+                    const Text(
+                      'Krish Sinha',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
                     ),
+                    Text(
+                      'krishworld432@gmail.com',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _infoChip(Icons.location_on, 'West Windsor, NJ'),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 20),
           Row(
             children: [
               _statBox('23', 'Reports'),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _statBox('141', 'Upvotes'),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _statBox('18', 'Resolved'),
             ],
           ),
@@ -559,12 +600,23 @@ class _ProfileState extends State<Profile> {
   Widget _infoChip(IconData? icon, String label, {Color? color}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: color ?? Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: color ?? Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) Icon(icon, size: 12, color: Colors.white),
           if (icon != null) const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -573,63 +625,27 @@ class _ProfileState extends State<Profile> {
   Widget _statBox(String val, String label) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Column(
           children: [
-            Text(val, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-            Text(label, style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget impactScoreCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Civic Impact Score', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('Top 12% in district', style: TextStyle(fontSize: 11, color: Colors.grey[500], fontFamily: 'monospace')),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Progress to City Champion', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      Text('740 / 1000', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: const LinearProgressIndicator(value: 0.74, minHeight: 10, backgroundColor: Color(0xFFEEEEEE), valueColor: AlwaysStoppedAnimation(Colors.blue)),
-                  ),
-                ],
+            Text(
+              val,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(width: 20),
-            Container(
-              width: 65, height: 65,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Colors.blue, Color(0xFF1565C0)]),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.75),
               ),
-              alignment: Alignment.center,
-              child: const Text('740', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
           ],
         ),
@@ -638,114 +654,72 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget badgesGrid() {
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _badgeCard(
-                'Top Reporter',
-                '10+ accepted reports',
-                Icons.emoji_events,
-                Colors.amber,
-                true,
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: _badgeCard(
+              'Top Reporter',
+              '10+ accepted',
+              Icons.emoji_events,
+              Colors.amber,
+              true,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _badgeCard(
-                'Community Walker',
-                '5 walk sessions',
-                Icons.directions_walk,
-                Colors.orange,
-                true,
-              ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _badgeCard(
+              'Walker',
+              '5 walk sessions',
+              Icons.directions_walk,
+              Colors.orange,
+              true,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _badgeCard(
-                'Fast Responder',
-                'Report within 1hr of issue',
-                Icons.bolt,
-                Colors.amber,
-                true,
-              ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _badgeCard(
+              'Fast',
+              'Report within 1hr',
+              Icons.bolt,
+              Colors.amber,
+              true,
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _badgeCard(
-                'City Champion',
-                '50+ reports submitted',
-                Icons.star,
-                Colors.amber,
-                false,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _badgeCard(
-                'Voice Pioneer',
-                '10 voice reports',
-                Icons.mic,
-                Colors.blueGrey,
-                false,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _badgeCard(
-                'Collaborator',
-                'Confirmed 20 duplicates',
-                Icons.handshake,
-                Colors.blue,
-                false,
-              ),
-            ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _badgeCard(
-      String title,
-      String description,
-      IconData icon,
-      Color color,
-      bool earned,
-      ) {
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+    bool earned,
+  ) {
     return Opacity(
       opacity: earned ? 1 : 0.4,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 32, color: color),
+            Icon(icon, size: 28, color: color),
             const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A237E),
+                fontWeight: FontWeight.w700,
+                color: _ink,
               ),
             ),
             const SizedBox(height: 4),
@@ -754,14 +728,10 @@ class _ProfileState extends State<Profile> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.grey[600],
+                color: _muted,
                 height: 1.2,
               ),
             ),
-            if (earned) ...[
-              const SizedBox(height: 8),
-              const Icon(Icons.check_circle, size: 18, color: Colors.green),
-            ],
           ],
         ),
       ),
