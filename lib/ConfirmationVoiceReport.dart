@@ -26,8 +26,52 @@ class ConfirmationVoiceReport extends StatefulWidget {
 class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   static const _primaryBlue = Color(0xFF2196F3);
 
-  Color get _severityColor {
-    switch (widget.severity.toLowerCase()) {
+  String get _autoSeverity {
+    int score = 0;
+    switch (widget.category.toLowerCase()) {
+      case 'accessibility':
+        score = 3;
+        break;
+      case 'road damage':
+      case 'public works':
+        score = 2;
+        break;
+      case 'environmental':
+        score = 1;
+        break;
+      default:
+        score = 2;
+    }
+
+    String desc = widget.description.toLowerCase();
+    if (desc.contains('blocked') ||
+        desc.contains('unsafe') ||
+        desc.contains('flooding') ||
+        desc.contains('fallen') ||
+        desc.contains('injury') ||
+        desc.contains('wheelchair') ||
+        desc.contains('no ramp') ||
+        desc.contains('large') ||
+        desc.contains('deep') ||
+        desc.contains('entire lane')) {
+      score++;
+    }
+
+    if (desc.contains('minor') ||
+        desc.contains('small') ||
+        desc.contains('crack') ||
+        desc.contains('cosmetic') ||
+        desc.contains('faded')) {
+      score--;
+    }
+
+    if (score >= 3) return 'High';
+    if (score <= 1) return 'Low';
+    return 'Medium';
+  }
+
+  Color _getColorForSeverity(String sev) {
+    switch (sev.toLowerCase()) {
       case 'high':
         return Colors.red;
       case 'medium':
@@ -39,12 +83,14 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     }
   }
 
+  Color get _severityColor => _getColorForSeverity(_autoSeverity);
+
   Map<String, dynamic> _reportMap({required String status}) {
     return {
       'category': widget.category,
       'location': widget.location,
       'description': widget.description,
-      'severity': widget.severity,
+      'severity': _autoSeverity,
       'othercat': widget.othercat,
       'status': status,
       'time': DateTime.now().toIso8601String(),
@@ -254,8 +300,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             _buildSummaryRow(
               icon: Icons.warning_amber_rounded,
               iconColor: _severityColor,
-              label: 'Severity',
-              value: widget.severity,
+              label: 'Severity (Auto-detected)',
+              value: _autoSeverity,
+              isSuggested: true,
             ),
           ],
         ),
@@ -278,6 +325,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     required Color iconColor,
     required String label,
     required String value,
+    bool isSuggested = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -294,13 +342,36 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    if (isSuggested) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: iconColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: iconColor.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          'SUGGESTED',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
