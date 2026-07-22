@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/draft_reports.dart';
+import 'package:street_sync/report_severity.dart';
 
 class ConfirmationVoiceReport extends StatefulWidget {
   const ConfirmationVoiceReport({
     super.key,
-    required this.category,
     required this.location,
     required this.description,
-    required this.severity,
     this.othercat = '',
   });
 
-  final String category;
   final String location;
   final String description;
-  final String severity;
   final String othercat;
 
   @override
@@ -26,49 +23,12 @@ class ConfirmationVoiceReport extends StatefulWidget {
 class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   static const _primaryBlue = Color(0xFF2196F3);
 
-  String get _autoSeverity {
-    int score = 0;
-    switch (widget.category.toLowerCase()) {
-      case 'accessibility':
-        score = 3;
-        break;
-      case 'road damage':
-      case 'public works':
-        score = 2;
-        break;
-      case 'environmental':
-        score = 1;
-        break;
-      default:
-        score = 2;
-    }
+  String get _inferredCategory => inferCategory(widget.description);
 
-    String desc = widget.description.toLowerCase();
-    if (desc.contains('blocked') ||
-        desc.contains('unsafe') ||
-        desc.contains('flooding') ||
-        desc.contains('fallen') ||
-        desc.contains('injury') ||
-        desc.contains('wheelchair') ||
-        desc.contains('no ramp') ||
-        desc.contains('large') ||
-        desc.contains('deep') ||
-        desc.contains('entire lane')) {
-      score++;
-    }
-
-    if (desc.contains('minor') ||
-        desc.contains('small') ||
-        desc.contains('crack') ||
-        desc.contains('cosmetic') ||
-        desc.contains('faded')) {
-      score--;
-    }
-
-    if (score >= 3) return 'High';
-    if (score <= 1) return 'Low';
-    return 'Medium';
-  }
+  String get _autoSeverity => autoSeverity(
+        category: _inferredCategory,
+        description: widget.description,
+      );
 
   Color _getColorForSeverity(String sev) {
     switch (sev.toLowerCase()) {
@@ -86,8 +46,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   Color get _severityColor => _getColorForSeverity(_autoSeverity);
 
   Map<String, dynamic> _reportMap({required String status}) {
+    final category = _inferredCategory;
     return {
-      'category': widget.category,
+      'category': category,
       'location': widget.location,
       'description': widget.description,
       'severity': _autoSeverity,
@@ -96,7 +57,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       'time': DateTime.now().toIso8601String(),
       'source': 'voice',
       'icon': Icons.mic_outlined,
-      'name': widget.category,
+      'name': category,
       'bgColor': Colors.orange[100]!,
     };
   }
@@ -280,7 +241,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               icon: Icons.category_outlined,
               iconColor: Colors.blue,
               label: 'Category',
-              value: widget.category,
+              value: _inferredCategory,
             ),
             _summaryDivider(),
             _buildSummaryRow(

@@ -111,8 +111,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationVoiceReport(
-            category: 'Voice',
-            severity: 'medium',
             description: _transcript,
             location: location,
           ),

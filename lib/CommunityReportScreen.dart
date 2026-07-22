@@ -10,6 +10,7 @@ import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/draft_reports.dart';
+import 'package:street_sync/report_severity.dart';
 class CommunityReportScreen extends StatefulWidget {
   
   CommunityReportScreen({super.key});
@@ -286,12 +287,16 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   }
 
   Widget _buildLocationCard(){
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    return  Card(
+     color: Colors.white,
+     elevation: 2,
+     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+     child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Location', style: TextStyle(fontWeight: FontWeight.w700)),
+          Text('Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey[800])),
           SizedBox(height: 10,),
           SizedBox(
             height: 220,
@@ -336,6 +341,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           ),
         ],
       ),
+    )
     );
   }
 
@@ -388,15 +394,19 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Road Damage',
+                    value: 'Road Damage',
+                    label: 'Roads',
+                    subtitle: 'Potholes, cracks, pavement',
                     icon: Icons.construction_rounded,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Public Works',
-                    icon: Icons.handyman_outlined,
+                    value: 'Public Works',
+                    label: 'Lights',
+                    subtitle: 'Streetlights, signs, trash, hydrants',
+                    icon: Icons.lightbulb_outline,
                   ),
                 ),
               ],
@@ -406,14 +416,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Environmental',
+                    value: 'Environmental',
+                    label: 'Nature',
+                    subtitle: 'Trees, flooding, litter',
                     icon: Icons.eco_outlined,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Accessibility',
+                    value: 'Accessibility',
+                    label: 'Access',
+                    subtitle: 'Ramps, curb cuts, mobility',
                     icon: Icons.accessible_forward_rounded,
                   ),
                 ),
@@ -421,7 +435,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
             ),
             const SizedBox(height: 10),
             _buildCategoryChip(
+              value: 'Other',
               label: 'Other',
+              subtitle: 'Noise, animals, parking, odd issues',
               icon: Icons.more_horiz_rounded,
             ),
             if (_selectedCategory == 'Other') ...[
@@ -436,7 +452,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 child: TextField(
                   controller: _otherCategoryController,
                   decoration: const InputDecoration(
-                    hintText: 'Enter other category',
+                    hintText: 'e.g. noise, stray animal, abandoned car',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.fromLTRB(18, 12, 16, 12),
                   ),
@@ -450,52 +466,74 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   }
 
   Widget _buildCategoryChip({
+    required String value,
     required String label,
+    required String subtitle,
     required IconData icon,
   }) {
-    final selected = _selectedCategory == label;
+    final selected = _selectedCategory == value;
 
-    return _Pressable(
-      onTap: () {
-        setState(() => _selectedCategory = label);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: selected ? _blue.withValues(alpha: 0.1) : Colors.grey[50],
-          border: Border.all(
-            color: selected ? _blue : Colors.grey[300]!,
-            width: selected ? 1.8 : 1,
-          ),
-          borderRadius: BorderRadius.circular(14),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      height: 88,
+      decoration: BoxDecoration(
+        color: selected ? _blue.withValues(alpha: 0.1) : Colors.grey[50],
+        border: Border.all(
+          color: selected ? _blue : Colors.grey[300]!,
+          width: selected ? 1.8 : 1,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: selected ? _blue : _muted,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? _blue : Colors.grey[700],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => setState(() => _selectedCategory = value),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 26,
+                      color: selected ? _blue : _muted,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                        color: selected ? _blue : Colors.grey[800],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Tooltip(
+              message: subtitle,
+              triggerMode: TooltipTriggerMode.tap,
+              preferBelow: false,
+              child: Icon(
+                Icons.info_outline,
+                size: 16,
+                color: selected ? _blue : Colors.grey[500],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -650,16 +688,20 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                       backgroundColor: _blue,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () async{
-                      if(_selectedCategory == null){
+                    onPressed: () {
+                      if (_selectedCategory == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Please enter a category'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
+                        return;
                       }
-                      String severity = await _autoSeverityCalc(_selectedCategory!);
+                      final severity = autoSeverity(
+                        category: _selectedCategory!,
+                        description: _descriptionController.text,
+                      );
                       setState(() => _selectedSeverity = severity);
                     },
                     child: Text('Calculate Severity',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold,color: Colors.white),),
@@ -903,20 +945,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     );
   }
 }
-Future<String> _autoSeverityCalc(String category) async {
-  switch (category) {
-    case 'Accessibility':
-      return 'high';
-    case 'Road Damage':
-    case 'Public Works':
-      return 'Medium';
-    case 'Environmental':
-      return 'Low';
-    case 'Other':
-    default:
-      return 'Medium';
-  }
-}
+
 Future<String> _addressFromLatLng(LatLng pos) async {
   try {
     final places = await placemarkFromCoordinates(
