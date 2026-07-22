@@ -651,6 +651,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () async{
+                      if(_selectedCategory == null){
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a category'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                       String severity = await _autoSeverityCalc(_selectedCategory!);
                       setState(() => _selectedSeverity = severity);
                     },

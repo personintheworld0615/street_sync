@@ -1,68 +1,134 @@
 from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed
 from fastapi import HTTPException
-
-fake_db = {}
-fake_db_users = {}
-next_id = 1
-next_id_user = 1
+from api.models.reports import User, Report
 
 
-def create_report(report: Reports):
-    global next_id
-    new_report = report.model_dump()
-    status = "draft" if report.isDraft else "submitted"
-    report_detailed = ReportsFull(**new_report, id=next_id, status=status)
-    fake_db[next_id] = report_detailed
-    next_id += 1
-    return report_detailed
-
-
-def get_report(report_id: int):
-    if report_id not in fake_db:
-        raise HTTPException(status_code=404, detail="Report not found")
-    return fake_db[report_id]
-
-
-def create_user(user: Users):
-    global next_id_user
-    new_user = user.model_dump()
-    user_detailed = UsersDetailed(**new_user, id=next_id_user)
-    fake_db_users[next_id_user] = user_detailed
-    next_id_user += 1
-    return user_detailed
-
-
-def get_all_reports_by_user_submitted(user_id: int):
-    return [
-        report
-        for report in fake_db.values()
-        if report.user_id == user_id and not report.isDraft
-    ]
-
-
-def get_all_reports_by_user_draft(user_id: int):
-    return [
-        report
-        for report in fake_db.values()
-        if report.user_id == user_id and report.isDraft
-    ]
-
-
-def get_all_user_reports(user_id: int):
-    return get_all_reports_by_user_submitted(user_id) + get_all_reports_by_user_draft(
-        user_id
+def report_to_schema(row: Report) -> ReportsFull:
+    return ReportsFull(
+        id=row.id,
+        description=row.description,
+        category=row.category,
+        latitude=row.latitude,
+        longitude=row.longitude,
+        location=row.location,
+        image=row.image,
+        time=row.time,
+        severity=row.severity,
+        status=row.status,
+        user_id=row.user_id,
+        isDraft=row.is_draft,
     )
 
 
-def get_all_reports():
-    return list(fake_db.values())
+def create_report(db, report: Reports):
+    user = db.query(User).filter(User.id == report.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    row = Report(
+        description=report.description,
+        category=report.category,
+        latitude=report.latitude,
+        longitude=report.longitude,
+        location=report.location,
+        severity=report.severity,
+        user_id=report.user_id,
+        is_draft=report.isDraft,
+        image=report.image,
+        status="open",
+        time=report.time,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    if not report.isDraft:
+        bump_user_report_count(db, report.user_id)
+
+    return report_to_schema(row)
 
 
-def get_most_recent_reports(amount: int):
-    return sorted(fake_db.values(), key=lambda x: x.time, reverse=True)[:amount]
+def bump_user_report_count(db, user_id: int):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.total_reports += 1
+    db.commit()
 
 
-def get_top10_users():
-    return sorted(
-        fake_db_users.values(), key=lambda x: x.total_reports, reverse=True
-    )[:10]
+def get_report(db, report_id: int):
+    row = db.query(Report).filter(Report.id == report_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report_to_schema(row)
+
+
+def create_user(db, user: Users):
+    row = User(name=user.name, total_reports=0)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return UsersDetailed(
+        id=row.id,
+        name=row.name,
+        total_reports=row.total_reports,
+        reports=[],
+    )
+
+
+def get_all_reports_by_user_notdraft(db, user_id: int):
+    rows = (
+        db.query(Report)
+        .filter(Report.user_id == user_id, Report.is_draft == False)
+        .all()
+    )
+    return [report_to_schema(report) for report in rows]
+
+
+def get_all_reports_by_user_draft(db, user_id: int):
+    rows = (
+        db.query(Report)
+        .filter(Report.user_id == user_id, Report.is_draft == True)
+        .all()
+    )
+    return [report_to_schema(report) for report in rows]
+
+
+def get_all_reports(db):
+    rows = db.query(Report).all()
+    return [report_to_schema(report) for report in rows]
+
+
+def get_most_recent_reports(db, amount: int):
+    rows = db.query(Report).order_by(Report.time.desc()).limit(amount).all()
+    return [report_to_schema(report) for report in rows]
+
+
+def get_top10_users(db, user_id: int):
+    rows = (
+        db.query(User)
+        .filter(User.id != user_id)
+        .order_by(User.total_reports.desc())
+        .limit(10)
+        .all()
+    )
+    you = db.query(User).filter(User.id == user_id).first()
+    if not you:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    you_in_top10 = False
+    for user in rows:
+        if user.id == user_id:
+            you_in_top10 = True
+            break
+    if not you_in_top10:
+        rows.append(you)
+    rows.sort(key=lambda x: x.total_reports, reverse=True)
+    return [
+        UsersDetailed(
+            id=user.id,
+            name=user.name,
+            total_reports=user.total_reports,
+            reports=[],
+        )
+        for user in rows
+    ]

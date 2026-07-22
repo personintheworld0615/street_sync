@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
-from typing import Literal
-from typing import List
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Reports(BaseModel):
@@ -19,6 +18,8 @@ class Reports(BaseModel):
 
 
 class ReportsFull(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     description: str
     category: str
@@ -27,19 +28,21 @@ class ReportsFull(BaseModel):
     location: str
     image: Optional[str] = None
     time: datetime
-    severity: Literal["low", "medium", "high"]
-    status: Literal["draft", "submitted", "approved", "rejected"]
+    severity: str
+    status: str
     user_id: int
     isDraft: bool = False
 
 
 class Users(BaseModel):
     name: str
-    total_reports: int
+    total_reports: int = 0
 
 
 class UsersDetailed(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
-    reports: List[ReportsFull]
-    total_reports: int
+    reports: List[ReportsFull] = Field(default_factory=list)
+    total_reports: int = 0

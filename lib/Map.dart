@@ -118,14 +118,14 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     setState(() {
-      _center = userLatLng;
+      // _center = userLatLng;
       _ready = true;
     });
 
 _loadFakeReports();
 
     await _controller?.animateCamera(
-      CameraUpdate.newLatLngZoom(userLatLng, 15),
+      CameraUpdate.newLatLngZoom(_center, 15),
     );
   }
 

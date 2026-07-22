@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:street_sync/HomeScreen.dart';
-import 'package:street_sync/Leaderboard.dart';
-import 'package:street_sync/Map.dart';
-import 'package:street_sync/Profile.dart';
-
-import 'CommunityReportScreen.dart';
-import 'Confirmation.dart';
-import 'Mainshell.dart';
+import 'package:street_sync/WelcomeScreen.dart';
 
 void main() {
   runApp(
     MaterialApp(
-      home:  MainShell(),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2196F3)),
+        useMaterial3: true,
+      ),
+      home: const WelcomeScreen(),
     ),
   );
 }
