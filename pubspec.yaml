@@ -41,6 +41,8 @@ dependencies:
   speech_to_text: ^7.4.0
   geolocator: ^14.0.3
   geocoding: ^3.0.0
+  http: ^1.2.2
+  flutter_dotenv: ^5.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

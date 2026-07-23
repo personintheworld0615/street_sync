@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'config.dart';
 
 enum IssueCategory {
   roadDamage,
@@ -22,6 +26,59 @@ class _MapScreenState extends State<MapScreen> {
   LatLng _center = const LatLng(40.3573, -74.6672);
   bool _ready = false;
   Set<Marker> _markers = {};
+  final TextEditingController _searchController = TextEditingController();
+
+  List<dynamic> _suggestions = [];
+
+  final String apiKey = googleMapsApiKey;
+
+  Future<void> _searchLocation(String query) async {
+    if (query.isEmpty) return;
+
+    try {
+      List<Location> locations = await locationFromAddress(query);
+
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+
+        final newPosition = LatLng(
+          location.latitude,
+          location.longitude,
+        );
+
+        await _controller?.animateCamera(
+          CameraUpdate.newLatLngZoom(newPosition, 15),
+        );
+      }
+    } catch (e) {
+      print("Location not found: $e");
+    }
+  }
+
+  Future<void> _getSuggestions(String input) async {
+    if (input.isEmpty) {
+      setState(() {
+        _suggestions = [];
+      });
+      return;
+    }
+
+    final url = Uri.parse(
+      "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+      "?input=$input"
+      "&key=$apiKey"
+    );
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      setState(() {
+        _suggestions = data['predictions'];
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -45,7 +102,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
 
-        // Public Works - Orange
+        // Public Works - Cyan
         Marker(
           markerId: const MarkerId('public_works_1'),
           position: const LatLng(40.3565, -74.6665),
@@ -54,7 +111,7 @@ class _MapScreenState extends State<MapScreen> {
             snippet: "Category: Public Works",
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueOrange,
+            BitmapDescriptor.hueRose,
           ),
         ),
 
@@ -80,7 +137,7 @@ class _MapScreenState extends State<MapScreen> {
             snippet: "Category: ADA",
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueYellow,
+            BitmapDescriptor.hueViolet,
           ),
         ),
 
@@ -93,7 +150,7 @@ class _MapScreenState extends State<MapScreen> {
             snippet: "Category: Other",
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueBlue,
+            BitmapDescriptor.hueAzure,
           ),
         ),
       };
@@ -131,20 +188,92 @@ _loadFakeReports();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Map')),
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(target: _center, zoom: 14),
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        zoomControlsEnabled: true,
-        onMapCreated: (c) async {
-          _controller = c;
-          if (_ready) {
-            await c.animateCamera(CameraUpdate.newLatLngZoom(_center, 15));
-          }
-        },
-        markers: _markers,
+    return Scaffold(        
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _center,
+              zoom: 14,
+            ),
+            myLocationEnabled: true,
+            markers: _markers,
+            onMapCreated: (c) {
+              _controller = c;
+            },
+          ),
+
+          Positioned(
+            top: 70,
+            left: 16,
+            right: 16,
+            child: SearchBar(
+              controller: _searchController,
+              elevation: const WidgetStatePropertyAll(0),
+              backgroundColor: const WidgetStatePropertyAll(Colors.white),
+              surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+              shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+              side: const WidgetStatePropertyAll(
+                BorderSide(color: Colors.transparent),
+              ),
+              hintText: 'Search for a location',
+              constraints: const BoxConstraints(
+                minHeight: 50,
+                maxHeight: 50,
+              ),
+              textStyle: const WidgetStatePropertyAll(
+                TextStyle(fontSize: 14),
+              ),
+              leading: const Icon(
+                Icons.search,
+                size: 20,
+              ),
+              onChanged: (value) {
+                _getSuggestions(value);
+              },
+              onSubmitted: (value) {
+                _searchLocation(value);
+
+                setState(() {
+                  _suggestions.clear();
+                });
+              },
+            )
+          ),
+          if (_suggestions.isNotEmpty && _searchController.text.isNotEmpty)
+            Positioned(
+              top: 125,
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 4,
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: _suggestions.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      title: Text(_suggestions[index]['description']),
+                      onTap: () async {
+                        final selectedLocation =
+                            _suggestions[index]['description'];
+
+                        _searchController.text = selectedLocation;
+
+                        await _searchLocation(selectedLocation);
+
+                        if (!mounted) return;
+
+                        setState(() {
+                          _suggestions.clear();
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

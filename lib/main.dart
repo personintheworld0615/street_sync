@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/WelcomeScreen.dart';
+import 'package:street_sync/Map.dart';
 
 void main() {
   runApp(
@@ -9,7 +10,7 @@ void main() {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2196F3)),
         useMaterial3: true,
       ),
-      home: const WelcomeScreen(),
+      home: const MapScreen(),
     ),
   );
 }
