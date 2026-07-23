@@ -14,3 +14,7 @@ SQLAlchemy==2.0.51
 starlette==0.44.0
 typing_extensions==4.13.2
 uvicorn==0.33.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.3.0
+email-validator==2.2.0
