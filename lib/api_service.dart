@@ -1,67 +1,204 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
+  static const _sessionKey = 'current_user';
+
+  static String get _devHost =>
+      dotenv.maybeGet('DEV_HOST')?.trim().isNotEmpty == true
+          ? dotenv.get('DEV_HOST').trim()
+          : 'localhost';
+
+  static int get _devPort =>
+      int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8001;
+
   // Automatically switch base URL depending on the platform
   static String get baseUrl {
-    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
-    return 'http://localhost:8000'; // iOS and Web
+    if (Platform.isAndroid) {
+      // Android emulator → host machine. Physical Android: set DEV_HOST in assets/.env
+      // and change this branch to use _devHost if needed.
+      return 'http://10.0.2.2:$_devPort';
+    }
+    // iOS: use DEV_HOST from assets/.env (Mac LAN IP for a real phone).
+    return 'http://$_devHost:$_devPort';
   }
 
   // Store the logged-in user's info
   static Map<String, dynamic>? currentUser;
 
-  static Future<bool> signup({
-    required String name,
+  static int? get userId {
+    final id = currentUser?['user_id'];
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    return null;
+  }
+
+  static String get firstName =>
+      currentUser?['first_name'] as String? ?? 'Citizen';
+
+  static String get lastName =>
+      currentUser?['last_name'] as String? ?? '';
+
+  /// Full name for profile, leaderboard "you", etc.
+  static String get userName {
+    final last = lastName.trim();
+    if (last.isEmpty) return firstName;
+    return '$firstName $last';
+  }
+
+  static String? get userEmail => currentUser?['email'] as String?;
+
+  static String? get token => currentUser?['access_token'] as String?;
+
+  static Future<void> loadSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_sessionKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      currentUser = jsonDecode(raw) as Map<String, dynamic>;
+    } catch (e) {
+      print('loadSession Error: $e');
+      currentUser = null;
+      await prefs.remove(_sessionKey);
+    }
+  }
+
+  static Future<void> _saveSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (currentUser == null) {
+      await prefs.remove(_sessionKey);
+    } else {
+      await prefs.setString(_sessionKey, jsonEncode(currentUser));
+    }
+  }
+
+  static Future<void> logout() async {
+    currentUser = null;
+    await _saveSession();
+  }
+
+  static Map<String, String> get _headers {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    final t = token;
+    if (t != null && t.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $t';
+    }
+    return headers;
+  }
+
+  /// Returns null on success, or an error message on failure.
+  static Future<String?> signup({
+    required String firstname,
+    required String lastname,
     required String email,
     required String password,
   }) async {
     final url = Uri.parse('$baseUrl/auth/signup');
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': password,
-        }),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .post(
+            url,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'first_name': firstname,
+              'last_name': lastname,
+              'email': email,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        currentUser = jsonDecode(response.body);
-        return true;
+        currentUser = jsonDecode(response.body) as Map<String, dynamic>;
+        await _saveSession();
+        return null;
       }
+
+      return _errorFromResponse(response, fallback: 'Signup failed');
     } catch (e) {
-      print('Signup Error: $e');
+      print('Signup Error ($url): $e');
+      return 'Cannot reach API at $baseUrl. Is the server running?';
     }
-    return false;
   }
 
-  static Future<bool> login({
+  /// Returns null on success, or an error message on failure.
+  static Future<String?> login({
     required String email,
     required String password,
   }) async {
     final url = Uri.parse('$baseUrl/auth/login');
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .post(
+            url,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        currentUser = jsonDecode(response.body);
-        return true;
+        currentUser = jsonDecode(response.body) as Map<String, dynamic>;
+        await _saveSession();
+        return null;
       }
+
+      return _errorFromResponse(response, fallback: 'Login failed');
     } catch (e) {
-      print('Login Error: $e');
+      print('Login Error ($url): $e');
+      return 'Cannot reach API at $baseUrl. Is the server running?';
     }
-    return false;
+  }
+
+  static Future<String?> deleteAccount() async {
+    final id = userId;
+    if (id == null) {
+      return 'Not logged in';
+    }
+
+    final url = Uri.parse('$baseUrl/auth/delete/$id');
+    try {
+      final response = await http
+          .delete(url, headers: _headers)
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        await logout();
+        return null;
+      }
+
+      return _errorFromResponse(response, fallback: 'Could not delete account');
+    } catch (e) {
+      print('Delete Account Error ($url): $e');
+      return 'Cannot reach API at $baseUrl. Is the server running?';
+    }
+  }
+
+  static String _errorFromResponse(
+    http.Response response, {
+    required String fallback,
+  }) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['detail'] != null) {
+        final detail = body['detail'];
+        if (detail is String) return detail;
+        if (detail is List && detail.isNotEmpty) {
+          final first = detail.first;
+          if (first is Map && first['msg'] != null) {
+            return first['msg'].toString();
+          }
+        }
+      }
+    } catch (_) {}
+    return '$fallback (${response.statusCode})';
   }
 
   static Future<bool> submitReport({
@@ -74,26 +211,37 @@ class ApiService {
     double longitude = 0.0,
     int? userId,
   }) async {
+    final effectiveUserId = userId ?? ApiService.userId;
+    if (effectiveUserId == null) {
+      print('submitReport: no logged-in user');
+      return false;
+    }
+
     final url = Uri.parse('$baseUrl/reports');
-    final effectiveUserId = userId ?? currentUser?['user_id'] ?? 1;
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'description': description,
-          'category': category,
-          'latitude': latitude,
-          'longitude': longitude,
-          'location': location,
-          'time': DateTime.now().toIso8601String(),
-          'severity': severity.toLowerCase(),
-          'user_id': effectiveUserId,
-          'isDraft': isDraft,
-        }),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({
+              'description': description,
+              'category': category,
+              'latitude': latitude,
+              'longitude': longitude,
+              'location': location,
+              'time': DateTime.now().toIso8601String(),
+              'severity': severity.toLowerCase(),
+              'user_id': effectiveUserId,
+              'isDraft': isDraft,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
 
+      if (response.statusCode == 401) {
+        await logout();
+        return false;
+      }
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('Connection Error: $e');
@@ -104,9 +252,11 @@ class ApiService {
   static Future<List<dynamic>> getRecentReports({int amount = 10}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return jsonDecode(response.body) as List<dynamic>;
       }
     } catch (e) {
       print('Error fetching reports: $e');
@@ -117,9 +267,15 @@ class ApiService {
   static Future<List<dynamic>> getDraftReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/drafts');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 401) {
+        await logout();
+        return [];
+      }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return jsonDecode(response.body) as List<dynamic>;
       }
     } catch (e) {
       print('Error fetching draft reports: $e');
@@ -130,9 +286,15 @@ class ApiService {
   static Future<List<dynamic>> getSubmittedReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/submitted');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 401) {
+        await logout();
+        return [];
+      }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return jsonDecode(response.body) as List<dynamic>;
       }
     } catch (e) {
       print('Error fetching submitted reports: $e');
@@ -143,15 +305,19 @@ class ApiService {
   static Future<List<dynamic>> getTopUsers(int userId) async {
     final url = Uri.parse('$baseUrl/users/top/$userId');
     try {
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 401) {
+        await logout();
+        return [];
+      }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return jsonDecode(response.body) as List<dynamic>;
       }
     } catch (e) {
       print('Error fetching top users: $e');
     }
     return [];
   }
-
-
 }

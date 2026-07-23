@@ -11,12 +11,15 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100))
+    first_name: Mapped[str] = mapped_column(String(100))
+    last_name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(255),unique=True,index=True)
     password: Mapped[str] = mapped_column(String(255))
     total_reports: Mapped[int] = mapped_column(Integer, default=0)
-
-    reports: Mapped[List["Report"]] = relationship(back_populates="user")
+    reports: Mapped[List["Report"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class Report(Base):

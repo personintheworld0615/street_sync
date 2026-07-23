@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/skeleton.dart';
 
 class Leaderboard extends StatefulWidget {
   const Leaderboard({super.key});
@@ -19,7 +20,18 @@ class _LeaderboardState extends State<Leaderboard> {
   }
 
   Future<void> _fetchLeaderboard() async {
-    final users = await ApiService.getTopUsers(1); // Default user ID 1
+    final userId = ApiService.userId;
+    if (userId == null) {
+      if (mounted) {
+        setState(() {
+          _topUsers = [];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    final users = await ApiService.getTopUsers(userId);
     if (mounted) {
       setState(() {
         _topUsers = users;
@@ -31,7 +43,7 @@ class _LeaderboardState extends State<Leaderboard> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const LeaderboardSkeleton();
     }
 
     // Sort to ensure rank 1 is first
@@ -107,6 +119,13 @@ class _LeaderboardState extends State<Leaderboard> {
     );
   }
 
+  String _displayName(dynamic user) {
+    final first = (user['first_name'] as String?)?.trim() ?? '';
+    final last = (user['last_name'] as String?)?.trim() ?? '';
+    final full = '$first $last'.trim();
+    return full.isEmpty ? 'Citizen' : full;
+  }
+
   Widget topThreeSection(List<dynamic> topThree) {
     // Reorder for visual podium: 2, 1, 3
     List<dynamic> podium = [];
@@ -120,7 +139,7 @@ class _LeaderboardState extends State<Leaderboard> {
       children: podium.map((user) {
         int originalIndex = topThree.indexOf(user);
         return _topThreePodium(
-          name: user['name'],
+          name: _displayName(user),
           score: user['total_reports'].toString(),
           rank: originalIndex + 1,
           color: originalIndex == 0 ? const Color(0xFFFFD700) : (originalIndex == 1 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32)),
@@ -201,9 +220,9 @@ class _LeaderboardState extends State<Leaderboard> {
         final user = remaining[index];
         return _playerRow(
           rank: (index + 4).toString(),
-          name: user['name'],
+          name: _displayName(user),
           score: user['total_reports'].toString(),
-          isYou: user['id'] == 1, // Assume current user is 1
+          isYou: user['id'] == ApiService.userId,
         );
       },
     );

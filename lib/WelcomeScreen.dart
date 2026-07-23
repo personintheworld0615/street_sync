@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/OnboardingFlow.dart';
+import 'package:street_sync/api_service.dart';
 
 /// Animated splash / welcome that then hands off to onboarding.
 class WelcomeScreen extends StatefulWidget {
@@ -67,9 +69,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     if (!mounted) return;
     await _exitCtrl.forward();
     if (!mounted) return;
+    final next = ApiService.userId != null
+        ? const MainShell()
+        : const OnboardingFlow();
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const OnboardingFlow(),
+        pageBuilder: (_, __, ___) => next,
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 400),

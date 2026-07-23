@@ -523,7 +523,7 @@ class _ConfirmationState extends State<Confirmation> {
               onPressed: () => Navigator.pop(context, true),
               icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[800]),
               label: Text(
-                'Go Back to Camera report to edit',
+                'Go Back To Edit',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

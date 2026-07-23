@@ -47,6 +47,9 @@ app.*.map.json
 
 # Python / FastAPI
 api/venv/
+.venv/
 api/__pycache__/
 api/**/*.pyc
 api/**/*.db
+.env
+app.db

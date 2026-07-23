@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -120,10 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildCategoryFilters(),
                     const SizedBox(height: 12),
                     if (_isLoading)
-                      const Center(child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: CircularProgressIndicator(),
-                      ))
+                      const ReportListSkeleton(count: 4)
                     else
                       ..._filteredReports.map(
                         (r) => _buildReportCard(
@@ -461,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Good morning ${ApiService.currentUser?['name'] ?? 'Citizen'}',
+            'Hi ${ApiService.firstName}',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,

@@ -15,18 +15,6 @@ class Reports(BaseModel):
     severity: Literal["low", "medium", "high"]
     user_id: int
     isDraft: bool = False
-class SignupRequest(BaseModel):
-    name: str = Field(min_length=1,max_length=100)
-    email: EmailStr
-    password: str = Field(min_length=8,max_length=100)
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user_id: int
-    name: str
 
 class ReportsFull(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -43,10 +31,15 @@ class ReportsFull(BaseModel):
     status: str
     user_id: int
     isDraft: bool = False
+class Badge(BaseModel):
+    name: str
+    description: str
+    icon: str
 
 
 class Users(BaseModel):
-    name: str
+    first_name: str
+    last_name: str
     total_reports: int = 0
 
 
@@ -54,6 +47,7 @@ class UsersDetailed(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    name: str
+    first_name: str
+    last_name: str
     reports: List[ReportsFull] = Field(default_factory=list)
     total_reports: int = 0
