@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/api_service.dart';
 
 /// Placeholder login — UI only for now; continues into the app.
 class LoginScreen extends StatefulWidget {
@@ -17,19 +18,61 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   bool _obscure = true;
+  bool _isLogin = true;
+  bool _loading = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
   }
 
-  void _enterApp() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
-    );
+  Future<void> _handleSubmit() async {
+    if (_emailCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+    if (!_isLogin && _nameCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    bool success;
+    if (_isLogin) {
+      success = await ApiService.login(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+    } else {
+      success = await ApiService.signup(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+    }
+
+    if (mounted) {
+      setState(() => _loading = false);
+      if (success) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainShell()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isLogin ? 'Login failed' : 'Signup failed')),
+        );
+      }
+    }
   }
 
   @override
@@ -53,24 +96,38 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: const Icon(Icons.map_rounded, color: _blue, size: 28),
               ),
               const SizedBox(height: 28),
-              const Text(
-                'Welcome back',
-                style: TextStyle(
+              Text(
+                _isLogin ? 'Welcome back' : 'Create account',
+                style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   color: _ink,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Sign in to sync with your community.',
-                style: TextStyle(
+              Text(
+                _isLogin 
+                    ? 'Sign in to sync with your community.'
+                    : 'Join StreetSync to start making an impact.',
+                style: const TextStyle(
                   fontSize: 15,
                   color: _muted,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 36),
+              if (!_isLogin) ...[
+                _label('Full Name'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameCtrl,
+                  decoration: _inputDecoration(
+                    hint: 'Alex Rivera',
+                    icon: Icons.person_outline_rounded,
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
               _label('Email'),
               const SizedBox(height: 8),
               TextField(
@@ -101,25 +158,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Forgot password?',
-                    style: TextStyle(
-                      color: _blue,
-                      fontWeight: FontWeight.w600,
+              if (_isLogin)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Text(
+                      'Forgot password?',
+                      style: TextStyle(
+                        color: _blue,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _enterApp,
+                  onPressed: _loading ? null : _handleSubmit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _blue,
                     foregroundColor: Colors.white,
@@ -128,29 +186,34 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Log in',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: _loading 
+                      ? const SizedBox(
+                          height: 24, 
+                          width: 24, 
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : Text(
+                          _isLogin ? 'Log in' : 'Sign up',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
-              const SizedBox(height: 14),
               const SizedBox(height: 28),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Don't have an account? ",
-                    style: TextStyle(color: _muted),
+                  Text(
+                    _isLogin ? "Don't have an account? " : "Already have an account? ",
+                    style: const TextStyle(color: _muted),
                   ),
                   GestureDetector(
-                    onTap: _enterApp,
-                    child: const Text(
-                      'Sign up',
-                      style: TextStyle(
+                    onTap: () => setState(() => _isLogin = !_isLogin),
+                    child: Text(
+                      _isLogin ? 'Sign up' : 'Log in',
+                      style: const TextStyle(
                         color: _blue,
                         fontWeight: FontWeight.w700,
                       ),

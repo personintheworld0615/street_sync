@@ -9,6 +9,61 @@ class ApiService {
     return 'http://localhost:8000'; // iOS and Web
   }
 
+  // Store the logged-in user's info
+  static Map<String, dynamic>? currentUser;
+
+  static Future<bool> signup({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final url = Uri.parse('$baseUrl/auth/signup');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        currentUser = jsonDecode(response.body);
+        return true;
+      }
+    } catch (e) {
+      print('Signup Error: $e');
+    }
+    return false;
+  }
+
+  static Future<bool> login({
+    required String email,
+    required String password,
+  }) async {
+    final url = Uri.parse('$baseUrl/auth/login');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        currentUser = jsonDecode(response.body);
+        return true;
+      }
+    } catch (e) {
+      print('Login Error: $e');
+    }
+    return false;
+  }
+
   static Future<bool> submitReport({
     required String description,
     required String category,
@@ -17,9 +72,10 @@ class ApiService {
     required bool isDraft,
     double latitude = 0.0,
     double longitude = 0.0,
-    int userId = 1,
+    int? userId,
   }) async {
     final url = Uri.parse('$baseUrl/reports');
+    final effectiveUserId = userId ?? currentUser?['user_id'] ?? 1;
 
     try {
       final response = await http.post(
@@ -33,10 +89,10 @@ class ApiService {
           'location': location,
           'time': DateTime.now().toIso8601String(),
           'severity': severity.toLowerCase(),
-          'user_id': userId,
+          'user_id': effectiveUserId,
           'isDraft': isDraft,
         }),
-      ).timeout(const Duration(seconds: 5)); // Add timeout
+      ).timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {

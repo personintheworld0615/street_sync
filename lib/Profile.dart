@@ -598,7 +598,7 @@ class _ProfileState extends State<Profile> {
                       ),
                     ),
                     Text(
-                      'krishworld432@gmail.com',
+                      ApiService.currentUser?['email'] ?? 'krishworld432@gmail.com',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 13,

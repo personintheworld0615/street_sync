@@ -460,9 +460,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Good morning Aarav',
-            style: TextStyle(
+          Text(
+            'Good morning ${ApiService.currentUser?['name'] ?? 'Citizen'}',
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               color: Colors.white,
