@@ -874,6 +874,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                       image: _image!,
                       severity: _selectedSeverity!,
                       location: address,
+                      latitude: position.latitude,
+                      longitude: position.longitude,
                     ),
                   ),
                 );

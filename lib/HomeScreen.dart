@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,31 +25,24 @@ class _HomeScreenState extends State<HomeScreen> {
     'Other',
   ];
   String? _selectedCat;
+  List<dynamic> _recentReports = [];
+  bool _isLoading = true;
 
-  // Placeholder recent reports (category as title — matches real data model).
-  final List<Map<String, dynamic>> _recentReports = [
-    {
-      'category': 'Road Damage',
-      'location': 'Nassau St & Mercer St',
-      'time': '12 min ago',
-      'severity': 'high',
-      'icon': Icons.construction_rounded,
-    },
-    {
-      'category': 'Public Works',
-      'location': 'Witherspoon St',
-      'time': '2 hrs ago',
-      'severity': 'medium',
-      'icon': Icons.handyman_outlined,
-    },
-    {
-      'category': 'Environmental',
-      'location': 'Palmer Square',
-      'time': '1 day ago',
-      'severity': 'low',
-      'icon': Icons.eco_outlined,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchReports();
+  }
+
+  Future<void> _fetchReports() async {
+    final reports = await ApiService.getRecentReports();
+    if (mounted) {
+      setState(() {
+        _recentReports = reports;
+        _isLoading = false;
+      });
+    }
+  }
 
   TextStyle get _sectionTitle => const TextStyle(
         fontSize: 17,
@@ -56,72 +50,105 @@ class _HomeScreenState extends State<HomeScreen> {
         color: _ink,
       );
 
-  List<Map<String, dynamic>> get _filteredReports {
+  List<dynamic> get _filteredReports {
     if (_selectedCat == null) return _recentReports;
     return _recentReports
         .where((r) => r['category'] == _selectedCat)
         .toList();
   }
 
+  String _formatTime(String timeStr) {
+    try {
+      final dt = DateTime.parse(timeStr);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (_) {
+      return 'Recently';
+    }
+  }
+
+  IconData _iconFromCat(String category) {
+    switch (category.toLowerCase()) {
+      case 'road damage': return Icons.construction_rounded;
+      case 'public works': return Icons.handyman_outlined;
+      case 'environmental': return Icons.eco_outlined;
+      case 'accessibility': return Icons.accessible_forward_rounded;
+      default: return Icons.warning_amber_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _pageBg,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            header(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  threecard(),
-                  const SizedBox(height: 20),
-                  Text('Quick actions', style: _sectionTitle),
-                  const SizedBox(height: 12),
-                  twocardsection(context),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Recent reports', style: _sectionTitle),
-                      const Text(
-                        'Near you',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: _muted,
+      body: RefreshIndicator(
+        onRefresh: _fetchReports,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              header(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    threecard(),
+                    const SizedBox(height: 20),
+                    Text('Quick actions', style: _sectionTitle),
+                    const SizedBox(height: 12),
+                    twocardsection(context),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Recent reports', style: _sectionTitle),
+                        const Text(
+                          'Near you',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCategoryFilters(),
+                    const SizedBox(height: 12),
+                    if (_isLoading)
+                      const Center(child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(),
+                      ))
+                    else
+                      ..._filteredReports.map(
+                        (r) => _buildReportCard(
+                          icon: _iconFromCat(r['category']),
+                          severity: r['severity'] as String,
+                          name: r['description'] as String,
+                          location: r['location'] as String,
+                          time: _formatTime(r['time'] as String),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildCategoryFilters(),
-                  const SizedBox(height: 12),
-                  ..._filteredReports.map(
-                    (r) => _buildReportCard(
-                      icon: r['icon'] as IconData,
-                      severity: r['severity'] as String,
-                      name: r['category'] as String,
-                      location: r['location'] as String,
-                      time: r['time'] as String,
-                    ),
-                  ),
-                  if (_filteredReports.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'No reports in this category',
-                          style: TextStyle(color: _muted, fontSize: 14),
+                    if (!_isLoading && _filteredReports.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No reports in this category',
+                            style: TextStyle(color: _muted, fontSize: 14),
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

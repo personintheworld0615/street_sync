@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/draft_reports.dart';
+import 'package:street_sync/api_service.dart';
 
 import 'MyDraftReportsScreen.dart';
 import 'UpdateThing.dart';
@@ -16,6 +17,24 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   bool pushNotifications = true;
   bool locationSharing = true;
+  Map<String, dynamic>? _userData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    final topUsers = await ApiService.getTopUsers(1);
+    if (mounted) {
+      setState(() {
+        _userData = topUsers.firstWhere((u) => u['id'] == 1, orElse: () => null);
+        _isLoading = false;
+      });
+    }
+  }
 
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
@@ -70,65 +89,75 @@ class _ProfileState extends State<Profile> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    
+    final int reportsCount = _userData?['total_reports'] ?? 0;
+
     return Scaffold(
       backgroundColor: _pageBg,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            header(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-              child: Column(
-                children: [
-                  _sectionHeader(
-                    title: 'My Drafts',
-                    seeAll: draftReports.isNotEmpty
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MyDraftReportsScreen(
-                                  reports: draftReports,
+      body: RefreshIndicator(
+        onRefresh: _fetchUserData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              header(_userData?['name'] ?? 'Krish Sinha', reportsCount),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                child: Column(
+                  children: [
+                    _sectionHeader(
+                      title: 'My Drafts',
+                      seeAll: draftReports.isNotEmpty
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MyDraftReportsScreen(
+                                    reports: draftReports,
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                  myDraftReportsList(),
-                  const SizedBox(height: 20),
-                  _sectionHeader(
-                    title: 'My Reports',
-                    seeAll: _myReports.isNotEmpty
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    MyReportsScreen(reports: _myReports),
-                              ),
-                            );
-                          }
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                  myReportsList(),
-                  const SizedBox(height: 20),
-                  prefrencesCard(),
-                  const SizedBox(height: 20),
-                  _sectionHeader(
-                    title: 'Badges',
-                    trailing: Text(
-                      '3 of 6 earned',
-                      style: TextStyle(color: _muted, fontSize: 13),
+                              );
+                            }
+                          : null,
                     ),
-                  ),
-                  badgesGrid(),
-                ],
+                    const SizedBox(height: 10),
+                    myDraftReportsList(),
+                    const SizedBox(height: 20),
+                    _sectionHeader(
+                      title: 'My Reports',
+                      seeAll: _myReports.isNotEmpty
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      MyReportsScreen(reports: _myReports),
+                                ),
+                              );
+                            }
+                          : null,
+                    ),
+                    const SizedBox(height: 10),
+                    myReportsList(),
+                    const SizedBox(height: 20),
+                    prefrencesCard(),
+                    const SizedBox(height: 20),
+                    _sectionHeader(
+                      title: 'Badges',
+                      trailing: Text(
+                        '${reportsCount >= 10 ? 3 : (reportsCount >= 5 ? 2 : (reportsCount >= 1 ? 1 : 0))} of 6 earned',
+                        style: TextStyle(color: _muted, fontSize: 13),
+                      ),
+                    ),
+                    badgesGrid(reportsCount),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -507,7 +536,7 @@ class _ProfileState extends State<Profile> {
     }
   }
 
-  Widget header() {
+  Widget header(String name, int reportsCount) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -560,9 +589,9 @@ class _ProfileState extends State<Profile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Krish Sinha',
-                      style: TextStyle(
+                    Text(
+                      name,
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -585,7 +614,7 @@ class _ProfileState extends State<Profile> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _statBox('23', 'Reports'),
+              _statBox(reportsCount.toString(), 'Reports'),
               const SizedBox(width: 10),
               _statBox('141', 'Upvotes'),
               const SizedBox(width: 10),
@@ -653,7 +682,7 @@ class _ProfileState extends State<Profile> {
     );
   }
 
-  Widget badgesGrid() {
+  Widget badgesGrid(int reportsCount) {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Row(
@@ -664,7 +693,7 @@ class _ProfileState extends State<Profile> {
               '10+ accepted',
               Icons.emoji_events,
               Colors.amber,
-              true,
+              reportsCount >= 10,
             ),
           ),
           const SizedBox(width: 10),
@@ -674,7 +703,7 @@ class _ProfileState extends State<Profile> {
               '5 walk sessions',
               Icons.directions_walk,
               Colors.orange,
-              true,
+              reportsCount >= 5,
             ),
           ),
           const SizedBox(width: 10),
@@ -684,7 +713,7 @@ class _ProfileState extends State<Profile> {
               'Report within 1hr',
               Icons.bolt,
               Colors.amber,
-              true,
+              reportsCount >= 1,
             ),
           ),
         ],

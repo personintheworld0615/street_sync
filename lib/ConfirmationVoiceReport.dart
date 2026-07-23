@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/draft_reports.dart';
 import 'package:street_sync/report_severity.dart';
+import 'package:street_sync/api_service.dart';
 
 class ConfirmationVoiceReport extends StatefulWidget {
   const ConfirmationVoiceReport({
@@ -63,66 +64,107 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   }
 
   Future<void> _showSubmittedThenGoHome() async {
+    // 1. Show a loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: _primaryBlue.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  color: _primaryBlue,
-                  size: 44,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Report submitted!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Thanks your report is on its way.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-    await Future.delayed(const Duration(seconds: 2));
+
+    // 2. Send the data to the backend
+    final success = await ApiService.submitReport(
+      description: widget.description,
+      category: _inferredCategory,
+      location: widget.location,
+      severity: _autoSeverity,
+      isDraft: false,
+    );
+
+    // 3. Close the loading indicator
     if (!mounted) return;
     Navigator.pop(context);
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainShell()),
-      (route) => false,
-    );
+
+    if (success) {
+      // 4. Show success dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: _primaryBlue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: _primaryBlue,
+                    size: 44,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Report submitted!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Thanks your report is on its way.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      Navigator.pop(context);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+        (route) => false,
+      );
+    } else {
+      // 5. Show error if connection failed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not reach the server. Please try again later.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  void _saveAsDraft() {
+  void _saveAsDraft() async {
+    // Send to backend as a draft
+    await ApiService.submitReport(
+      description: widget.description,
+      category: _inferredCategory,
+      location: widget.location,
+      severity: _autoSeverity,
+      isDraft: true,
+    );
+
     draftReports.add(_reportMap(status: 'Draft'));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saved as draft'),

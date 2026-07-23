@@ -2,18 +2,20 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:street_sync/HomeScreen.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/draft_reports.dart';
+import 'package:street_sync/api_service.dart';
 
 class Confirmation extends StatefulWidget {
-   Confirmation({
+   const Confirmation({
     super.key,
     required this.category,
      required this.location,
      required this.description,
     required this.severity,
     required this.image,
+     this.latitude = 0.0,
+     this.longitude = 0.0,
      this.othercat = ""
   });
 
@@ -22,6 +24,8 @@ class Confirmation extends StatefulWidget {
   final String description;
   final String severity;
   final XFile image;
+  final double latitude;
+  final double longitude;
   final String othercat;
 
   @override
@@ -44,7 +48,17 @@ class _ConfirmationState extends State<Confirmation> {
     }
   }
 
-  void _saveAsDraft() {
+  void _saveAsDraft() async {
+    await ApiService.submitReport(
+      description: widget.description,
+      category: widget.category,
+      location: widget.location,
+      severity: widget.severity,
+      isDraft: true,
+      latitude: widget.latitude,
+      longitude: widget.longitude,
+    );
+
     draftReports.add({
       'category': widget.category,
       'location': widget.location,
@@ -59,6 +73,7 @@ class _ConfirmationState extends State<Confirmation> {
       'name': widget.category,
       'bgColor': Colors.orange[100]!,
     });
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saved as draft'),
@@ -83,7 +98,7 @@ class _ConfirmationState extends State<Confirmation> {
           'Confirm Report',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        leading: IconButton(onPressed: () => Navigator.pop(context, true), icon: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white,)),
+        leading: IconButton(onPressed: () => Navigator.pop(context, true), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white,)),
       ),
       body: Column(
         children: [
@@ -131,7 +146,7 @@ class _ConfirmationState extends State<Confirmation> {
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
-          CircleAvatar(backgroundColor: Colors.white.withOpacity(0.2),radius: 26,child: Icon(Icons.check_circle_outline,size: 36,color: Colors.white,),),
+          CircleAvatar(backgroundColor: Colors.white.withValues(alpha: 0.2),radius: 26,child: const Icon(Icons.check_circle_outline,size: 36,color: Colors.white,),),
           const SizedBox(height: 8),
           const Text(
             'Review your report',
@@ -375,6 +390,32 @@ class _ConfirmationState extends State<Confirmation> {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                );
+
+                final success = await ApiService.submitReport(
+                  description: widget.description,
+                  category: widget.category,
+                  location: widget.location,
+                  severity: widget.severity,
+                  isDraft: false,
+                  latitude: widget.latitude,
+                  longitude: widget.longitude,
+                );
+
+                if (!mounted) return;
+                Navigator.pop(context);
+
+                if (!success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to submit report. Please try again.')),
+                  );
+                  return;
+                }
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
                   builder: (_) => Dialog(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -422,15 +463,15 @@ class _ConfirmationState extends State<Confirmation> {
                   ),
                 );
                 await Future.delayed(const Duration(seconds: 2));
-                if (!context.mounted) return;
+                if (!mounted) return;
                 Navigator.pop(context);
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const MainShell()),
                   (route) => false,
                 );
               },
-              icon:  Icon(Icons.send_rounded, size: 20),
-              label:  Text(
+              icon:  const Icon(Icons.send_rounded, size: 20),
+              label:  const Text(
                 'Confirm and Submit',
                 style: TextStyle(
                   fontSize: 16,

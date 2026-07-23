@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:street_sync/api_service.dart';
 
 class Leaderboard extends StatefulWidget {
   const Leaderboard({super.key});
@@ -8,31 +9,76 @@ class Leaderboard extends StatefulWidget {
 }
 
 class _LeaderboardState extends State<Leaderboard> {
+  List<dynamic> _topUsers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLeaderboard();
+  }
+
+  Future<void> _fetchLeaderboard() async {
+    final users = await ApiService.getTopUsers(1); // Default user ID 1
+    if (mounted) {
+      setState(() {
+        _topUsers = users;
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Sort to ensure rank 1 is first
+    _topUsers.sort((a, b) => b['total_reports'].compareTo(a['total_reports']));
+    
+    // Safety check for empty list
+    if (_topUsers.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F7FA),
+        body: Column(
+          children: [
+            header([]),
+            const Expanded(child: Center(child: Text('No leaderboard data available.'))),
+          ],
+        ),
+      );
+    }
+
+    final topThree = _topUsers.take(3).toList();
+    final remaining = _topUsers.skip(3).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
-        children: [
-          header(),
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+      body: RefreshIndicator(
+        onRefresh: _fetchLeaderboard,
+        child: Column(
+          children: [
+            header(topThree),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
                 ),
+                child: playerList(remaining),
               ),
-              child: playerList(),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget header() {
+  Widget header(List<dynamic> topThree) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -55,40 +101,32 @@ class _LeaderboardState extends State<Leaderboard> {
             style: TextStyle(fontSize: 14, color: Colors.white70, fontStyle: FontStyle.italic),
           ),
           const SizedBox(height: 30),
-          topThreeSection(),
+          if (topThree.isNotEmpty) topThreeSection(topThree),
         ],
       ),
     );
   }
 
-  Widget topThreeSection() {
+  Widget topThreeSection(List<dynamic> topThree) {
+    // Reorder for visual podium: 2, 1, 3
+    List<dynamic> podium = [];
+    if (topThree.length >= 2) podium.add(topThree[1]);
+    podium.add(topThree[0]);
+    if (topThree.length >= 3) podium.add(topThree[2]);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        _topThreePodium(
-          name: 'Sarah J.',
-          score: '1120',
-          rank: 2,
-          height: 140,
-          color: const Color(0xFFC0C0C0),
-        ),
-        _topThreePodium(
-          name: 'Alex Rivera',
-          score: '1450',
-          rank: 1,
-          height: 170,
-          color: const Color(0xFFFFD700),
-          isFirst: true,
-        ),
-        _topThreePodium(
-          name: 'Marcus K.',
-          score: '980',
-          rank: 3,
-          height: 130,
-          color: const Color(0xFFCD7F32),
-        ),
-      ],
+      children: podium.map((user) {
+        int originalIndex = topThree.indexOf(user);
+        return _topThreePodium(
+          name: user['name'],
+          score: user['total_reports'].toString(),
+          rank: originalIndex + 1,
+          color: originalIndex == 0 ? const Color(0xFFFFD700) : (originalIndex == 1 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32)),
+          isFirst: originalIndex == 0,
+        );
+      }).toList(),
     );
   }
 
@@ -96,7 +134,6 @@ class _LeaderboardState extends State<Leaderboard> {
     required String name,
     required String score,
     required int rank,
-    required double height,
     required Color color,
     bool isFirst = false,
   }) {
@@ -155,20 +192,20 @@ class _LeaderboardState extends State<Leaderboard> {
     );
   }
 
-  Widget playerList() {
-    return ListView(
+  Widget playerList(List<dynamic> remaining) {
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(15, 25, 15, 15),
       physics: const BouncingScrollPhysics(),
-      children: [
-        _playerRow(rank: '4', name: 'James Wilson', score: '850'),
-        _playerRow(rank: '5', name: 'Elena Gomez', score: '720'),
-        _playerRow(rank: '6', name: 'Kevin Hart', score: '690'),
-        _playerRow(rank: '7', name: 'Aarav Sharma', score: '640', isYou: true),
-        _playerRow(rank: '8', name: 'Linda Chen', score: '580'),
-        _playerRow(rank: '9', name: 'Robert Fox', score: '510'),
-        _playerRow(rank: '10', name: 'Emily Blunt', score: '490'),
-        _playerRow(rank: '11', name: 'Chris Pratt', score: '450'),
-      ],
+      itemCount: remaining.length,
+      itemBuilder: (context, index) {
+        final user = remaining[index];
+        return _playerRow(
+          rank: (index + 4).toString(),
+          name: user['name'],
+          score: user['total_reports'].toString(),
+          isYou: user['id'] == 1, // Assume current user is 1
+        );
+      },
     );
   }
 
