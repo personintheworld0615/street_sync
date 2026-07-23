@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // For Android Emulator: http://10.0.2.2:8000
-  // For iOS Simulator: http://localhost:8000
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  // Automatically switch base URL depending on the platform
+  static String get baseUrl {
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
+    return 'http://localhost:8000'; // iOS and Web
+  }
 
   static Future<bool> submitReport({
     required String description,
@@ -33,7 +36,7 @@ class ApiService {
           'user_id': userId,
           'isDraft': isDraft,
         }),
-      );
+      ).timeout(const Duration(seconds: 5)); // Add timeout
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
@@ -45,7 +48,7 @@ class ApiService {
   static Future<List<dynamic>> getRecentReports({int amount = 10}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
@@ -58,7 +61,7 @@ class ApiService {
   static Future<List<dynamic>> getTopUsers(int userId) async {
     final url = Uri.parse('$baseUrl/users/top/$userId');
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
