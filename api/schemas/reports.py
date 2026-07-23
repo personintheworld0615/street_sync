@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, Field
 
 
 class Reports(BaseModel):
@@ -15,7 +15,18 @@ class Reports(BaseModel):
     severity: Literal["low", "medium", "high"]
     user_id: int
     isDraft: bool = False
-
+class SignupRequest(BaseModel):
+    name: str = Field(min_length=1,max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8,max_length=100)
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    name: str
 
 class ReportsFull(BaseModel):
     model_config = ConfigDict(from_attributes=True)
