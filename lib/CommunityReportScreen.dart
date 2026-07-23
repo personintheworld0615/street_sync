@@ -9,6 +9,7 @@ import 'Confirmation.dart';
 import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:street_sync/api_service.dart';
 import 'package:street_sync/draft_reports.dart';
 import 'package:street_sync/report_severity.dart';
 class CommunityReportScreen extends StatefulWidget {
@@ -751,13 +752,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   IconData _iconFromCat(String category) {
     switch (category) {
       case 'Road Damage':
-        return Icons.construction_rounded;
+        return Icons.car_crash_outlined;
       case 'Public Works':
-        return Icons.handyman_outlined;
+        return Icons.lightbulb_outline;
       case 'Environmental':
         return Icons.eco_outlined;
       case 'Accessibility':
-        return Icons.accessible_forward_rounded;
+        return Icons.accessible_forward_outlined;
       case 'Other':
       default:
         return Icons.more_horiz_rounded;
@@ -774,13 +775,37 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ? (_otherCategoryController.text.trim().isEmpty
             ? 'Other'
             : _otherCategoryController.text.trim())
-        : _selectedCategory;
+        : (_selectedCategory ?? 'Other');
+    final description = _descriptionController.text.trim();
+    final severity = _selectedSeverity ?? 'medium';
+
+    final success = await ApiService.submitReport(
+      description: description,
+      category: category,
+      location: location,
+      severity: severity,
+      isDraft: true,
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+
+    if (!mounted) return;
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save draft. Is the API running?'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     draftReports.add({
       'category': category,
       'location': location,
-      'description': _descriptionController.text.trim(),
-      'severity': _selectedSeverity,
+      'description': description,
+      'severity': severity,
       'othercat': _selectedCategory == 'Other'
           ? _otherCategoryController.text.trim()
           : '',
@@ -791,11 +816,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       'time': DateTime.now().toIso8601String(),
       'source': 'camera',
       'icon': _iconFromCat(_selectedCategory ?? 'Other'),
-      'name': category ?? 'Draft report',
+      'name': category,
       'bgColor': Colors.orange[100]!,
     });
 
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saved as draft'),

@@ -25,12 +25,19 @@ class MyReportsScreen extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final report = reports[index];
+                final description = report['description'] as String?;
+                final name = (description != null && description.trim().isNotEmpty)
+                    ? description
+                    : report['name'] as String? ??
+                        report['category'] as String? ??
+                        'Report';
                 return _reportCard(
-                  icon: report['icon'] as IconData? ?? Icons.assignment_outlined,
-                  status: report['status'] as String? ?? 'Open',
-                  name: report['name'] as String? ?? 'Report',
+                  icon: report['icon'] as IconData? ??
+                      _iconFromCategory(report['category'] as String?),
+                  status: _formatStatus(report['status'] as String?),
+                  name: name,
                   location: report['location'] as String? ?? '',
-                  time: report['time'] as String? ?? '',
+                  time: _formatTime(report['time']),
                 );
               },
             ),
@@ -49,6 +56,42 @@ class MyReportsScreen extends StatelessWidget {
     );
   }
 
+
+  String _formatStatus(String? status) {
+    final value = (status ?? 'Open').trim();
+    if (value.isEmpty) return 'Open';
+    return '${value[0].toUpperCase()}${value.substring(1).toLowerCase()}';
+  }
+
+  String _formatTime(dynamic time) {
+    if (time is String) {
+      final parsed = DateTime.tryParse(time);
+      if (parsed != null) {
+        final diff = DateTime.now().difference(parsed);
+        if (diff.inMinutes < 1) return 'Just now';
+        if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+        if (diff.inHours < 24) return '${diff.inHours} hrs ago';
+        return '${diff.inDays} days ago';
+      }
+      return time;
+    }
+    return '';
+  }
+
+  IconData _iconFromCategory(String? category) {
+    switch ((category ?? '').toLowerCase()) {
+      case 'road damage':
+        return Icons.construction_rounded;
+      case 'public works':
+        return Icons.handyman_outlined;
+      case 'environmental':
+        return Icons.eco_outlined;
+      case 'accessibility':
+        return Icons.accessible_forward_rounded;
+      default:
+        return Icons.assignment_outlined;
+    }
+  }
 
   Widget _reportCard({
     required IconData icon,
@@ -133,12 +176,12 @@ class MyReportsScreen extends StatelessWidget {
   }
 
   Color _statusColor(String status) {
-    switch (status) {
-      case 'Draft':
+    switch (status.toLowerCase()) {
+      case 'draft':
         return const Color(0xFFB86B2A);
-      case 'Open':
+      case 'open':
         return Colors.blue[700]!;
-      case 'Resolved':
+      case 'resolved':
         return Colors.green[700]!;
       default:
         return Colors.grey[700]!;

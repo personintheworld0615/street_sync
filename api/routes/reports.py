@@ -51,3 +51,12 @@ def create_user(user: Users, db: Session = Depends(get_db)):
 @router.get("/users/top/{user_id}", response_model=List[UsersDetailed])
 def get_top_users(user_id: int, db: Session = Depends(get_db)):
     return reports_service.get_top10_users(db, user_id)
+@router.get("/reports/nearme", response_model=List[ReportsFull])
+def get_reports_nearme(db: Session = Depends(get_db)):
+    return reports_service.get_reports_open(db)
+@router.get("/reports/resolved", response_model=List[ReportsFull])
+def get_reports_resolved(db: Session = Depends(get_db)):
+    return reports_service.get_reports_resolved(db)
+@router.get("/reports/in_progress", response_model=List[ReportsFull])
+def get_reports_in_progress(db: Session = Depends(get_db)):
+    return reports_service.get_reports_in_progress(db)

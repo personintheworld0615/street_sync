@@ -34,7 +34,7 @@ def create_report(db, report: Reports):
         user_id=report.user_id,
         is_draft=report.isDraft,
         image=report.image,
-        status="open",
+        status="Open",
         time=report.time,
     )
     db.add(row)
@@ -99,7 +99,7 @@ def get_all_reports(db):
 
 
 def get_most_recent_reports(db, amount: int):
-    rows = db.query(Report).order_by(Report.time.desc()).limit(amount).all()
+    rows = db.query(Report).filter(Report.is_draft == False).order_by(Report.time.desc()).limit(amount).all()
     return [report_to_schema(report) for report in rows]
 
 
@@ -132,3 +132,13 @@ def get_top10_users(db, user_id: int):
         )
         for user in rows
     ]
+def get_reports_open(db):
+    rows = db.query(Report).filter(Report.status == "Open").all()
+    return [report_to_schema(report) for report in rows]
+
+def get_reports_resolved(db):
+    rows = db.query(Report).filter(Report.status == "Resolved").all()
+    return [report_to_schema(report) for report in rows]
+def get_reports_in_progress(db):
+    rows = db.query(Report).filter(Report.status == "In Progress").all()
+    return [report_to_schema(report) for report in rows]

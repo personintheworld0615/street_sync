@@ -33,6 +33,12 @@ class MyDraftReportsScreen extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final report = reports[index];
+                final description = report['description'] as String?;
+                final name = (description != null && description.trim().isNotEmpty)
+                    ? description
+                    : report['name'] as String? ??
+                        report['category'] as String? ??
+                        'Draft report';
                 return InkWell(
                   onTap: () {
                     Navigator.push(
@@ -46,10 +52,8 @@ class MyDraftReportsScreen extends StatelessWidget {
                   child: _reportCard(
                     icon: report['icon'] as IconData? ??
                         Icons.edit_note_outlined,
-                    status: report['status'] as String? ?? 'Draft',
-                    name: report['name'] as String? ??
-                        report['category'] as String? ??
-                        'Draft report',
+                    status: 'Draft',
+                    name: name,
                     location: report['location'] as String? ?? '',
                     time: _formatTime(report['time']),
                     bgColor:
@@ -78,6 +82,7 @@ class MyDraftReportsScreen extends StatelessWidget {
       final parsed = DateTime.tryParse(time);
       if (parsed != null) {
         final diff = DateTime.now().difference(parsed);
+        if (diff.inMinutes < 1) return 'Just now';
         if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
         if (diff.inHours < 24) return '${diff.inHours} hrs ago';
         return '${diff.inDays} days ago';

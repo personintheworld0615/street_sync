@@ -114,6 +114,32 @@ class ApiService {
     return [];
   }
 
+  static Future<List<dynamic>> getDraftReports(int userid) async {
+    final url = Uri.parse('$baseUrl/reports/user/$userid/drafts');
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error fetching draft reports: $e');
+    }
+    return [];
+  }
+
+  static Future<List<dynamic>> getSubmittedReports(int userid) async {
+    final url = Uri.parse('$baseUrl/reports/user/$userid/submitted');
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error fetching submitted reports: $e');
+    }
+    return [];
+  }
+
   static Future<List<dynamic>> getTopUsers(int userId) async {
     final url = Uri.parse('$baseUrl/users/top/$userId');
     try {
@@ -127,16 +153,5 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>?> getUserStats(int userId) async {
-    // There isn't a direct "stats" endpoint, but we can get user info
-    // From the backend routes, get_user_submitted_reports or similar
-    // Actually, get_top_users returns UsersDetailed which has total_reports.
-    // Or we can add a specific endpoint if needed.
-    // For now, let's use the top users list to find our user or 
-    // we might need a get_user endpoint. 
-    // Looking at routes/reports.py, there is no get_user(user_id).
-    // Let's assume we can get it or just use a placeholder for now if missing.
-    // Wait, let's check if I can add a route or if one exists.
-    return null;
-  }
+
 }

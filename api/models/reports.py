@@ -30,7 +30,7 @@ class Report(Base):
     location: Mapped[str] = mapped_column(String)
     image: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     severity: Mapped[str] = mapped_column(String(20))
-    status: Mapped[str] = mapped_column(String(20), default="open")
+    status: Mapped[str] = mapped_column(String(20), default="Open")
     is_draft: Mapped[bool] = mapped_column(Boolean, default=False)
     time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

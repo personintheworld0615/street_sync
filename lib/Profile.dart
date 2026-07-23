@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
-import 'package:street_sync/draft_reports.dart';
 import 'package:street_sync/api_service.dart';
 
 import 'MyDraftReportsScreen.dart';
@@ -17,23 +16,32 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   bool pushNotifications = true;
   bool locationSharing = true;
-  Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  List<Map<String, dynamic>> _draftReports = [];
+  List<Map<String, dynamic>> _submittedReports = [];
+  static const int _userId = 1;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    _fetchUserReports();
   }
 
-  Future<void> _fetchUserData() async {
-    final topUsers = await ApiService.getTopUsers(1);
-    if (mounted) {
-      setState(() {
-        _userData = topUsers.firstWhere((u) => u['id'] == 1, orElse: () => null);
-        _isLoading = false;
-      });
-    }
+  Future<void> _fetchUserReports() async {
+    final results = await Future.wait([
+      ApiService.getDraftReports(_userId),
+      ApiService.getSubmittedReports(_userId),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _draftReports = results[0]
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      _submittedReports = results[1]
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      _isLoading = false;
+    });
   }
 
   static const _pageBg = Color(0xFFF4F7FB);
@@ -42,81 +50,57 @@ class _ProfileState extends State<Profile> {
   static const _blue = Color(0xFF2196F3);
   static const _iconBg = Color(0xFFE8F4FD);
 
-  // Submitted reports only (not drafts).
-  final List<Map<String, dynamic>> _myReports = [
-    {
-      'icon': Icons.construction,
-      'status': 'Open',
-      'name': 'Large pothole',
-      'location': 'Nassau St & Mercer St',
-      'time': '12 min ago',
-    },
-    {
-      'icon': Icons.traffic,
-      'status': 'Open',
-      'name': 'Broken streetlight',
-      'location': 'Witherspoon St',
-      'time': '2 hrs ago',
-    },
-    {
-      'icon': Icons.delete_outline,
-      'status': 'Resolved',
-      'name': 'Overflowing trash',
-      'location': 'Palmer Square',
-      'time': '1 day ago',
-    },
-    {
-      'icon': Icons.water_drop_outlined,
-      'status': 'Open',
-      'name': 'Sidewalk flooding',
-      'location': 'University Place',
-      'time': '3 days ago',
-    },
-    {
-      'icon': Icons.park_outlined,
-      'status': 'Open',
-      'name': 'Fallen tree branch',
-      'location': 'Marquand Park',
-      'time': '5 days ago',
-    },
-  ];
-
   TextStyle get _sectionTitle => const TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w700,
         color: _ink,
       );
 
+  IconData _iconFromCategory(String? category) {
+    switch ((category ?? '').toLowerCase()) {
+      case 'road damage':
+        return Icons.construction_rounded;
+      case 'public works':
+        return Icons.handyman_outlined;
+      case 'environmental':
+        return Icons.eco_outlined;
+      case 'accessibility':
+        return Icons.accessible_forward_rounded;
+      default:
+        return Icons.assignment_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
-    final int reportsCount = _userData?['total_reports'] ?? 0;
+
+    final int reportsCount = _submittedReports.length;
 
     return Scaffold(
       backgroundColor: _pageBg,
       body: RefreshIndicator(
-        onRefresh: _fetchUserData,
+        onRefresh: _fetchUserReports,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-              header(_userData?['name'] ?? 'Krish Sinha', reportsCount),
+              header('Krish Sinha', reportsCount),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: Column(
                   children: [
                     _sectionHeader(
                       title: 'My Drafts',
-                      seeAll: draftReports.isNotEmpty
+                      seeAll: _draftReports.isNotEmpty
                           ? () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => MyDraftReportsScreen(
-                                    reports: draftReports,
+                                    reports: _draftReports,
                                   ),
                                 ),
                               );
@@ -128,13 +112,14 @@ class _ProfileState extends State<Profile> {
                     const SizedBox(height: 20),
                     _sectionHeader(
                       title: 'My Reports',
-                      seeAll: _myReports.isNotEmpty
+                      seeAll: _submittedReports.isNotEmpty
                           ? () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      MyReportsScreen(reports: _myReports),
+                                  builder: (context) => MyReportsScreen(
+                                    reports: _submittedReports,
+                                  ),
                                 ),
                               );
                             }
@@ -303,20 +288,20 @@ class _ProfileState extends State<Profile> {
       );
 
   Widget myDraftReportsList() {
-    if (draftReports.isEmpty) {
+    if (_draftReports.isEmpty) {
       return _emptyReportsState(
         'Save a report as a draft to finish it later',
       );
     }
 
-    final count = draftReports.length.clamp(0, 3);
+    final count = _draftReports.length.clamp(0, 3);
     return Container(
       decoration: _listDecoration,
       child: Column(
         children: [
           for (int i = 0; i < count; i++) ...[
             if (i > 0) Divider(color: Colors.grey[200], height: 1),
-            _buildDraftCard(draftReports[i]),
+            _buildDraftCard(_draftReports[i]),
           ],
         ],
       ),
@@ -324,12 +309,12 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildDraftCard(Map<String, dynamic> report) {
-    final name = report['name'] as String? ??
-        report['category'] as String? ??
-        'Draft report';
+    final name = (report['description'] as String?)?.trim().isNotEmpty == true
+        ? report['description'] as String
+        : report['category'] as String? ?? 'Draft report';
     final location = report['location'] as String? ?? '';
-    final status = report['status'] as String? ?? 'Draft';
-    final icon = report['icon'] as IconData? ?? Icons.edit_note_outlined;
+    final status = 'Draft';
+    final icon = _iconFromCategory(report['category'] as String?);
     final time = _formatDraftTime(report['time']);
 
     return InkWell(
@@ -355,6 +340,7 @@ class _ProfileState extends State<Profile> {
       final parsed = DateTime.tryParse(time);
       if (parsed != null) {
         final diff = DateTime.now().difference(parsed);
+        if (diff.inMinutes < 1) return 'Just now';
         if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
         if (diff.inHours < 24) return '${diff.inHours} hrs ago';
         return '${diff.inDays} days ago';
@@ -365,28 +351,41 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget myReportsList() {
-    if (_myReports.isEmpty) {
-      return _emptyReportsState("Create a new report");
+    if (_submittedReports.isEmpty) {
+      return _emptyReportsState('Create a new report');
     }
 
-    final count = _myReports.length.clamp(0, 3);
+    final count = _submittedReports.length.clamp(0, 3);
     return Container(
       decoration: _listDecoration,
       child: Column(
         children: [
           for (int i = 0; i < count; i++) ...[
             if (i > 0) Divider(color: Colors.grey[200], height: 1),
-            _buildReportCard(
-              icon: _myReports[i]['icon'] as IconData,
-              status: _myReports[i]['status'] as String,
-              name: _myReports[i]['name'] as String,
-              location: _myReports[i]['location'] as String,
-              time: _myReports[i]['time'] as String,
-            ),
+            _buildSubmittedCard(_submittedReports[i]),
           ],
         ],
       ),
     );
+  }
+
+  Widget _buildSubmittedCard(Map<String, dynamic> report) {
+    final name = (report['description'] as String?)?.trim().isNotEmpty == true
+        ? report['description'] as String
+        : report['category'] as String? ?? 'Report';
+    return _buildReportCard(
+      icon: _iconFromCategory(report['category'] as String?),
+      status: _formatStatus(report['status'] as String?),
+      name: name,
+      location: report['location'] as String? ?? '',
+      time: _formatDraftTime(report['time']),
+    );
+  }
+
+  String _formatStatus(String? status) {
+    final value = (status ?? 'Open').trim();
+    if (value.isEmpty) return 'Open';
+    return '${value[0].toUpperCase()}${value.substring(1).toLowerCase()}';
   }
 
   Widget _emptyReportsState(String text) {
@@ -524,12 +523,12 @@ class _ProfileState extends State<Profile> {
   }
 
   Color _statusColor(String status) {
-    switch (status) {
-      case 'Draft':
+    switch (status.toLowerCase()) {
+      case 'draft':
         return const Color(0xFFB86B2A);
-      case 'Open':
+      case 'open':
         return Colors.blue[700]!;
-      case 'Resolved':
+      case 'resolved':
         return Colors.green[700]!;
       default:
         return Colors.grey[700]!;
