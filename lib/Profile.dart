@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/error_popup.dart';
+import 'package:street_sync/skeleton.dart';
 
 import 'MyDraftReportsScreen.dart';
 import 'UpdateThing.dart';
@@ -19,7 +22,6 @@ class _ProfileState extends State<Profile> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _draftReports = [];
   List<Map<String, dynamic>> _submittedReports = [];
-  static const int _userId = 1;
 
   @override
   void initState() {
@@ -28,9 +30,20 @@ class _ProfileState extends State<Profile> {
   }
 
   Future<void> _fetchUserReports() async {
+    final userId = ApiService.userId;
+    if (userId == null) {
+      if (!mounted) return;
+      setState(() {
+        _draftReports = [];
+        _submittedReports = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
     final results = await Future.wait([
-      ApiService.getDraftReports(_userId),
-      ApiService.getSubmittedReports(_userId),
+      ApiService.getDraftReports(userId),
+      ApiService.getSubmittedReports(userId),
     ]);
     if (!mounted) return;
     setState(() {
@@ -74,7 +87,7 @@ class _ProfileState extends State<Profile> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const ProfileSkeleton();
     }
 
     final int reportsCount = _submittedReports.length;
@@ -87,7 +100,7 @@ class _ProfileState extends State<Profile> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-              header('Krish Sinha', reportsCount),
+              header(ApiService.userName, reportsCount),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: Column(
@@ -223,11 +236,65 @@ class _ProfileState extends State<Profile> {
               iconColor: Colors.red[600]!,
               title: 'Sign Out',
               titleColor: Colors.red[600],
-              onTap: () {},
+              onTap: () async {
+                await ApiService.logout();
+                if (!mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              },
+            ),
+            Divider(color: Colors.grey[200], height: 1),
+            _prefRow(
+              icon: Icons.delete_outline,
+              iconBg: Colors.red[50]!,
+              iconColor: Colors.red[600]!,
+              title: 'Delete Account',
+              titleColor: Colors.red[600],
+              onTap: _confirmDeleteAccount,
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently deletes your account and reports. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red[600]),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final error = await ApiService.deleteAccount();
+    if (!mounted) return;
+
+    if (error != null) {
+      await showErrorPopup(context, error);
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
     );
   }
 
@@ -597,7 +664,7 @@ class _ProfileState extends State<Profile> {
                       ),
                     ),
                     Text(
-                      ApiService.currentUser?['email'] ?? 'krishworld432@gmail.com',
+                      ApiService.userEmail ?? 'No email',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 13,

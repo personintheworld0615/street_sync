@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/error_popup.dart';
 
 /// Placeholder login — UI only for now; continues into the app.
 class LoginScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
   bool _obscure = true;
   bool _isLogin = true;
   bool _loading = false;
@@ -28,34 +30,38 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _nameCtrl.dispose();
+    _lastNameCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _handleSubmit() async {
     if (_emailCtrl.text.isEmpty || _passwordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      await showErrorPopup(context, 'Please fill in all fields');
       return;
     }
-    if (!_isLogin && _nameCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your name')),
-      );
+    if (!_isLogin &&
+        (_nameCtrl.text.isEmpty || _lastNameCtrl.text.isEmpty)) {
+      await showErrorPopup(context, 'Please enter your first and last name');
       return;
     }
 
     setState(() => _loading = true);
 
-    bool success;
+    String? error;
     if (_isLogin) {
-      success = await ApiService.login(
+      error = await ApiService.login(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
     } else {
-      success = await ApiService.signup(
-        name: _nameCtrl.text.trim(),
+      if (_passwordCtrl.text.length < 8) {
+        setState(() => _loading = false);
+        await showErrorPopup(context, 'Password must be at least 8 characters');
+        return;
+      }
+      error = await ApiService.signup(
+        firstname: _nameCtrl.text.trim(),
+        lastname: _lastNameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
@@ -63,14 +69,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (mounted) {
       setState(() => _loading = false);
-      if (success) {
+      if (error == null) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainShell()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isLogin ? 'Login failed' : 'Signup failed')),
-        );
+        await showErrorPopup(context, error);
       }
     }
   }
@@ -117,12 +121,24 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 36),
               if (!_isLogin) ...[
-                _label('Full Name'),
+                _label('First Name'),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameCtrl,
                   decoration: _inputDecoration(
-                    hint: 'Alex Rivera',
+                    hint: 'Alex',
+                    icon: Icons.person_outline_rounded,
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+                if (!_isLogin) ...[
+                _label('Last Name'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _lastNameCtrl,
+                  decoration: _inputDecoration(
+                    hint: 'Rivera',
                     icon: Icons.person_outline_rounded,
                   ),
                 ),

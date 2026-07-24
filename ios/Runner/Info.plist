@@ -38,6 +38,17 @@
 	<string>StreetSync needs photo library access to upload issue photos.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>StreetSync needs speech recognition for voice reports.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>StreetSync needs local network access to reach the API on your computer during development.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

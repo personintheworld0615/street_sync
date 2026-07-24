@@ -62,17 +62,6 @@ def get_report(db, report_id: int):
     return report_to_schema(row)
 
 
-def create_user(db, user: Users):
-    row = User(name=user.name, total_reports=0)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return UsersDetailed(
-        id=row.id,
-        name=row.name,
-        total_reports=row.total_reports,
-        reports=[],
-    )
 
 
 def get_all_reports_by_user_notdraft(db, user_id: int):
@@ -126,7 +115,8 @@ def get_top10_users(db, user_id: int):
     return [
         UsersDetailed(
             id=user.id,
-            name=user.name,
+            first_name=user.first_name,
+            last_name=user.last_name,
             total_reports=user.total_reports,
             reports=[],
         )
@@ -142,3 +132,19 @@ def get_reports_resolved(db):
 def get_reports_in_progress(db):
     rows = db.query(Report).filter(Report.status == "In Progress").all()
     return [report_to_schema(report) for report in rows]
+def delete_account(db, user_id: int):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Remove reports first so FK constraints don't block the user delete.
+    db.query(Report).filter(Report.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return {"message": "Account deleted successfully"}
+def delete_report(db, report_id: int):
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    db.delete(report)
+    db.commit()
+    return {"message": "Report deleted successfully"}
