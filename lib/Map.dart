@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'config.dart';
+import 'api_service.dart';
 
 enum IssueCategory {
   roadDamage,
@@ -27,6 +28,108 @@ class _MapScreenState extends State<MapScreen> {
   bool _ready = false;
   Set<Marker> _markers = {};
   final TextEditingController _searchController = TextEditingController();
+
+  List<dynamic> _recentReports = [];
+
+  String? _selectedCategory; // null = show all
+
+  Map<String, dynamic>? _selectedReport;
+
+  Future<void> _loadRecentReports() async {
+  _recentReports = await ApiService.getRecentReports(amount: 100);
+
+  print(_recentReports);
+
+  _updateMarkers();
+}
+
+void _updateMarkers() {
+  final reports = _selectedCategory == null
+      ? _recentReports
+      : _recentReports.where((report) {
+          if (_selectedCategory == "Other") {
+            return ![
+              "Road Damage",
+              "Public Works",
+              "Environmental",
+              "Accessibility",
+            ].contains(report["category"]);
+          }
+
+          return report["category"] == _selectedCategory;
+        });
+
+  setState(() {
+    _markers = reports.map<Marker>((report) {
+      return Marker(
+        markerId: MarkerId(report["id"].toString()),
+        position: LatLng(
+          report["latitude"],
+          report["longitude"],
+        ),
+        onTap: () {
+          setState(() {
+            _selectedReport = report;
+          });
+        },
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _getMarkerColor(report["category"]),
+        ),
+      );
+    }).toSet();
+  });
+}
+
+double _getMarkerColor(String category) {
+  switch (category) {
+    case "Road Damage":
+      return BitmapDescriptor.hueRed;
+
+    case "Public Works":
+      return BitmapDescriptor.hueOrange;
+
+    case "Environmental":
+      return BitmapDescriptor.hueGreen;
+
+    case "Accessibility":
+      return BitmapDescriptor.hueAzure;
+
+    default:
+      return BitmapDescriptor.hueViolet;
+  }
+}
+
+Widget _categoryChip(
+  String label,
+  String? category,
+  Color color,
+) {
+  return Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: FilterChip(
+      showCheckmark: false,
+      label: Text(
+        label,
+        style: TextStyle(
+          color: _selectedCategory == category
+              ? Colors.white
+              : Colors.black,
+        ),
+      ),
+      selected: _selectedCategory == category,
+      selectedColor: color,
+      backgroundColor: Colors.white,
+      checkmarkColor: Colors.white,
+      onSelected: (_) {
+        setState(() {
+          _selectedCategory = category;
+        });
+
+        _updateMarkers();
+      },
+    ),
+  );
+}
 
   List<dynamic> _suggestions = [];
 
@@ -86,77 +189,6 @@ class _MapScreenState extends State<MapScreen> {
     _goToUser();
   }
 
-  void _loadFakeReports() {
-    setState(() {
-      _markers = {
-        // Road Damage - Red
-        Marker(
-          markerId: const MarkerId('road_damage_1'),
-          position: const LatLng(40.3578, -74.6678),
-          infoWindow: const InfoWindow(
-            title: "Pothole",
-            snippet: "Category: Road Damage",
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueRed,
-          ),
-        ),
-
-        // Public Works - Cyan
-        Marker(
-          markerId: const MarkerId('public_works_1'),
-          position: const LatLng(40.3565, -74.6665),
-          infoWindow: const InfoWindow(
-            title: "Broken Streetlight",
-            snippet: "Category: Public Works",
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueRose,
-          ),
-        ),
-
-        // Environmental - Green
-        Marker(
-          markerId: const MarkerId('environmental_1'),
-          position: const LatLng(40.3585, -74.6655),
-          infoWindow: const InfoWindow(
-            title: "Illegal Dumping",
-            snippet: "Category: Environmental",
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
-        ),
-
-        // ADA - Yellow
-        Marker(
-          markerId: const MarkerId('ada_1'),
-          position: const LatLng(40.3590, -74.6680),
-          infoWindow: const InfoWindow(
-            title: "Damaged Sidewalk Ramp",
-            snippet: "Category: ADA",
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueViolet,
-          ),
-        ),
-
-        // Other - Blue
-        Marker(
-          markerId: const MarkerId('other_1'),
-          position: const LatLng(40.3558, -74.6670),
-          infoWindow: const InfoWindow(
-            title: "Missing Sign",
-            snippet: "Category: Other",
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-        ),
-      };
-    });
-  }
-
   Future<void> _goToUser() async {
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -175,11 +207,11 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     setState(() {
-      // _center = userLatLng;
+       _center = userLatLng;
       _ready = true;
     });
 
-_loadFakeReports();
+    await _loadRecentReports();
 
     await _controller?.animateCamera(
       CameraUpdate.newLatLngZoom(_center, 15),
@@ -270,6 +302,63 @@ _loadFakeReports();
                       },
                     );
                   },
+                ),
+              ),
+            ),
+            if (_selectedReport != null)
+              Positioned(
+                bottom: 90,
+                left: 20,
+                right: 20,
+                child: Card(
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+
+                        Text(
+                          _selectedReport!["description"],
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        Text(
+                          "Category: ${_selectedReport!["category"]}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                        ),
+
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              bottom: 20,
+              left: 10,
+              right: 10,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _categoryChip("All", null, Colors.grey),
+                    _categoryChip("Road", "Road Damage", Colors.red),
+                    _categoryChip("Public", "Public Works", Colors.orange),
+                    _categoryChip("Environment", "Environmental", Colors.green),
+                    _categoryChip("ADA", "Accessibility", Colors.blue),
+                    _categoryChip("Other", "Other", Colors.purple),
+                  ],
                 ),
               ),
             ),

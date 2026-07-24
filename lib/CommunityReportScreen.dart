@@ -857,6 +857,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               if (_descriptionController.text.trim().isEmpty) {
                 errors.add('description');
               }
+              if (_selectedSeverity == null) {
+                errors.add('severity');
+              }
               if (_markers.isEmpty) errors.add('location');
 
               if (errors.isNotEmpty) {
