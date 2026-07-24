@@ -6,6 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static const _sessionKey = 'current_user';
+  static const _cacheRecentReports = 'cache_recent_reports';
+  static const _cacheDraftReports = 'cache_draft_reports';
+  static const _cacheSubmittedReports = 'cache_submitted_reports';
+  static const _cacheTopUsers = 'cache_top_users';
+  static const _cacheUserScopedId = 'cache_user_scoped_id';
 
   static String get _devHost =>
       dotenv.maybeGet('DEV_HOST')?.trim().isNotEmpty == true
@@ -78,6 +83,83 @@ class ApiService {
   static Future<void> logout() async {
     currentUser = null;
     await _saveSession();
+    await clearDataCache();
+  }
+
+  static Future<void> clearDataCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheRecentReports);
+    await prefs.remove(_cacheDraftReports);
+    await prefs.remove(_cacheSubmittedReports);
+    await prefs.remove(_cacheTopUsers);
+    await prefs.remove(_cacheUserScopedId);
+  }
+
+  static Future<List<dynamic>?> _readListCache(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) return decoded;
+    } catch (e) {
+      print('cache read error ($key): $e');
+    }
+    return null;
+  }
+
+  static Future<void> _writeListCache(String key, List<dynamic> value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, jsonEncode(value));
+  }
+
+  static Future<void> _ensureUserScopedCache(int userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedFor = prefs.getInt(_cacheUserScopedId);
+    if (cachedFor == userId) return;
+    await prefs.remove(_cacheDraftReports);
+    await prefs.remove(_cacheSubmittedReports);
+    await prefs.remove(_cacheTopUsers);
+    await prefs.setInt(_cacheUserScopedId, userId);
+  }
+
+  static Future<List<dynamic>?> getCachedRecentReports() =>
+      _readListCache(_cacheRecentReports);
+
+  static Future<void> cacheRecentReports(List<dynamic> reports) =>
+      _writeListCache(_cacheRecentReports, reports);
+
+  static Future<List<dynamic>?> getCachedDraftReports(int userId) async {
+    await _ensureUserScopedCache(userId);
+    return _readListCache(_cacheDraftReports);
+  }
+
+  static Future<void> cacheDraftReports(int userId, List<dynamic> reports) async {
+    await _ensureUserScopedCache(userId);
+    await _writeListCache(_cacheDraftReports, reports);
+  }
+
+  static Future<List<dynamic>?> getCachedSubmittedReports(int userId) async {
+    await _ensureUserScopedCache(userId);
+    return _readListCache(_cacheSubmittedReports);
+  }
+
+  static Future<void> cacheSubmittedReports(
+    int userId,
+    List<dynamic> reports,
+  ) async {
+    await _ensureUserScopedCache(userId);
+    await _writeListCache(_cacheSubmittedReports, reports);
+  }
+
+  static Future<List<dynamic>?> getCachedTopUsers(int userId) async {
+    await _ensureUserScopedCache(userId);
+    return _readListCache(_cacheTopUsers);
+  }
+
+  static Future<void> cacheTopUsers(int userId, List<dynamic> users) async {
+    await _ensureUserScopedCache(userId);
+    await _writeListCache(_cacheTopUsers, users);
   }
 
   static Map<String, String> get _headers {
@@ -249,14 +331,16 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> getRecentReports({int amount = 10}) async {
+  static Future<List<dynamic>> getRecentReports({int amount = 3}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheRecentReports(list);
+        return list;
       }
     } catch (e) {
       print('Error fetching reports: $e');
@@ -275,7 +359,9 @@ class ApiService {
         return [];
       }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheDraftReports(userid, list);
+        return list;
       }
     } catch (e) {
       print('Error fetching draft reports: $e');
@@ -294,7 +380,9 @@ class ApiService {
         return [];
       }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheSubmittedReports(userid, list);
+        return list;
       }
     } catch (e) {
       print('Error fetching submitted reports: $e');
@@ -313,7 +401,9 @@ class ApiService {
         return [];
       }
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheTopUsers(userId, list);
+        return list;
       }
     } catch (e) {
       print('Error fetching top users: $e');

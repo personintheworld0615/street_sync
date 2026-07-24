@@ -32,10 +32,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchReports();
+    _loadReports();
   }
 
-  Future<void> _fetchReports() async {
+  Future<void> _loadReports({bool forceNetwork = false}) async {
+    if (!forceNetwork) {
+      final cached = await ApiService.getCachedRecentReports();
+      if (cached != null && mounted) {
+        setState(() {
+          _recentReports = cached;
+          _isLoading = false;
+        });
+      }
+    }
+
     final reports = await ApiService.getRecentReports();
     if (mounted) {
       setState(() {
@@ -44,6 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     }
   }
+
+  Future<void> _fetchReports() => _loadReports(forceNetwork: true);
 
   TextStyle get _sectionTitle => const TextStyle(
         fontSize: 17,

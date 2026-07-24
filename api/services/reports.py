@@ -88,7 +88,15 @@ def get_all_reports(db):
 
 
 def get_most_recent_reports(db, amount: int):
-    rows = db.query(Report).filter(Report.is_draft == False).order_by(Report.time.desc()).limit(amount).all()
+    rows = []
+    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Road Damage").order_by(Report.time.desc()).limit(amount).all())
+    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Public Works").order_by(Report.time.desc()).limit(amount).all())
+    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Environmental").order_by(Report.time.desc()).limit(amount).all())
+    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Accessibility").order_by(Report.time.desc()).limit(amount).all())
+    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category != "Road Damage", Report.category != "Public Works", Report.category != "Environmental", Report.category != "Accessibility").order_by(Report.time.desc()).limit(amount).all())
+
+    rows.sort(key=lambda x: x.time, reverse=True)
+    # rows = db.query(Report).filter(Report.is_draft == False).order_by(Report.time.desc()).limit(amount).all()
     return [report_to_schema(report) for report in rows]
 
 

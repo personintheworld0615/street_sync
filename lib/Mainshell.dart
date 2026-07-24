@@ -24,7 +24,10 @@ class _MainShellState extends State<MainShell> {
     Widget build(BuildContext context) {
      
         return Scaffold(
-            body: _screens[_index],
+            body: IndexedStack(
+                index: _index,
+                children: _screens,
+            ),
             bottomNavigationBar: BottomNavigationBar(
                 selectedItemColor: const Color(0xFF2196F3),
                 unselectedItemColor: const Color(0xFF5B677A),

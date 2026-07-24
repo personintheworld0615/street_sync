@@ -16,10 +16,10 @@ class _LeaderboardState extends State<Leaderboard> {
   @override
   void initState() {
     super.initState();
-    _fetchLeaderboard();
+    _loadLeaderboard();
   }
 
-  Future<void> _fetchLeaderboard() async {
+  Future<void> _loadLeaderboard({bool forceNetwork = false}) async {
     final userId = ApiService.userId;
     if (userId == null) {
       if (mounted) {
@@ -31,6 +31,16 @@ class _LeaderboardState extends State<Leaderboard> {
       return;
     }
 
+    if (!forceNetwork) {
+      final cached = await ApiService.getCachedTopUsers(userId);
+      if (cached != null && mounted) {
+        setState(() {
+          _topUsers = cached;
+          _isLoading = false;
+        });
+      }
+    }
+
     final users = await ApiService.getTopUsers(userId);
     if (mounted) {
       setState(() {
@@ -39,6 +49,8 @@ class _LeaderboardState extends State<Leaderboard> {
       });
     }
   }
+
+  Future<void> _fetchLeaderboard() => _loadLeaderboard(forceNetwork: true);
 
   @override
   Widget build(BuildContext context) {
@@ -138,12 +150,18 @@ class _LeaderboardState extends State<Leaderboard> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: podium.map((user) {
         int originalIndex = topThree.indexOf(user);
-        return _topThreePodium(
-          name: _displayName(user),
-          score: user['total_reports'].toString(),
-          rank: originalIndex + 1,
-          color: originalIndex == 0 ? const Color(0xFFFFD700) : (originalIndex == 1 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32)),
-          isFirst: originalIndex == 0,
+        return Expanded(
+          child: _topThreePodium(
+            name: _displayName(user),
+            score: user['total_reports'].toString(),
+            rank: originalIndex + 1,
+            color: originalIndex == 0
+                ? const Color(0xFFFFD700)
+                : (originalIndex == 1
+                    ? const Color(0xFFC0C0C0)
+                    : const Color(0xFFCD7F32)),
+            isFirst: originalIndex == 0,
+          ),
         );
       }).toList(),
     );
@@ -156,58 +174,91 @@ class _LeaderboardState extends State<Leaderboard> {
     required Color color,
     bool isFirst = false,
   }) {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: color, width: 3),
-                boxShadow: [
-                  BoxShadow(color: color.withOpacity(0.3), blurRadius: 10, spreadRadius: 2),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: isFirst ? 45 : 35,
-                backgroundColor: Colors.white24,
-                child: Icon(Icons.person, size: isFirst ? 50 : 40, color: Colors.white),
-              ),
-            ),
-            Positioned(
-              bottom: -10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Container(
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white, width: 2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-                child: Text(
-                  '#$rank',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                child: CircleAvatar(
+                  radius: isFirst ? 45 : 35,
+                  backgroundColor: Colors.white24,
+                  child: Icon(
+                    Icons.person,
+                    size: isFirst ? 50 : 40,
+                    color: Colors.white,
+                  ),
                 ),
               ),
+              Positioned(
+                bottom: -10,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: Text(
+                    '#$rank',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              if (isFirst)
+                const Positioned(
+                  top: -25,
+                  child: Icon(
+                    Icons.workspace_premium,
+                    color: Color(0xFFFFD700),
+                    size: 30,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
-            if (isFirst)
-              const Positioned(
-                top: -25,
-                child: Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 30),
-              ),
-          ],
-        ),
-        const SizedBox(height: 15),
-        Text(
-          name,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        Text(
-          score,
-          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ],
+          ),
+          Text(
+            score,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -267,6 +318,8 @@ class _LeaderboardState extends State<Leaderboard> {
           Expanded(
             child: Text(
               isYou ? '$name (You)' : name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: isYou ? FontWeight.bold : FontWeight.w600,

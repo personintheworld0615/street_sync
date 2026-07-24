@@ -17,7 +17,7 @@ Future<void> main() async {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2196F3)),
         useMaterial3: true,
       ),
-      home: const MainShell(),
+      home: const WelcomeScreen(),
     ),
   );
 }

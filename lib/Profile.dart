@@ -26,10 +26,10 @@ class _ProfileState extends State<Profile> {
   @override
   void initState() {
     super.initState();
-    _fetchUserReports();
+    _loadUserReports();
   }
 
-  Future<void> _fetchUserReports() async {
+  Future<void> _loadUserReports({bool forceNetwork = false}) async {
     final userId = ApiService.userId;
     if (userId == null) {
       if (!mounted) return;
@@ -39,6 +39,27 @@ class _ProfileState extends State<Profile> {
         _isLoading = false;
       });
       return;
+    }
+
+    if (!forceNetwork) {
+      final cachedDrafts = await ApiService.getCachedDraftReports(userId);
+      final cachedSubmitted =
+          await ApiService.getCachedSubmittedReports(userId);
+      if ((cachedDrafts != null || cachedSubmitted != null) && mounted) {
+        setState(() {
+          if (cachedDrafts != null) {
+            _draftReports = cachedDrafts
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+          if (cachedSubmitted != null) {
+            _submittedReports = cachedSubmitted
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+          _isLoading = false;
+        });
+      }
     }
 
     final results = await Future.wait([
@@ -56,6 +77,8 @@ class _ProfileState extends State<Profile> {
       _isLoading = false;
     });
   }
+
+  Future<void> _fetchUserReports() => _loadUserReports(forceNetwork: true);
 
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
