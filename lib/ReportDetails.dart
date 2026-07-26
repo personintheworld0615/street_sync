@@ -25,7 +25,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.report["description"],
+              widget.report["title"],
               style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,

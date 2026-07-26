@@ -3,6 +3,7 @@ import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/skeleton.dart';
+import 'api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _recentReports = [];
   bool _isLoading = true;
 
+  int _nearbyCount = 0;
+  int _inProgressCount = 0;
+  int _resolvedCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadReports({bool forceNetwork = false}) async {
     if (!forceNetwork) {
       final cached = await ApiService.getCachedRecentReports();
+
       if (cached != null && mounted) {
         setState(() {
           _recentReports = cached;
@@ -47,9 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final reports = await ApiService.getRecentReports();
+    final stats = await ApiService.getReportStats();
+
     if (mounted) {
       setState(() {
         _recentReports = reports;
+
+        _nearbyCount = stats['nearby'] ?? 0;
+        _inProgressCount = stats['in_progress'] ?? 0;
+        _resolvedCount = stats['resolved'] ?? 0;
+
         _isLoading = false;
       });
     }
@@ -391,21 +404,21 @@ class _HomeScreenState extends State<HomeScreen> {
         _statCard(
           icon: Icons.warning_amber_rounded,
           iconColor: Colors.red,
-          value: '6',
+          value: _nearbyCount.toString(),
           label: 'Nearby',
         ),
         const SizedBox(width: 10),
         _statCard(
           icon: Icons.build_rounded,
           iconColor: Colors.orange,
-          value: '3',
+          value: _inProgressCount.toString(),
           label: 'In progress',
         ),
         const SizedBox(width: 10),
         _statCard(
           icon: Icons.check_circle_outline,
           iconColor: Colors.green,
-          value: '12',
+          value: _resolvedCount.toString(),
           label: 'Resolved',
         ),
       ],

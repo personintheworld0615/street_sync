@@ -354,6 +354,34 @@ class ApiService {
     return [];
   }
 
+  static Future<Map<String, dynamic>> getReportStats() async {
+    final url = Uri.parse('$baseUrl/reports/stats');
+
+    try {
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+      }
+
+      print('Stats error: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching report stats: $e');
+    }
+
+    return {
+      'nearby': 0,
+      'in_progress': 0,
+      'resolved': 0,
+    };
+  }
+
   static Future<List<dynamic>> getDraftReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/drafts');
     try {

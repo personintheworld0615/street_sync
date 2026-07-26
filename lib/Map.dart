@@ -39,8 +39,6 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _loadRecentReports() async {
   _recentReports = await ApiService.getRecentReports(amount: 100);
 
-  print(_recentReports);
-
   _updateMarkers();
 }
 
