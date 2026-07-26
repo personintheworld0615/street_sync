@@ -1,6 +1,10 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+# Ensure .env is loaded before reading environment variables
+load_dotenv()
 
 # 1. Try to get a single DATABASE_URL (standard for Render/Neon/Supabase)
 DATABASE_URL = os.getenv("DATABASE_URL")

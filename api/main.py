@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+# Load environment variables from .env as early as possible
+load_dotenv()
+
 from api.routes.auth import router as auth_router
 from api.database import Base, engine
 from api.models import reports as models_reports 
