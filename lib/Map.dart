@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'config.dart';
 import 'api_service.dart';
+import 'ReportDetails.dart';
 
 enum IssueCategory {
   roadDamage,
@@ -123,6 +124,7 @@ Widget _categoryChip(
       onSelected: (_) {
         setState(() {
           _selectedCategory = category;
+          _selectedReport = null;
         });
 
         _updateMarkers();
@@ -332,13 +334,34 @@ Widget _categoryChip(
 
                         const SizedBox(height: 8),
 
-                        Text(
-                          "Category: ${_selectedReport!["category"]}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                          ),
-                        ),
-
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                "Category: ${_selectedReport!["category"]}",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ReportDetailsScreen(
+                                      report: _selectedReport!,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 12,
+                              ),
+                            ),
+                          ],
+                        )
                       ],
                     ),
                   ),
