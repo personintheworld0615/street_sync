@@ -1,6 +1,16 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from api.database import get_db
@@ -8,18 +18,68 @@ from api.models.reports import User
 from api.schemas.reports import Reports, ReportsFull, UsersDetailed
 from api.services import reports as reports_service
 from api.services.auth import get_current_user, get_optional_user
+from api.services.storage import upload_report_image
 
 router = APIRouter(tags=["reports"])
 
 
 @router.post("/reports", response_model=ReportsFull)
-def create_report(
-    report: Reports,
+async def create_report(
+    title: str = Form(...),
+    description: str = Form(...),
+    category: str = Form(...),
+    latitude: float = Form(0.0),
+    longitude: float = Form(0.0),
+    location: str = Form(...),
+    severity: str = Form(...),
+    isDraft: bool = Form(False),
+    time: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Always attribute the report to the authenticated user
-    report.user_id = current_user.id
+    # Upload photo to Supabase Storage; DB only stores the public URL
+    image_url: Optional[str] = None
+    if image is not None and image.filename:
+        data = await image.read()
+        if data:
+            image_url = upload_report_image(
+                data,
+                content_type=image.content_type or "image/jpeg",
+                filename=image.filename,
+            )
+
+    severity_norm = severity.strip().lower()
+    if severity_norm not in ("low", "medium", "high"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="severity must be low, medium, or high",
+        )
+
+    if time:
+        try:
+            report_time = datetime.fromisoformat(time.replace("Z", "+00:00"))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid time format",
+            ) from e
+    else:
+        report_time = datetime.utcnow()
+
+    report = Reports(
+        title=title,
+        description=description,
+        category=category,
+        latitude=latitude,
+        longitude=longitude,
+        location=location,
+        image=image_url,
+        time=report_time,
+        severity=severity_norm,  # type: ignore[arg-type]
+        user_id=current_user.id,
+        isDraft=isDraft,
+    )
     return reports_service.create_report(db, report)
 
 

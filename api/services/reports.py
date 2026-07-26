@@ -1,6 +1,7 @@
 from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed
 from fastapi import HTTPException
 from api.models.reports import User, Report
+from api.services.storage import persist_report_image
 
 
 def report_to_schema(row: Report) -> ReportsFull:
@@ -25,6 +26,8 @@ def create_report(db, report: Reports):
     user = db.query(User).filter(User.id == report.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Store only a Storage URL (upload base64/data-URI if needed)
+    image_url = persist_report_image(report.image)
     row = Report(
         title=report.title,
         description=report.description,
@@ -35,7 +38,7 @@ def create_report(db, report: Reports):
         severity=report.severity,
         user_id=report.user_id,
         is_draft=report.isDraft,
-        image=report.image,
+        image=image_url,
         # Drafts must not appear in public "Open" feeds
         status="Draft" if report.isDraft else "Open",
         time=report.time,

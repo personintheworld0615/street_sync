@@ -287,25 +287,8 @@ class ApiService {
     return '$fallback (${response.statusCode})';
   }
 
-  /// Reads a local image file and returns a data-URI base64 string for the API.
-  static Future<String?> encodeImageForUpload(String? imagePath) async {
-    if (imagePath == null || imagePath.isEmpty) return null;
-    final file = File(imagePath);
-    if (!await file.exists()) {
-      print('submitReport: image not found at $imagePath');
-      return null;
-    }
-    final bytes = await file.readAsBytes();
-    final ext = imagePath.split('.').last.toLowerCase();
-    final mime = switch (ext) {
-      'png' => 'image/png',
-      'gif' => 'image/gif',
-      'webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
-    return 'data:$mime;base64,${base64Encode(bytes)}';
-  }
-
+  /// Submits a report as multipart/form-data so photos go to Supabase Storage
+  /// (API stores only the public URL in Postgres).
   static Future<bool> submitReport({
     required String title,
     required String description,
@@ -325,32 +308,40 @@ class ApiService {
     }
 
     final url = Uri.parse('$baseUrl/reports');
-    final image = await encodeImageForUpload(imagePath);
+    final hasImage = imagePath != null &&
+        imagePath.isNotEmpty &&
+        await File(imagePath).exists();
 
     try {
-      final body = <String, dynamic>{
+      final request = http.MultipartRequest('POST', url);
+      final t = token;
+      if (t != null && t.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $t';
+      }
+
+      request.fields.addAll({
         'title': title,
         'description': description,
         'category': category,
-        'latitude': latitude,
-        'longitude': longitude,
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
         'location': location,
         'time': DateTime.now().toIso8601String(),
         'severity': severity.toLowerCase(),
-        'user_id': effectiveUserId,
-        'isDraft': isDraft,
-      };
-      if (image != null) {
-        body['image'] = image;
+        'user_id': effectiveUserId.toString(),
+        'isDraft': isDraft.toString(),
+      });
+
+      if (hasImage) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imagePath!),
+        );
       }
 
-      final response = await http
-          .post(
-            url,
-            headers: _headers,
-            body: jsonEncode(body),
-          )
-          .timeout(Duration(seconds: image != null ? 30 : 8));
+      final streamed = await request.send().timeout(
+            Duration(seconds: hasImage ? 60 : 15),
+          );
+      final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode == 401) {
         await logout();
