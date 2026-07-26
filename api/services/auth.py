@@ -31,6 +31,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 90
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 def hash_password(plain: str) -> str:
@@ -74,3 +75,16 @@ def get_current_user(
             detail="User not found",
         )
     return user
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Return the logged-in user if a valid Bearer token is present; else None."""
+    if credentials is None:
+        return None
+    try:
+        return get_current_user(credentials=credentials, db=db)
+    except HTTPException:
+        return None

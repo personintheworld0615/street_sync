@@ -36,7 +36,8 @@ def create_report(db, report: Reports):
         user_id=report.user_id,
         is_draft=report.isDraft,
         image=report.image,
-        status="Open",
+        # Drafts must not appear in public "Open" feeds
+        status="Draft" if report.isDraft else "Open",
         time=report.time,
     )
     db.add(row)
@@ -57,10 +58,14 @@ def bump_user_report_count(db, user_id: int):
     db.commit()
 
 
-def get_report(db, report_id: int):
+def get_report(db, report_id: int, current_user: User | None = None):
     row = db.query(Report).filter(Report.id == report_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
+    # Drafts are private to the owner
+    if row.is_draft:
+        if current_user is None or row.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Report not found")
     return report_to_schema(row)
 
 
@@ -85,7 +90,8 @@ def get_all_reports_by_user_draft(db, user_id: int):
 
 
 def get_all_reports(db):
-    rows = db.query(Report).all()
+    # Public list: submitted reports only (never drafts)
+    rows = db.query(Report).filter(Report.is_draft == False).all()
     return [report_to_schema(report) for report in rows]
 
 
@@ -133,14 +139,27 @@ def get_top10_users(db, user_id: int):
         for user in rows
     ]
 def get_reports_open(db):
-    rows = db.query(Report).filter(Report.status == "Open").all()
+    rows = (
+        db.query(Report)
+        .filter(Report.status == "Open", Report.is_draft == False)
+        .all()
+    )
     return [report_to_schema(report) for report in rows]
 
 def get_reports_resolved(db):
-    rows = db.query(Report).filter(Report.status == "Resolved").all()
+    rows = (
+        db.query(Report)
+        .filter(Report.status == "Resolved", Report.is_draft == False)
+        .all()
+    )
     return [report_to_schema(report) for report in rows]
+
 def get_reports_in_progress(db):
-    rows = db.query(Report).filter(Report.status == "In Progress").all()
+    rows = (
+        db.query(Report)
+        .filter(Report.status == "In Progress", Report.is_draft == False)
+        .all()
+    )
     return [report_to_schema(report) for report in rows]
 def delete_account(db, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()

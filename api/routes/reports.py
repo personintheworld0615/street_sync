@@ -7,7 +7,7 @@ from api.database import get_db
 from api.models.reports import User
 from api.schemas.reports import Reports, ReportsFull, UsersDetailed
 from api.services import reports as reports_service
-from api.services.auth import get_current_user
+from api.services.auth import get_current_user, get_optional_user
 
 router = APIRouter(tags=["reports"])
 
@@ -80,8 +80,12 @@ def get_reports_in_progress(db: Session = Depends(get_db)):
 
 
 @router.get("/reports/{report_id}", response_model=ReportsFull)
-def get_report(report_id: int, db: Session = Depends(get_db)):
-    return reports_service.get_report(db, report_id)
+def get_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    return reports_service.get_report(db, report_id, current_user)
 
 
 @router.get("/users/top/{user_id}", response_model=List[UsersDetailed])
