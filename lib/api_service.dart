@@ -287,6 +287,25 @@ class ApiService {
     return '$fallback (${response.statusCode})';
   }
 
+  /// Reads a local image file and returns a data-URI base64 string for the API.
+  static Future<String?> encodeImageForUpload(String? imagePath) async {
+    if (imagePath == null || imagePath.isEmpty) return null;
+    final file = File(imagePath);
+    if (!await file.exists()) {
+      print('submitReport: image not found at $imagePath');
+      return null;
+    }
+    final bytes = await file.readAsBytes();
+    final ext = imagePath.split('.').last.toLowerCase();
+    final mime = switch (ext) {
+      'png' => 'image/png',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+    return 'data:$mime;base64,${base64Encode(bytes)}';
+  }
+
   static Future<bool> submitReport({
     required String title,
     required String description,
@@ -297,6 +316,7 @@ class ApiService {
     double latitude = 0.0,
     double longitude = 0.0,
     int? userId,
+    String? imagePath,
   }) async {
     final effectiveUserId = userId ?? ApiService.userId;
     if (effectiveUserId == null) {
@@ -305,30 +325,39 @@ class ApiService {
     }
 
     final url = Uri.parse('$baseUrl/reports');
+    final image = await encodeImageForUpload(imagePath);
 
     try {
+      final body = <String, dynamic>{
+        'title': title,
+        'description': description,
+        'category': category,
+        'latitude': latitude,
+        'longitude': longitude,
+        'location': location,
+        'time': DateTime.now().toIso8601String(),
+        'severity': severity.toLowerCase(),
+        'user_id': effectiveUserId,
+        'isDraft': isDraft,
+      };
+      if (image != null) {
+        body['image'] = image;
+      }
+
       final response = await http
           .post(
             url,
             headers: _headers,
-            body: jsonEncode({
-              'title': title,
-              'description': description,
-              'category': category,
-              'latitude': latitude,
-              'longitude': longitude,
-              'location': location,
-              'time': DateTime.now().toIso8601String(),
-              'severity': severity.toLowerCase(),
-              'user_id': effectiveUserId,
-              'isDraft': isDraft,
-            }),
+            body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(Duration(seconds: image != null ? 30 : 8));
 
       if (response.statusCode == 401) {
         await logout();
         return false;
+      }
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        print('submitReport failed: ${response.statusCode} ${response.body}');
       }
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
@@ -354,33 +383,37 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>> getReportStats() async {
-    final url = Uri.parse('$baseUrl/reports/stats');
-
+  static Future<int> _countReports(String path) async {
+    final url = Uri.parse('$baseUrl$path');
     try {
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 5));
-
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data is Map<String, dynamic>) {
-          return data;
-        }
+        final list = jsonDecode(response.body) as List<dynamic>;
+        return list.length;
       }
-
-      print('Stats error: ${response.statusCode}');
+      print('Stats error ($path): ${response.statusCode}');
     } catch (e) {
-      print('Error fetching report stats: $e');
+      print('Error fetching $path: $e');
     }
+    return 0;
+  }
+
+  static Future<Map<String, dynamic>> getReportStats() async {
+    final counts = await Future.wait([
+      _countReports('/reports/nearme'),
+      _countReports('/reports/in_progress'),
+      _countReports('/reports/resolved'),
+    ]);
 
     return {
-      'nearby': 0,
-      'in_progress': 0,
-      'resolved': 0,
+      'nearby': counts[0],
+      'in_progress': counts[1],
+      'resolved': counts[2],
     };
   }
+  
 
   static Future<List<dynamic>> getDraftReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/drafts');

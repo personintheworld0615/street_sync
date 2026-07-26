@@ -60,6 +60,7 @@ class _ConfirmationState extends State<Confirmation> {
       isDraft: true,
       latitude: widget.latitude,
       longitude: widget.longitude,
+      imagePath: widget.image.path,
     );
 
     draftReports.add({
@@ -413,6 +414,7 @@ class _ConfirmationState extends State<Confirmation> {
                   isDraft: false,
                   latitude: widget.latitude,
                   longitude: widget.longitude,
+                  imagePath: widget.image.path,
                 );
 
                 if (!mounted) return;

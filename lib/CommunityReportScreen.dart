@@ -835,6 +835,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       isDraft: true,
       latitude: position.latitude,
       longitude: position.longitude,
+      imagePath: _image?.path,
     );
 
     if (!mounted) return;
