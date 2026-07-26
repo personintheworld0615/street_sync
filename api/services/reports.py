@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed
 from fastapi import HTTPException
 from api.models.reports import User, Report
@@ -108,6 +111,39 @@ def get_most_recent_reports(db, amount: int):
 
     rows.sort(key=lambda x: x.time, reverse=True)
     # rows = db.query(Report).filter(Report.is_draft == False).order_by(Report.time.desc()).limit(amount).all()
+    return [report_to_schema(report) for report in rows]
+
+
+def get_reports_feed(
+    db,
+    amount: int,
+    category: Optional[str] = None,
+    before: Optional[datetime] = None,
+):
+    """Newest-first feed with optional category filter and cursor (`before` timestamp)."""
+    q = db.query(Report).filter(Report.is_draft == False)
+
+    if category:
+        if category == "Other":
+            q = q.filter(
+                ~Report.category.in_(
+                    [
+                        "Road Damage",
+                        "Public Works",
+                        "Environmental",
+                        "Accessibility",
+                    ]
+                )
+            )
+        else:
+            q = q.filter(Report.category == category)
+
+    if before is not None:
+        if isinstance(before, str):
+            before = datetime.fromisoformat(before.replace("Z", "+00:00"))
+        q = q.filter(Report.time < before)
+
+    rows = q.order_by(Report.time.desc()).limit(amount).all()
     return [report_to_schema(report) for report in rows]
 
 

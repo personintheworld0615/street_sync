@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/report_categories.dart';
 
 class MyReportsScreen extends StatelessWidget {
   final List<Map<String, dynamic>> reports;
@@ -78,20 +79,8 @@ class MyReportsScreen extends StatelessWidget {
     return '';
   }
 
-  IconData _iconFromCategory(String? category) {
-    switch ((category ?? '').toLowerCase()) {
-      case 'road damage':
-        return Icons.construction_rounded;
-      case 'public works':
-        return Icons.handyman_outlined;
-      case 'environmental':
-        return Icons.eco_outlined;
-      case 'accessibility':
-        return Icons.accessible_forward_rounded;
-      default:
-        return Icons.assignment_outlined;
-    }
-  }
+  IconData _iconFromCategory(String? category) =>
+      ReportCategories.icon(category);
 
   Widget _reportCard({
     required IconData icon,

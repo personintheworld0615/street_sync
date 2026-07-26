@@ -96,6 +96,21 @@ def get_most_recent_reports(
     return reports_service.get_most_recent_reports(db, amount)
 
 
+@router.get("/reports/feed", response_model=List[ReportsFull])
+def get_reports_feed(
+    amount: int = Query(default=10, ge=1, le=100),
+    category: Optional[str] = Query(default=None),
+    before: Optional[datetime] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return reports_service.get_reports_feed(
+        db,
+        amount=amount,
+        category=category,
+        before=before,
+    )
+
+
 @router.get("/reports/user/{user_id}/drafts", response_model=List[ReportsFull])
 def get_user_draft_reports(
     user_id: int,

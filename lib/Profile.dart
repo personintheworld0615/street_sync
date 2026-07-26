@@ -4,6 +4,7 @@ import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/error_popup.dart';
+import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
 
 import 'MyDraftReportsScreen.dart';
@@ -92,20 +93,8 @@ class _ProfileState extends State<Profile> {
         color: _ink,
       );
 
-  IconData _iconFromCategory(String? category) {
-    switch ((category ?? '').toLowerCase()) {
-      case 'road damage':
-        return Icons.construction_rounded;
-      case 'public works':
-        return Icons.handyman_outlined;
-      case 'environmental':
-        return Icons.eco_outlined;
-      case 'accessibility':
-        return Icons.accessible_forward_rounded;
-      default:
-        return Icons.assignment_outlined;
-    }
-  }
+  IconData _iconFromCategory(String? category) =>
+      ReportCategories.icon(category);
 
   @override
   Widget build(BuildContext context) {
@@ -379,7 +368,7 @@ class _ProfileState extends State<Profile> {
 
   Widget myDraftReportsList() {
     if (_draftReports.isEmpty) {
-      return _emptyReportsState(
+      return _emptydraftssState(
         'Save a report as a draft to finish it later',
       );
     }
@@ -479,6 +468,57 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _emptyReportsState(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: _listDecoration,
+      child: Column(
+        children: [
+          const CircleAvatar(
+            radius: 28,
+            backgroundColor: _iconBg,
+            child: Icon(Icons.assignment_outlined, size: 28, color: _blue),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'No reports yet',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: _muted),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CommunityReportScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _blue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Create a new report'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptydraftssState(String text) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),

@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'Confirmation.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:street_sync/report_categories.dart';
 class Updatething extends StatefulWidget {
   Updatething({
     super.key,
@@ -58,7 +59,7 @@ class Updatething extends StatefulWidget {
 }
 
 class _UpdateThingState extends State<Updatething> {
-  LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
+  LatLng position = const LatLng(40.3573, -74.6672);
   Set<Marker> _markers = {};
   static const _blue = Color(0xFF2196F3);
   static const _pageBg = Color(0xFFF4F7FB);
@@ -168,11 +169,7 @@ class _UpdateThingState extends State<Updatething> {
   }
 
   static const _knownCategories = {
-    'Road Damage',
-    'Public Works',
-    'Environmental',
-    'Accessibility',
-    'Other',
+    ...ReportCategories.all,
   };
 
   void _applyDraftFields() {
@@ -505,15 +502,15 @@ class _UpdateThingState extends State<Updatething> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Road Damage',
-                    icon: Icons.construction_rounded,
+                    value: ReportCategories.roadDamage,
+                    icon: ReportCategories.icon(ReportCategories.roadDamage),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Public Works',
-                    icon: Icons.handyman_outlined,
+                    value: ReportCategories.publicWorks,
+                    icon: ReportCategories.icon(ReportCategories.publicWorks),
                   ),
                 ),
               ],
@@ -523,25 +520,25 @@ class _UpdateThingState extends State<Updatething> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Environmental',
-                    icon: Icons.eco_outlined,
+                    value: ReportCategories.environmental,
+                    icon: ReportCategories.icon(ReportCategories.environmental),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    label: 'Accessibility',
-                    icon: Icons.accessible_forward_rounded,
+                    value: ReportCategories.accessibility,
+                    icon: ReportCategories.icon(ReportCategories.accessibility),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
             _buildCategoryChip(
-              label: 'Other',
-              icon: Icons.more_horiz_rounded,
+              value: ReportCategories.other,
+              icon: ReportCategories.icon(ReportCategories.other),
             ),
-            if (_selectedCategory == 'Other') ...[
+            if (_selectedCategory == ReportCategories.other) ...[
               const SizedBox(height: 10),
               Container(
                 height: 48,
@@ -567,14 +564,14 @@ class _UpdateThingState extends State<Updatething> {
   }
 
   Widget _buildCategoryChip({
-    required String label,
+    required String value,
     required IconData icon,
   }) {
-    final selected = _selectedCategory == label;
+    final selected = _selectedCategory == value;
 
     return _Pressable(
       onTap: () {
-        setState(() => _selectedCategory = label);
+        setState(() => _selectedCategory = value);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
@@ -600,7 +597,7 @@ class _UpdateThingState extends State<Updatething> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                label,
+                ReportCategories.label(value),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

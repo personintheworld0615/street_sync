@@ -10,7 +10,7 @@ import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/api_service.dart';
-import 'package:street_sync/draft_reports.dart';
+import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_severity.dart';
 class CommunityReportScreen extends StatefulWidget {
   
@@ -399,19 +399,19 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    value: 'Road Damage',
-                    label: 'Roads',
-                    subtitle: 'Potholes, cracks, pavement',
-                    icon: Icons.construction_rounded,
+                    value: ReportCategories.roadDamage,
+                    label: ReportCategories.label(ReportCategories.roadDamage),
+                    subtitle: ReportCategories.subtitle(ReportCategories.roadDamage),
+                    icon: ReportCategories.icon(ReportCategories.roadDamage),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    value: 'Public Works',
-                    label: 'Lights',
-                    subtitle: 'Streetlights, signs, trash, hydrants',
-                    icon: Icons.lightbulb_outline,
+                    value: ReportCategories.publicWorks,
+                    label: ReportCategories.label(ReportCategories.publicWorks),
+                    subtitle: ReportCategories.subtitle(ReportCategories.publicWorks),
+                    icon: ReportCategories.icon(ReportCategories.publicWorks),
                   ),
                 ),
               ],
@@ -421,31 +421,31 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               children: [
                 Expanded(
                   child: _buildCategoryChip(
-                    value: 'Environmental',
-                    label: 'Nature',
-                    subtitle: 'Trees, flooding, litter',
-                    icon: Icons.eco_outlined,
+                    value: ReportCategories.environmental,
+                    label: ReportCategories.label(ReportCategories.environmental),
+                    subtitle: ReportCategories.subtitle(ReportCategories.environmental),
+                    icon: ReportCategories.icon(ReportCategories.environmental),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildCategoryChip(
-                    value: 'Accessibility',
-                    label: 'Access',
-                    subtitle: 'Ramps, curb cuts, mobility',
-                    icon: Icons.accessible_forward_rounded,
+                    value: ReportCategories.accessibility,
+                    label: ReportCategories.label(ReportCategories.accessibility),
+                    subtitle: ReportCategories.subtitle(ReportCategories.accessibility),
+                    icon: ReportCategories.icon(ReportCategories.accessibility),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
             _buildCategoryChip(
-              value: 'Other',
-              label: 'Other',
-              subtitle: 'Noise, animals, parking, odd issues',
-              icon: Icons.more_horiz_rounded,
+              value: ReportCategories.other,
+              label: ReportCategories.label(ReportCategories.other),
+              subtitle: ReportCategories.subtitle(ReportCategories.other),
+              icon: ReportCategories.icon(ReportCategories.other),
             ),
-            if (_selectedCategory == 'Other') ...[
+            if (_selectedCategory == ReportCategories.other) ...[
               const SizedBox(height: 10),
               Container(
                 height: 48,
@@ -795,22 +795,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       ),
     );
   }
-  IconData _iconFromCat(String category) {
-    switch (category) {
-      case 'Road Damage':
-        return Icons.car_crash_outlined;
-      case 'Public Works':
-        return Icons.lightbulb_outline;
-      case 'Environmental':
-        return Icons.eco_outlined;
-      case 'Accessibility':
-        return Icons.accessible_forward_outlined;
-      case 'Other':
-      default:
-        return Icons.more_horiz_rounded;
-    }
-  }
-
   Future<void> _saveAsDraft() async {
     String location = 'Location not set';
     try {
@@ -850,25 +834,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       return;
     }
 
-    draftReports.add({
-      'category': category,
-      'location': location,
-      'title': title,
-      'description': description,
-      'severity': severity,
-      'othercat': _selectedCategory == 'Other'
-          ? _otherCategoryController.text.trim()
-          : '',
-      'imagePath': _image?.path,
-      'latitude': position.latitude,
-      'longitude': position.longitude,
-      'status': 'Draft',
-      'time': DateTime.now().toIso8601String(),
-      'source': 'camera',
-      'icon': _iconFromCat(_selectedCategory ?? 'Other'),
-      'name': title.isNotEmpty ? title : category,
-      'bgColor': Colors.orange[100]!,
-    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
-import 'package:street_sync/draft_reports.dart';
 import 'package:street_sync/report_severity.dart';
 import 'package:street_sync/api_service.dart';
 
@@ -168,7 +167,6 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       isDraft: true,
     );
 
-    draftReports.add(_reportMap(status: 'Draft'));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

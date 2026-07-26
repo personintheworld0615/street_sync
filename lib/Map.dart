@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'config.dart';
 import 'api_service.dart';
 import 'ReportDetails.dart';
+import 'report_categories.dart';
 
 enum IssueCategory {
   roadDamage,
@@ -46,13 +47,8 @@ void _updateMarkers() {
   final reports = _selectedCategory == null
       ? _recentReports
       : _recentReports.where((report) {
-          if (_selectedCategory == "Other") {
-            return ![
-              "Road Damage",
-              "Public Works",
-              "Environmental",
-              "Accessibility",
-            ].contains(report["category"]);
+          if (_selectedCategory == ReportCategories.other) {
+            return !ReportCategories.isPrimary(report["category"] as String?);
           }
 
           return report["category"] == _selectedCategory;
@@ -81,16 +77,16 @@ void _updateMarkers() {
 
 double _getMarkerColor(String category) {
   switch (category) {
-    case "Road Damage":
+    case ReportCategories.roadDamage:
       return BitmapDescriptor.hueRed;
 
-    case "Public Works":
+    case ReportCategories.publicWorks:
       return BitmapDescriptor.hueOrange;
 
-    case "Environmental":
+    case ReportCategories.environmental:
       return BitmapDescriptor.hueGreen;
 
-    case "Accessibility":
+    case ReportCategories.accessibility:
       return BitmapDescriptor.hueAzure;
 
     default:
@@ -321,11 +317,31 @@ Widget _categoryChip(
                 child: Row(
                   children: [
                     _categoryChip("All", null, Colors.grey),
-                    _categoryChip("Road", "Road Damage", Colors.red),
-                    _categoryChip("Public", "Public Works", Colors.orange),
-                    _categoryChip("Environment", "Environmental", Colors.green),
-                    _categoryChip("ADA", "Accessibility", Colors.blue),
-                    _categoryChip("Other", "Other", Colors.purple),
+                    _categoryChip(
+                      ReportCategories.shortLabel(ReportCategories.roadDamage),
+                      ReportCategories.roadDamage,
+                      ReportCategories.color(ReportCategories.roadDamage),
+                    ),
+                    _categoryChip(
+                      ReportCategories.shortLabel(ReportCategories.publicWorks),
+                      ReportCategories.publicWorks,
+                      ReportCategories.color(ReportCategories.publicWorks),
+                    ),
+                    _categoryChip(
+                      ReportCategories.shortLabel(ReportCategories.environmental),
+                      ReportCategories.environmental,
+                      ReportCategories.color(ReportCategories.environmental),
+                    ),
+                    _categoryChip(
+                      ReportCategories.shortLabel(ReportCategories.accessibility),
+                      ReportCategories.accessibility,
+                      ReportCategories.color(ReportCategories.accessibility),
+                    ),
+                    _categoryChip(
+                      ReportCategories.shortLabel(ReportCategories.other),
+                      ReportCategories.other,
+                      ReportCategories.color(ReportCategories.other),
+                    ),
                   ],
                 ),
               ),
@@ -343,7 +359,7 @@ Widget _categoryChip(
     final location = report['location']?.toString() ?? 'Unknown location';
     final severity = report['severity']?.toString() ?? '';
     final imageUrl = report['image']?.toString();
-    final categoryColor = _categoryColor(category);
+    final categoryColor = ReportCategories.color(category);
 
     return Material(
       elevation: 10,
@@ -385,7 +401,7 @@ Widget _categoryChip(
                     Row(
                       children: [
                         Icon(
-                          _iconForCategory(category),
+                          ReportCategories.icon(category),
                           size: 14,
                           color: categoryColor,
                         ),
@@ -509,26 +525,11 @@ Widget _categoryChip(
     return ColoredBox(
       color: categoryColor.withValues(alpha: 0.12),
       child: Icon(
-        _iconForCategory(category),
+        ReportCategories.icon(category),
         color: categoryColor,
         size: 28,
       ),
     );
-  }
-
-  Color _categoryColor(String category) {
-    switch (category) {
-      case 'Road Damage':
-        return Colors.red;
-      case 'Public Works':
-        return Colors.orange;
-      case 'Environmental':
-        return Colors.green;
-      case 'Accessibility':
-        return Colors.blue;
-      default:
-        return Colors.purple;
-    }
   }
 
   Color _severityColor(String severity) {
@@ -541,21 +542,6 @@ Widget _categoryChip(
         return Colors.green;
       default:
         return Colors.grey;
-    }
-  }
-
-  IconData _iconForCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'road damage':
-        return Icons.warning_amber_rounded;
-      case 'public works':
-        return Icons.construction_outlined;
-      case 'environmental':
-        return Icons.park_outlined;
-      case 'accessibility':
-        return Icons.accessible;
-      default:
-        return Icons.report_outlined;
     }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
 import 'api_service.dart';
 
@@ -19,16 +20,13 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _blue = Color(0xFF2196F3);
   static const _iconBg = Color(0xFFE8F4FD);
 
-  final List<String> cat = [
-    'Road Damage',
-    'Public Works',
-    'Environmental',
-    'Accessibility',
-    'Other',
-  ];
+  final List<String> cat = ReportCategories.all;
   String? _selectedCat;
   List<dynamic> _recentReports = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  static const int _pageSize = 5;
 
   int _nearbyCount = 0;
   int _inProgressCount = 0;
@@ -52,20 +50,48 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    final reports = await ApiService.getRecentReports();
+    // TEMP: use old /reports/recent until /reports/feed is deployed on Render
+    // final reports = await ApiService.getReportsFeed(
+    //   amount: _pageSize,
+    //   category: _selectedCat,
+    // );
+    final reports = await ApiService.getRecentReports(amount: _pageSize);
     final stats = await ApiService.getReportStats();
 
     if (mounted) {
       setState(() {
         _recentReports = reports;
-
+        _hasMore = false; // TEMP: Show more needs /reports/feed
         _nearbyCount = stats['nearby'] ?? 0;
         _inProgressCount = stats['in_progress'] ?? 0;
         _resolvedCount = stats['resolved'] ?? 0;
-
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadMore() async {
+    // TEMP: disabled until Render has /reports/feed
+    // if (_isLoadingMore || !_hasMore || _recentReports.isEmpty) return;
+    //
+    // final lastTime = _recentReports.last['time']?.toString();
+    // if (lastTime == null || lastTime.isEmpty) return;
+    //
+    // setState(() => _isLoadingMore = true);
+    //
+    // final more = await ApiService.getReportsFeed(
+    //   amount: _pageSize,
+    //   category: _selectedCat,
+    //   before: lastTime,
+    // );
+    //
+    // if (!mounted) return;
+    //
+    // setState(() {
+    //   _recentReports = [..._recentReports, ...more];
+    //   _hasMore = more.length >= _pageSize;
+    //   _isLoadingMore = false;
+    // });
   }
 
   Future<void> _fetchReports() => _loadReports(forceNetwork: true);
@@ -78,6 +104,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<dynamic> get _filteredReports {
     if (_selectedCat == null) return _recentReports;
+    if (_selectedCat == ReportCategories.other) {
+      return _recentReports
+          .where((r) => !ReportCategories.isPrimary(r['category'] as String?))
+          .toList();
+    }
     return _recentReports
         .where((r) => r['category'] == _selectedCat)
         .toList();
@@ -96,15 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  IconData _iconFromCat(String category) {
-    switch (category.toLowerCase()) {
-      case 'road damage': return Icons.construction_rounded;
-      case 'public works': return Icons.handyman_outlined;
-      case 'environmental': return Icons.eco_outlined;
-      case 'accessibility': return Icons.accessible_forward_rounded;
-      default: return Icons.warning_amber_rounded;
-    }
-  }
+  IconData _iconFromCat(String category) => ReportCategories.icon(category);
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +192,35 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
+                    // TEMP: Show more needs /reports/feed on Render
+                    // if (!_isLoading && _hasMore && _recentReports.isNotEmpty)
+                    //   Padding(
+                    //     padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    //     child: Center(
+                    //       child: ElevatedButton(
+                    //         onPressed: _isLoadingMore ? null : _loadMore,
+                    //         style: ElevatedButton.styleFrom(
+                    //           backgroundColor: _blue,
+                    //           foregroundColor: Colors.white,
+                    //           disabledBackgroundColor: _blue.withValues(alpha: 0.6),
+                    //           disabledForegroundColor: Colors.white,
+                    //           elevation: 0,
+                    //           padding: const EdgeInsets.symmetric(
+                    //             horizontal: 28,
+                    //             vertical: 12,
+                    //           ),
+                    //           shape: RoundedRectangleBorder(
+                    //             borderRadius: BorderRadius.circular(12),
+                    //           ),
+                    //           textStyle: const TextStyle(
+                    //             fontSize: 14,
+                    //             fontWeight: FontWeight.w400,
+                    //           ),
+                    //         ),
+                    //         child: Text(_isLoadingMore ? 'Loading...' : 'Show more'),
+                    //       ),
+                    //     ),
+                    //   ),
                   ],
                 ),
               ),

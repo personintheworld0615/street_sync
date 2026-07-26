@@ -374,6 +374,38 @@ class ApiService {
     return [];
   }
 
+  /// Cursor feed for Home "Show more". Pass [before] as the oldest loaded
+  /// report's `time` to fetch the next older page.
+  static Future<List<dynamic>> getReportsFeed({
+    int amount = 10,
+    String? category,
+    String? before,
+  }) async {
+    final params = <String, String>{
+      'amount': amount.toString(),
+    };
+    if (category != null && category.isNotEmpty) {
+      params['category'] = category;
+    }
+    if (before != null && before.isNotEmpty) {
+      params['before'] = before;
+    }
+
+    final url = Uri.parse('$baseUrl/reports/feed').replace(queryParameters: params);
+    try {
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      print('Feed error: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching feed: $e');
+    }
+    return [];
+  }
+
   static Future<int> _countReports(String path) async {
     final url = Uri.parse('$baseUrl$path');
     try {

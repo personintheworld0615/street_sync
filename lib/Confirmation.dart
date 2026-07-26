@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/Mainshell.dart';
-import 'package:street_sync/draft_reports.dart';
 import 'package:street_sync/api_service.dart';
 
 class Confirmation extends StatefulWidget {
@@ -63,21 +62,7 @@ class _ConfirmationState extends State<Confirmation> {
       imagePath: widget.image.path,
     );
 
-    draftReports.add({
-      'category': widget.category,
-      'location': widget.location,
-      'title': widget.title,
-      'description': widget.description,
-      'severity': widget.severity,
-      'othercat': widget.othercat,
-      'imagePath': widget.image.path,
-      'status': 'Draft',
-      'time': DateTime.now().toIso8601String(),
-      'source': 'camera',
-      'icon': Icons.camera_alt_outlined,
-      'name': widget.title,
-      'bgColor': Colors.orange[100]!,
-    });
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
