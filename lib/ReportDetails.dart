@@ -12,6 +12,19 @@ class ReportDetailsScreen extends StatefulWidget {
   State<ReportDetailsScreen> createState() => _ReportDetailsScreenState();
 }
 
+String _formatTime(String timeStr) {
+    try {
+      final dt = DateTime.parse(timeStr);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (_) {
+      return 'Recently';
+    }
+  }
+
 class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   @override
   Widget build(BuildContext context) {
@@ -32,7 +45,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
             Text(
               "Category: ${widget.report["category"]}",
@@ -43,12 +56,27 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
 
             const SizedBox(height: 10),
 
+            if (widget.report["image"] != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  widget.report["image"],
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                )
+              ),
+
             Text(
-              "Location: ${widget.report["latitude"]}, ${widget.report["longitude"]}",
+              "Location: ${widget.report["location"] ?? "Unknown location"}",
               style: const TextStyle(
                 fontSize: 14,
               ),
             ),
+
+            Text (
+              "Time: ${_formatTime(widget.report["time"] ?? "Unknown time")}",
+            )
           ],
         ),
       ),
