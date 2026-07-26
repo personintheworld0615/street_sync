@@ -22,12 +22,16 @@ class ApiService {
 
   // Automatically switch base URL depending on the platform
   static String get baseUrl {
+    // If you have a CLOUD_URL in your .env, use it. 
+    // Otherwise, fallback to local/emulator addresses.
+    final cloudUrl = dotenv.maybeGet('CLOUD_URL');
+    if (cloudUrl != null && cloudUrl.isNotEmpty) {
+      return cloudUrl;
+    }
+
     if (Platform.isAndroid) {
-      // Android emulator → host machine. Physical Android: set DEV_HOST in assets/.env
-      // and change this branch to use _devHost if needed.
       return 'http://10.0.2.2:$_devPort';
     }
-    // iOS: use DEV_HOST from assets/.env (Mac LAN IP for a real phone).
     return 'http://$_devHost:$_devPort';
   }
 
