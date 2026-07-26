@@ -139,7 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         (r) => _buildReportCard(
                           icon: _iconFromCat(r['category']),
                           severity: r['severity'] as String,
-                          name: r['description'] as String,
+                          name: (r['title'] as String?)?.trim().isNotEmpty == true
+                              ? r['title'] as String
+                              : (r['description'] as String? ?? 'Report'),
                           location: r['location'] as String,
                           time: _formatTime(r['time'] as String),
                         ),

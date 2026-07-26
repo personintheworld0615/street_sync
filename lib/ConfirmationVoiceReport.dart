@@ -8,11 +8,13 @@ class ConfirmationVoiceReport extends StatefulWidget {
   const ConfirmationVoiceReport({
     super.key,
     required this.location,
+    required this.title,
     required this.description,
     this.othercat = '',
   });
 
   final String location;
+  final String title;
   final String description;
   final String othercat;
 
@@ -51,6 +53,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     return {
       'category': category,
       'location': widget.location,
+      'title': widget.title,
       'description': widget.description,
       'severity': _autoSeverity,
       'othercat': widget.othercat,
@@ -58,7 +61,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       'time': DateTime.now().toIso8601String(),
       'source': 'voice',
       'icon': Icons.mic_outlined,
-      'name': category,
+      'name': widget.title,
       'bgColor': Colors.orange[100]!,
     };
   }
@@ -73,6 +76,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
 
     // 2. Send the data to the backend
     final success = await ApiService.submitReport(
+      title: widget.title,
       description: widget.description,
       category: _inferredCategory,
       location: widget.location,
@@ -156,6 +160,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   void _saveAsDraft() async {
     // Send to backend as a draft
     await ApiService.submitReport(
+      title: widget.title,
       description: widget.description,
       category: _inferredCategory,
       location: widget.location,
@@ -279,6 +284,13 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                 ),
               ),
             ),
+            _buildSummaryRow(
+              icon: Icons.title_outlined,
+              iconColor: Colors.indigo,
+              label: 'Title',
+              value: widget.title,
+            ),
+            _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.category_outlined,
               iconColor: Colors.blue,

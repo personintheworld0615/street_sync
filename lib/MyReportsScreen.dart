@@ -25,9 +25,9 @@ class MyReportsScreen extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final report = reports[index];
-                final description = report['description'] as String?;
-                final name = (description != null && description.trim().isNotEmpty)
-                    ? description
+                final title = report['title'] as String?;
+                final name = (title != null && title.trim().isNotEmpty)
+                    ? title
                     : report['name'] as String? ??
                         report['category'] as String? ??
                         'Report';

@@ -325,7 +325,9 @@ Widget _categoryChip(
                       children: [
 
                         Text(
-                          _selectedReport!["description"],
+                          (_selectedReport!["title"] as String?)?.trim().isNotEmpty == true
+                              ? _selectedReport!["title"]
+                              : (_selectedReport!["description"] ?? 'Report'),
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

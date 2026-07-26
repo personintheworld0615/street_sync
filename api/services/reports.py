@@ -6,6 +6,7 @@ from api.models.reports import User, Report
 def report_to_schema(row: Report) -> ReportsFull:
     return ReportsFull(
         id=row.id,
+        title=row.title,
         description=row.description,
         category=row.category,
         latitude=row.latitude,
@@ -25,6 +26,7 @@ def create_report(db, report: Reports):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     row = Report(
+        title=report.title,
         description=report.description,
         category=report.category,
         latitude=report.latitude,

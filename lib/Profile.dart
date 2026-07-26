@@ -399,8 +399,8 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildDraftCard(Map<String, dynamic> report) {
-    final name = (report['description'] as String?)?.trim().isNotEmpty == true
-        ? report['description'] as String
+    final name = (report['title'] as String?)?.trim().isNotEmpty == true
+        ? report['title'] as String
         : report['category'] as String? ?? 'Draft report';
     final location = report['location'] as String? ?? '';
     final status = 'Draft';
@@ -460,8 +460,8 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget _buildSubmittedCard(Map<String, dynamic> report) {
-    final name = (report['description'] as String?)?.trim().isNotEmpty == true
-        ? report['description'] as String
+    final name = (report['title'] as String?)?.trim().isNotEmpty == true
+        ? report['title'] as String
         : report['category'] as String? ?? 'Report';
     return _buildReportCard(
       icon: _iconFromCategory(report['category'] as String?),
