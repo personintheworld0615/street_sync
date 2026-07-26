@@ -308,64 +308,9 @@ Widget _categoryChip(
             if (_selectedReport != null)
               Positioned(
                 bottom: 90,
-                left: 20,
-                right: 20,
-                child: Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        Text(
-                          (_selectedReport!["title"] as String?)?.trim().isNotEmpty == true
-                              ? _selectedReport!["title"]
-                              : (_selectedReport!["description"] ?? 'Report'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                "Category: ${_selectedReport!["category"]}",
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ReportDetailsScreen(
-                                      report: _selectedReport!,
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.arrow_forward_ios,
-                                size: 12,
-                              ),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                left: 16,
+                right: 16,
+                child: _buildSelectedReportCard(_selectedReport!),
               ),
             Positioned(
               bottom: 20,
@@ -388,5 +333,229 @@ Widget _categoryChip(
         ],
       ),
     );
+  }
+
+  Widget _buildSelectedReportCard(Map<String, dynamic> report) {
+    final title = (report['title'] as String?)?.trim().isNotEmpty == true
+        ? report['title'] as String
+        : (report['description'] as String? ?? 'Report');
+    final category = report['category']?.toString() ?? 'Other';
+    final location = report['location']?.toString() ?? 'Unknown location';
+    final severity = report['severity']?.toString() ?? '';
+    final imageUrl = report['image']?.toString();
+    final categoryColor = _categoryColor(category);
+
+    return Material(
+      elevation: 10,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(18),
+      color: Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReportDetailsScreen(report: report),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              _buildPreviewThumb(imageUrl, category, categoryColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          _iconForCategory(category),
+                          size: 14,
+                          color: categoryColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: categoryColor,
+                          ),
+                        ),
+                        if (severity.isNotEmpty) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: _severityColor(severity),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            severity[0].toUpperCase() + severity.substring(1),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: Colors.grey[500],
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _selectedReport = null),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.close, size: 24, color: Colors.red),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 30,
+                    color: Colors.blue,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewThumb(
+    String? imageUrl,
+    String category,
+    Color categoryColor,
+  ) {
+    const size = 72.0;
+    final hasNetworkImage = imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: hasNetworkImage
+            ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _thumbFallback(category, categoryColor),
+              )
+            : _thumbFallback(category, categoryColor),
+      ),
+    );
+  }
+
+  Widget _thumbFallback(String category, Color categoryColor) {
+    return ColoredBox(
+      color: categoryColor.withValues(alpha: 0.12),
+      child: Icon(
+        _iconForCategory(category),
+        color: categoryColor,
+        size: 28,
+      ),
+    );
+  }
+
+  Color _categoryColor(String category) {
+    switch (category) {
+      case 'Road Damage':
+        return Colors.red;
+      case 'Public Works':
+        return Colors.orange;
+      case 'Environmental':
+        return Colors.green;
+      case 'Accessibility':
+        return Colors.blue;
+      default:
+        return Colors.purple;
+    }
+  }
+
+  Color _severityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _iconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'road damage':
+        return Icons.warning_amber_rounded;
+      case 'public works':
+        return Icons.construction_outlined;
+      case 'environmental':
+        return Icons.park_outlined;
+      case 'accessibility':
+        return Icons.accessible;
+      default:
+        return Icons.report_outlined;
+    }
   }
 }
