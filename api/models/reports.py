@@ -26,6 +26,7 @@ class Report(Base):
     __tablename__ = "reports"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), default="test")
     description: Mapped[str] = mapped_column(String)
     category: Mapped[str] = mapped_column(String(50))
     latitude: Mapped[float] = mapped_column(Float)

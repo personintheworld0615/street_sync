@@ -284,6 +284,7 @@ class ApiService {
   }
 
   static Future<bool> submitReport({
+    required String title,
     required String description,
     required String category,
     required String location,
@@ -307,6 +308,7 @@ class ApiService {
             url,
             headers: _headers,
             body: jsonEncode({
+              'title': title,
               'description': description,
               'category': category,
               'latitude': latitude,
@@ -368,6 +370,7 @@ class ApiService {
     }
     return [];
   }
+ 
 
   static Future<List<dynamic>> getSubmittedReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/submitted');

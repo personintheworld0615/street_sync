@@ -11,6 +11,7 @@ class Confirmation extends StatefulWidget {
     super.key,
     required this.category,
      required this.location,
+     required this.title,
      required this.description,
     required this.severity,
     required this.image,
@@ -21,6 +22,7 @@ class Confirmation extends StatefulWidget {
 
   final String category;
   final String location;
+  final String title;
   final String description;
   final String severity;
   final XFile image;
@@ -50,6 +52,7 @@ class _ConfirmationState extends State<Confirmation> {
 
   void _saveAsDraft() async {
     await ApiService.submitReport(
+      title: widget.title,
       description: widget.description,
       category: widget.category,
       location: widget.location,
@@ -62,6 +65,7 @@ class _ConfirmationState extends State<Confirmation> {
     draftReports.add({
       'category': widget.category,
       'location': widget.location,
+      'title': widget.title,
       'description': widget.description,
       'severity': widget.severity,
       'othercat': widget.othercat,
@@ -70,7 +74,7 @@ class _ConfirmationState extends State<Confirmation> {
       'time': DateTime.now().toIso8601String(),
       'source': 'camera',
       'icon': Icons.camera_alt_outlined,
-      'name': widget.category,
+      'name': widget.title,
       'bgColor': Colors.orange[100]!,
     });
     if (!mounted) return;
@@ -192,6 +196,13 @@ class _ConfirmationState extends State<Confirmation> {
                 ),
               ),
             ),
+            _buildSummaryRow(
+              icon: Icons.title_outlined,
+              iconColor: Colors.indigo,
+              label: 'Title',
+              value: widget.title,
+            ),
+            _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.category_outlined,
               iconColor: Colors.blue,
@@ -394,6 +405,7 @@ class _ConfirmationState extends State<Confirmation> {
                 );
 
                 final success = await ApiService.submitReport(
+                  title: widget.title,
                   description: widget.description,
                   category: widget.category,
                   location: widget.location,

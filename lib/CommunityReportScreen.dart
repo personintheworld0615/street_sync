@@ -31,6 +31,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   XFile? _image;
   String? _selectedCategory;
   final _otherCategoryController = TextEditingController();
+  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _descirption;
   String? _selectedSeverity;
@@ -42,6 +43,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   @override
   void dispose() {
     _otherCategoryController.dispose();
+    _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -99,6 +101,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _buildTitleCard(),
+                    const SizedBox(height: 14),
                     _buildPhotoCard(),
                     const SizedBox(height: 14),
                     _buildCategoryCard(),
@@ -539,6 +543,48 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     );
   }
 
+  Widget _buildTitleCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Title',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: TextField(
+                controller: _titleController,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                decoration: const InputDecoration(
+                  hintText: 'Give your report a short title...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDescriptionCard() {
     return Card(
       color: Colors.white,
@@ -777,9 +823,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
             : _otherCategoryController.text.trim())
         : (_selectedCategory ?? 'Other');
     final description = _descriptionController.text.trim();
+    final title = _titleController.text.trim();
     final severity = _selectedSeverity ?? 'medium';
 
     final success = await ApiService.submitReport(
+      title: title,
       description: description,
       category: category,
       location: location,
@@ -804,6 +852,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     draftReports.add({
       'category': category,
       'location': location,
+      'title': title,
       'description': description,
       'severity': severity,
       'othercat': _selectedCategory == 'Other'
@@ -816,7 +865,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       'time': DateTime.now().toIso8601String(),
       'source': 'camera',
       'icon': _iconFromCat(_selectedCategory ?? 'Other'),
-      'name': category,
+      'name': title.isNotEmpty ? title : category,
       'bgColor': Colors.orange[100]!,
     });
 
@@ -852,6 +901,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
           _Pressable(
             onTap: () async {
               final errors = <String>[];
+              if (_titleController.text.trim().isEmpty) errors.add('title');
               if (_image == null) errors.add('photo');
               if (_selectedCategory == null) errors.add('category');
               if (_descriptionController.text.trim().isEmpty) {
@@ -897,6 +947,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   MaterialPageRoute(
                     builder: (context) => Confirmation(
                       category: _selectedCategory!,
+                      title: _titleController.text.trim(),
                       description: _descriptionController.text.trim(),
                       image: _image!,
                       severity: _selectedSeverity!,

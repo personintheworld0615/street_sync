@@ -12,6 +12,7 @@ class Updatething extends StatefulWidget {
   Updatething({
     super.key,
     this.category,
+    this.title,
     this.description,
     this.severity,
     this.otherCategory,
@@ -21,6 +22,7 @@ class Updatething extends StatefulWidget {
   });
 
   final String? category;
+  final String? title;
   final String? description;
   final String? severity;
   final String? otherCategory;
@@ -31,6 +33,7 @@ class Updatething extends StatefulWidget {
   factory Updatething.fromDraft(Map<String, dynamic> draft) {
     return Updatething(
       category: draft['category'] as String?,
+      title: draft['title'] as String?,
       description: draft['description'] as String?,
       severity: draft['severity'] as String?,
       otherCategory: draft['othercat'] as String?,
@@ -42,6 +45,7 @@ class Updatething extends StatefulWidget {
 
   bool get hasDraftData =>
       category != null ||
+      title != null ||
       description != null ||
       severity != null ||
       otherCategory != null ||
@@ -64,6 +68,7 @@ class _UpdateThingState extends State<Updatething> {
   XFile? _image;
   String? _selectedCategory;
   final _otherCategoryController = TextEditingController();
+  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _descirption;
   String? _selectedSeverity;
@@ -75,6 +80,7 @@ class _UpdateThingState extends State<Updatething> {
   @override
   void dispose() {
     _otherCategoryController.dispose();
+    _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -132,6 +138,8 @@ class _UpdateThingState extends State<Updatething> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _buildTitleCard(),
+                    const SizedBox(height: 14),
                     _buildPhotoCard(),
                     const SizedBox(height: 14),
                     _buildCategoryCard(),
@@ -186,6 +194,11 @@ class _UpdateThingState extends State<Updatething> {
     if (description != null && description.isNotEmpty) {
       _descriptionController.text = description;
       _descirption = description;
+    }
+
+    final title = widget.title;
+    if (title != null && title.isNotEmpty) {
+      _titleController.text = title;
     }
 
     final severity = widget.severity;
@@ -604,6 +617,48 @@ class _UpdateThingState extends State<Updatething> {
     );
   }
 
+  Widget _buildTitleCard() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Title',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: TextField(
+                controller: _titleController,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                decoration: const InputDecoration(
+                  hintText: 'Give your report a short title...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDescriptionCard() {
     return Card(
       color: Colors.white,
@@ -821,6 +876,7 @@ class _UpdateThingState extends State<Updatething> {
 
         onTap: () async {
           final errors = <String>[];
+          if (_titleController.text.trim().isEmpty) errors.add('title');
           if (_image == null) errors.add('photo');
           if (_selectedCategory == null) errors.add('category');
           if (_descriptionController.text.trim().isEmpty) {
@@ -863,6 +919,7 @@ class _UpdateThingState extends State<Updatething> {
               MaterialPageRoute(
                 builder: (context) => Confirmation(
                   category: _selectedCategory!,
+                  title: _titleController.text.trim(),
                   description: _descriptionController.text.trim(),
                   image: _image!,
                   severity: _selectedSeverity!,
