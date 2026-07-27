@@ -158,7 +158,7 @@ class _ProfileState extends State<Profile> {
                     _sectionHeader(
                       title: 'Badges',
                       trailing: Text(
-                        '${reportsCount >= 10 ? 3 : (reportsCount >= 5 ? 2 : (reportsCount >= 1 ? 1 : 0))} of 6 earned',
+                        '${reportsCount >= 10 ? 3 : (reportsCount >= 5 ? 2 : (reportsCount >= 1 ? 1 : 0))} of 9 earned',
                         style: TextStyle(color: _muted, fontSize: 13),
                       ),
                     ),
@@ -812,40 +812,82 @@ class _ProfileState extends State<Profile> {
   }
 
   Widget badgesGrid(int reportsCount) {
+    final badges = [
+      _badgeCard(
+        'Community Report',
+        'First Community Report',
+        Icons.emoji_events,
+        Colors.amber,
+        reportsCount >= 1,
+      ),
+      _badgeCard(
+        'Voice Report',
+        'First Voice Report',
+        Icons.mic,
+        Colors.amber,
+        reportsCount >= 1,
+      ),
+      _badgeCard(
+        'Basic',
+        '1+ reports accepted',
+        Icons.looks_one,
+        Colors.green,
+        reportsCount >= 1,
+      ),
+      _badgeCard(
+        'Medium',
+        '10+ reports accepted',
+        Icons.looks_two,
+        Colors.orange,
+        reportsCount >= 10,
+      ),
+      _badgeCard(
+        'Good',
+        '20+ reports accepted',
+        Icons.looks_3,
+        Colors.amber,
+        reportsCount >= 20,
+      ),
+      _badgeCard(
+        'Great',
+        '35+ reports accepted',
+        Icons.star,
+        Colors.deepOrange,
+        reportsCount >= 35,
+      ),
+      _badgeCard(
+        'Elite',
+        '50+ reports accepted',
+        Icons.workspace_premium,
+        Colors.purple,
+        reportsCount >= 50,
+      ),
+      _badgeCard(
+        'Legendary',
+        '100+ reports accepted',
+        Icons.auto_awesome,
+        Colors.red,
+        reportsCount >= 100,
+      ),
+      _badgeCard(
+        'God',
+        '1000+ reports accepted',
+        Icons.local_fire_department,
+        Colors.redAccent,
+        reportsCount >= 1000,
+      ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: _badgeCard(
-              'Top Reporter',
-              '10+ accepted',
-              Icons.emoji_events,
-              Colors.amber,
-              reportsCount >= 10,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _badgeCard(
-              'Walker',
-              '5 walk sessions',
-              Icons.directions_walk,
-              Colors.orange,
-              reportsCount >= 5,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _badgeCard(
-              'Fast',
-              'Report within 1hr',
-              Icons.bolt,
-              Colors.amber,
-              reportsCount >= 1,
-            ),
-          ),
-        ],
+      child: GridView.count(
+        crossAxisCount: 3, // 3 columns
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.9,
+        children: badges,
       ),
     );
   }
