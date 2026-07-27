@@ -141,6 +141,11 @@ class _ProfileState extends State<Profile> {
     }
 
     final int reportsCount = _submittedReports.length;
+    final int draftsCount = _draftReports.length;
+    final int resolvedCount = _submittedReports.where((report) {
+      final status = (report['status'] as String?)?.trim().toLowerCase();
+      return status == 'resolved';
+    }).length;
 
     return Scaffold(
       backgroundColor: _pageBg,
@@ -150,7 +155,12 @@ class _ProfileState extends State<Profile> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
-              header(ApiService.userName, reportsCount),
+              header(
+                ApiService.userName,
+                reportsCount,
+                draftsCount,
+                resolvedCount,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: Column(
@@ -713,7 +723,12 @@ class _ProfileState extends State<Profile> {
     }
   }
 
-  Widget header(String name, int reportsCount) {
+  Widget header(
+    String name,
+    int reportsCount,
+    int draftsCount,
+    int resolvedCount,
+  ) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -779,9 +794,9 @@ class _ProfileState extends State<Profile> {
             children: [
               _statBox(reportsCount.toString(), 'Reports'),
               const SizedBox(width: 10),
-              _statBox('141', 'Upvotes'),
+              _statBox(draftsCount.toString(), 'Drafts'),
               const SizedBox(width: 10),
-              _statBox('18', 'Resolved'),
+              _statBox(resolvedCount.toString(), 'Resolved'),
             ],
           ),
         ],
