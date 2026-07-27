@@ -29,26 +29,27 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   StreamSubscription<AuthState>? _authSub;
 
-  @override
+	@override
   void initState() {
     super.initState();
     if (AuthService.isConfigured) {
       _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
-        if (data.event == AuthChangeEvent.signedIn &&
-            data.session != null &&
-            mounted &&
-            !_loading) {
-          setState(() => _loading = true);
-          final error = await ApiService.completeOAuthSession();
-          if (!mounted) return;
-          setState(() => _loading = false);
-          if (error == null && ApiService.userId != null) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const MainShell()),
-            );
-          } else if (error != null) {
-            await showErrorPopup(context, error);
-          }
+        // Must handle signedIn even while _loading is true (OAuth sets it).
+        if (data.event != AuthChangeEvent.signedIn ||
+            data.session == null ||
+            !mounted) {
+          return;
+        }
+        setState(() => _loading = true);
+        final error = await ApiService.completeOAuthSession();
+        if (!mounted) return;
+        setState(() => _loading = false);
+        if (ApiService.userId != null || error == null) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainShell()),
+          );
+        } else {
+          await showErrorPopup(context, error);
         }
       });
     }
@@ -102,10 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (error != null) {
       await showErrorPopup(context, error);
-      // After signup with email confirmation, flip to login.
-      if (!_isLogin && error.toLowerCase().contains('check your email')) {
-        setState(() => _isLogin = true);
-      }
       return;
     }
 
@@ -180,13 +177,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _oauth(OAuthProvider provider) async {
     setState(() => _loading = true);
-    final error = await AuthService.signInWithOAuth(provider);
+
+    final error = provider == OAuthProvider.google
+        ? await AuthService.signInWithGoogle()
+        : await AuthService.signInWithOAuth(provider);
+
     if (!mounted) return;
+
     if (error != null) {
       setState(() => _loading = false);
       await showErrorPopup(context, error);
+      return;
     }
-    // Keep loading until auth state listener completes, with a timeout.
+
+    // Native Google completes with a session immediately.
+    if (AuthService.isSignedIn) {
+      final syncError = await ApiService.completeOAuthSession();
+      if (!mounted) return;
+      setState(() => _loading = false);
+      if (syncError != null && ApiService.userId == null) {
+        await showErrorPopup(context, syncError);
+        return;
+      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+      );
+      return;
+    }
+
+    // Browser OAuth: keep spinner until onAuthStateChange fires (or timeout).
     Future<void>.delayed(const Duration(seconds: 90), () {
       if (mounted && _loading) setState(() => _loading = false);
     });
