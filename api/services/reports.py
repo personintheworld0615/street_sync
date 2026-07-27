@@ -81,6 +81,7 @@ def get_all_reports_by_user_notdraft(db, user_id: int):
     rows = (
         db.query(Report)
         .filter(Report.user_id == user_id, Report.is_draft == False)
+        .order_by(Report.time.desc())
         .all()
     )
     return [report_to_schema(report) for report in rows]
@@ -90,6 +91,7 @@ def get_all_reports_by_user_draft(db, user_id: int):
     rows = (
         db.query(Report)
         .filter(Report.user_id == user_id, Report.is_draft == True)
+        .order_by(Report.time.desc())
         .all()
     )
     return [report_to_schema(report) for report in rows]

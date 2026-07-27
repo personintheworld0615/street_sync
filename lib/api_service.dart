@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static const _sessionKey = 'current_user';
   static const _cacheRecentReports = 'cache_recent_reports';
+  static const _cacheReportStats = 'cache_report_stats';
   static const _cacheDraftReports = 'cache_draft_reports';
   static const _cacheSubmittedReports = 'cache_submitted_reports';
   static const _cacheTopUsers = 'cache_top_users';
@@ -93,6 +94,7 @@ class ApiService {
   static Future<void> clearDataCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheRecentReports);
+    await prefs.remove(_cacheReportStats);
     await prefs.remove(_cacheDraftReports);
     await prefs.remove(_cacheSubmittedReports);
     await prefs.remove(_cacheTopUsers);
@@ -132,6 +134,29 @@ class ApiService {
 
   static Future<void> cacheRecentReports(List<dynamic> reports) =>
       _writeListCache(_cacheRecentReports, reports);
+
+  static Future<Map<String, int>?> getCachedReportStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cacheReportStats);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return {
+        'nearby': (decoded['nearby'] as num?)?.toInt() ?? 0,
+        'in_progress': (decoded['in_progress'] as num?)?.toInt() ?? 0,
+        'resolved': (decoded['resolved'] as num?)?.toInt() ?? 0,
+      };
+    } catch (e) {
+      print('cache read error ($_cacheReportStats): $e');
+      return null;
+    }
+  }
+
+  static Future<void> cacheReportStats(Map<String, int> stats) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cacheReportStats, jsonEncode(stats));
+  }
 
   static Future<List<dynamic>?> getCachedDraftReports(int userId) async {
     await _ensureUserScopedCache(userId);
@@ -376,7 +401,8 @@ class ApiService {
 
   /// Cursor feed for Home "Show more". Pass [before] as the oldest loaded
   /// report's `time` to fetch the next older page.
-  static Future<List<dynamic>> getReportsFeed({
+  /// Returns null on network/HTTP failure so callers can keep cached UI.
+  static Future<List<dynamic>?> getReportsFeed({
     int amount = 10,
     String? category,
     String? before,
@@ -403,10 +429,10 @@ class ApiService {
     } catch (e) {
       print('Error fetching feed: $e');
     }
-    return [];
+    return null;
   }
 
-  static Future<int> _countReports(String path) async {
+  static Future<int?> _countReports(String path) async {
     final url = Uri.parse('$baseUrl$path');
     try {
       final response = await http
@@ -420,21 +446,26 @@ class ApiService {
     } catch (e) {
       print('Error fetching $path: $e');
     }
-    return 0;
+    return null;
   }
 
-  static Future<Map<String, dynamic>> getReportStats() async {
+  /// Returns null if any stats request fails (keep cached counts).
+  static Future<Map<String, int>?> getReportStats() async {
     final counts = await Future.wait([
       _countReports('/reports/nearme'),
       _countReports('/reports/in_progress'),
       _countReports('/reports/resolved'),
     ]);
 
-    return {
-      'nearby': counts[0],
-      'in_progress': counts[1],
-      'resolved': counts[2],
+    if (counts.any((c) => c == null)) return null;
+
+    final stats = {
+      'nearby': counts[0]!,
+      'in_progress': counts[1]!,
+      'resolved': counts[2]!,
     };
+    await cacheReportStats(stats);
+    return stats;
   }
   
 

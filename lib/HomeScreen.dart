@@ -4,7 +4,6 @@ import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
-import 'api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,38 +38,61 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadReports({bool forceNetwork = false}) async {
-    if (!forceNetwork) {
-      final cached = await ApiService.getCachedRecentReports();
+    // Show cached home data immediately so remounts (e.g. after submitting a
+    // report via pushAndRemoveUntil MainShell) don't flash the skeleton.
+    if (!forceNetwork && _selectedCat == null) {
+      final cachedReports = await ApiService.getCachedRecentReports();
+      final cachedStats = await ApiService.getCachedReportStats();
+      final hasCache =
+          (cachedReports != null && cachedReports.isNotEmpty) ||
+          cachedStats != null;
 
-      if (cached != null && mounted && _selectedCat == null) {
+      if (hasCache && mounted) {
         setState(() {
-          _recentReports = cached.take(_pageSize).toList();
+          if (cachedReports != null && cachedReports.isNotEmpty) {
+            _recentReports = cachedReports.take(_pageSize).toList();
+            _hasMore = cachedReports.length >= _pageSize;
+          }
+          if (cachedStats != null) {
+            _nearbyCount = cachedStats['nearby'] ?? 0;
+            _inProgressCount = cachedStats['in_progress'] ?? 0;
+            _resolvedCount = cachedStats['resolved'] ?? 0;
+          }
           _isLoading = false;
-          _hasMore = cached.length >= _pageSize;
         });
       }
     }
 
-    final reports = await ApiService.getReportsFeed(
-      amount: _pageSize,
-      category: _selectedCat,
-    );
-    final stats = await ApiService.getReportStats();
+    final results = await Future.wait([
+      ApiService.getReportsFeed(
+        amount: _pageSize,
+        category: _selectedCat,
+      ),
+      ApiService.getReportStats(),
+    ]);
 
-    if (_selectedCat == null && reports.isNotEmpty) {
+    final reports = results[0] as List<dynamic>?;
+    final stats = results[1] as Map<String, int>?;
+
+    if (_selectedCat == null && reports != null && reports.isNotEmpty) {
       await ApiService.cacheRecentReports(reports);
     }
 
-    if (mounted) {
-      setState(() {
+    if (!mounted) return;
+
+    setState(() {
+      // Only replace list on a real response — keep cache if the request failed.
+      if (reports != null) {
         _recentReports = reports;
         _hasMore = reports.length >= _pageSize;
+      }
+      if (stats != null) {
         _nearbyCount = stats['nearby'] ?? 0;
         _inProgressCount = stats['in_progress'] ?? 0;
         _resolvedCount = stats['resolved'] ?? 0;
-        _isLoading = false;
-      });
-    }
+      }
+      _isLoading = false;
+    });
   }
 
   Future<void> _loadMore() async {
@@ -88,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
+    if (more == null) {
+      setState(() => _isLoadingMore = false);
+      return;
+    }
 
     setState(() {
       _recentReports = [..._recentReports, ...more];
@@ -236,12 +263,15 @@ class _HomeScreenState extends State<HomeScreen> {
           return ChoiceChip(
             label: Text(label),
             selected: selected,
-            onSelected: (_) {
+            onSelected: (selected) {
+              if (!selected) return;
+              final nextCat = label == 'All' ? null : label;
+              if (nextCat == _selectedCat) return;
+
               setState(() {
-                _selectedCat = label == 'All' ? null : label;
-                _isLoading = true;
-                _hasMore = true;
-                _recentReports = [];
+                _selectedCat = nextCat;
+                // Hide Show more until the new feed response sets it.
+                _hasMore = false;
               });
               _loadReports(forceNetwork: true);
             },
