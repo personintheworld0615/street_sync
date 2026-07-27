@@ -43,6 +43,9 @@ dependencies:
   geolocator: ^14.0.3
   geocoding: ^3.0.0
   flutter_dotenv: ^5.2.1
+  supabase_flutter: ^2.9.1
+  app_links: ^6.4.0
+  http: ^1.2.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

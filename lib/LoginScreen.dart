@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Placeholder login — UI only for now; continues into the app.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,9 +27,36 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _isLogin = true;
   bool _loading = false;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AuthService.isConfigured) {
+      _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
+        if (data.event == AuthChangeEvent.signedIn &&
+            data.session != null &&
+            mounted &&
+            !_loading) {
+          setState(() => _loading = true);
+          final error = await ApiService.completeOAuthSession();
+          if (!mounted) return;
+          setState(() => _loading = false);
+          if (error == null && ApiService.userId != null) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const MainShell()),
+            );
+          } else if (error != null) {
+            await showErrorPopup(context, error);
+          }
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _nameCtrl.dispose();
@@ -67,16 +97,99 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
-    if (mounted) {
-      setState(() => _loading = false);
-      if (error == null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainShell()),
-        );
-      } else {
-        await showErrorPopup(context, error);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (error != null) {
+      await showErrorPopup(context, error);
+      // After signup with email confirmation, flip to login.
+      if (!_isLogin && error.toLowerCase().contains('check your email')) {
+        setState(() => _isLogin = true);
       }
+      return;
     }
+
+    if (ApiService.userId != null || AuthService.isSignedIn) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainShell()),
+      );
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final emailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset password'),
+        content: TextField(
+          controller: emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            hintText: 'you@email.com',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, emailCtrl.text.trim()),
+            child: const Text('Send link'),
+          ),
+        ],
+      ),
+    );
+    emailCtrl.dispose();
+    if (email == null) return;
+    if (email.isEmpty) {
+      if (!mounted) return;
+      await showErrorPopup(context, 'Enter the email for your account');
+      return;
+    }
+
+    setState(() => _loading = true);
+    final error = await AuthService.resetPassword(email);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (error != null) {
+      await showErrorPopup(context, error);
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Check your email'),
+        content: Text(
+          'We sent a reset link to $email. Open it on this device to choose a new password.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _oauth(OAuthProvider provider) async {
+    setState(() => _loading = true);
+    final error = await AuthService.signInWithOAuth(provider);
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _loading = false);
+      await showErrorPopup(context, error);
+    }
+    // Keep loading until auth state listener completes, with a timeout.
+    Future<void>.delayed(const Duration(seconds: 90), () {
+      if (mounted && _loading) setState(() => _loading = false);
+    });
   }
 
   @override
@@ -110,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _isLogin 
+                _isLogin
                     ? 'Sign in to sync with your community.'
                     : 'Join StreetSync to start making an impact.',
                 style: const TextStyle(
@@ -131,8 +244,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-              ],
-                if (!_isLogin) ...[
                 _label('Last Name'),
                 const SizedBox(height: 8),
                 TextField(
@@ -149,6 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
                 decoration: _inputDecoration(
                   hint: 'you@email.com',
                   icon: Icons.mail_outline_rounded,
@@ -178,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: _loading ? null : _forgotPassword,
                     child: const Text(
                       'Forgot password?',
                       style: TextStyle(
@@ -202,11 +314,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: _loading 
+                  child: _loading
                       ? const SizedBox(
-                          height: 24, 
-                          width: 24, 
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
                         )
                       : Text(
                           _isLogin ? 'Log in' : 'Sign up',
@@ -217,16 +332,58 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                 ),
               ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'or continue with',
+                      style: TextStyle(color: _muted, fontSize: 13),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _oauthButton(
+                      label: 'Google',
+                      icon: Icons.g_mobiledata_rounded,
+                      onTap: _loading
+                          ? null
+                          : () => _oauth(OAuthProvider.google),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _oauthButton(
+                      label: 'Apple',
+                      icon: Icons.apple,
+                      onTap: _loading
+                          ? null
+                          : () => _oauth(OAuthProvider.apple),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 28),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _isLogin ? "Don't have an account? " : "Already have an account? ",
+                    _isLogin
+                        ? "Don't have an account? "
+                        : 'Already have an account? ',
                     style: const TextStyle(color: _muted),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _isLogin = !_isLogin),
+                    onTap: _loading
+                        ? null
+                        : () => setState(() => _isLogin = !_isLogin),
                     child: Text(
                       _isLogin ? 'Sign up' : 'Log in',
                       style: const TextStyle(
@@ -238,6 +395,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _oauthButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onTap,
+  }) {
+    return SizedBox(
+      height: 50,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, color: _ink, size: 22),
+        label: Text(
+          label,
+          style: const TextStyle(
+            color: _ink,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: BorderSide(color: Colors.grey.shade200),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),

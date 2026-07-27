@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:street_sync/auth_service.dart';
 
 class ApiService {
   static const _sessionKey = 'current_user';
@@ -78,7 +79,11 @@ class ApiService {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  static String? get token => currentUser?['access_token'] as String?;
+  static String? get token {
+    final supabaseToken = AuthService.accessToken;
+    if (supabaseToken != null && supabaseToken.isNotEmpty) return supabaseToken;
+    return currentUser?['access_token'] as String?;
+  }
 
   static Future<void> updateUserPicture(String pictureUrl) async {
     if (currentUser == null) return;
@@ -87,6 +92,13 @@ class ApiService {
   }
 
   static Future<void> loadSession() async {
+    if (AuthService.isSignedIn) {
+      final error = await syncFromSupabase();
+      if (error == null) return;
+      print('loadSession sync error: $error');
+    }
+
+    // Legacy SharedPreferences session (pre-Supabase installs).
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_sessionKey);
     if (raw == null || raw.isEmpty) return;
@@ -108,7 +120,85 @@ class ApiService {
     }
   }
 
+  /// Pulls the Supabase session into [currentUser] and ensures a matching
+  /// row exists in the StreetSync API (`/auth/sync`).
+  /// Returns null on success, or an error message.
+  static Future<String?> syncFromSupabase({
+    String? firstName,
+    String? lastName,
+  }) async {
+    final access = AuthService.accessToken;
+    final authUser = AuthService.user;
+    if (access == null || authUser == null) {
+      currentUser = null;
+      await _saveSession();
+      return 'Not signed in';
+    }
+
+    final url = Uri.parse('$baseUrl/auth/sync');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $access',
+            },
+            body: jsonEncode({
+              if (firstName != null && firstName.isNotEmpty)
+                'first_name': firstName,
+              if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        currentUser = {
+          ...body,
+          'access_token': access,
+        };
+        await _saveSession();
+        return null;
+      }
+
+      // Soft-fallback so the app can still open if the API is down.
+      currentUser = {
+        'access_token': access,
+        'user_id': currentUser?['user_id'],
+        'first_name': firstName ??
+            AuthService.firstNameFromUser ??
+            currentUser?['first_name'] ??
+            'Citizen',
+        'last_name': lastName ??
+            AuthService.lastNameFromUser ??
+            currentUser?['last_name'] ??
+            '',
+        'email': authUser.email,
+        'picture': currentUser?['picture'] ??
+            authUser.userMetadata?['avatar_url'] ??
+            authUser.userMetadata?['picture'],
+      };
+      await _saveSession();
+      return _errorFromResponse(response, fallback: 'Could not sync profile');
+    } catch (e) {
+      print('syncFromSupabase Error ($url): $e');
+      currentUser = {
+        'access_token': access,
+        'user_id': currentUser?['user_id'],
+        'first_name': firstName ?? AuthService.firstNameFromUser ?? 'Citizen',
+        'last_name': lastName ?? AuthService.lastNameFromUser ?? '',
+        'email': authUser.email,
+        'picture': authUser.userMetadata?['avatar_url'] ??
+            authUser.userMetadata?['picture'],
+      };
+      await _saveSession();
+      return 'Cannot reach API at $baseUrl. Is the server running?';
+    }
+  }
+
   static Future<void> logout() async {
+    await AuthService.signOut();
     currentUser = null;
     await _saveSession();
     await clearDataCache();
@@ -288,6 +378,7 @@ class ApiService {
     return headers;
   }
 
+  /// Email/password signup via Supabase Auth, then profile sync with the API.
   /// Returns null on success, or an error message on failure.
   static Future<String?> signup({
     required String firstname,
@@ -295,63 +386,45 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    final url = Uri.parse('$baseUrl/auth/signup');
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'first_name': firstname,
-              'last_name': lastname,
-              'email': email,
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        currentUser = jsonDecode(response.body) as Map<String, dynamic>;
-        await _saveSession();
-        return null;
-      }
-
-      return _errorFromResponse(response, fallback: 'Signup failed');
-    } catch (e) {
-      print('Signup Error ($url): $e');
-      return 'Cannot reach API at $baseUrl. Is the server running?';
+    final error = await AuthService.signUp(
+      email: email,
+      password: password,
+      firstName: firstname,
+      lastName: lastname,
+    );
+    if (error != null) return error;
+    if (!AuthService.isSignedIn) {
+      // Email confirmation required — no session yet.
+      return null;
     }
+    final syncError = await syncFromSupabase(
+      firstName: firstname,
+      lastName: lastname,
+    );
+    // Treat unreachable API as soft failure only when we already have a session.
+    if (syncError != null && userId == null) return syncError;
+    return null;
   }
 
+  /// Email/password login via Supabase Auth, then profile sync with the API.
   /// Returns null on success, or an error message on failure.
   static Future<String?> login({
     required String email,
     required String password,
   }) async {
-    final url = Uri.parse('$baseUrl/auth/login');
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'email': email,
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
+    final error = await AuthService.signIn(email: email, password: password);
+    if (error != null) return error;
+    final syncError = await syncFromSupabase();
+    if (syncError != null && userId == null) return syncError;
+    return null;
+  }
 
-      if (response.statusCode == 200) {
-        currentUser = jsonDecode(response.body) as Map<String, dynamic>;
-        await _saveSession();
-        return null;
-      }
-
-      return _errorFromResponse(response, fallback: 'Login failed');
-    } catch (e) {
-      print('Login Error ($url): $e');
-      return 'Cannot reach API at $baseUrl. Is the server running?';
-    }
+  /// Completes an OAuth session (after deep link) and syncs the API profile.
+  static Future<String?> completeOAuthSession() async {
+    if (!AuthService.isSignedIn) return 'OAuth sign-in did not complete';
+    final syncError = await syncFromSupabase();
+    if (syncError != null && userId == null) return syncError;
+    return null;
   }
 
   /// Uploads a profile photo to Supabase via the API.
@@ -402,17 +475,21 @@ class ApiService {
 
   static Future<String?> deleteAccount() async {
     final id = userId;
-    if (id == null) {
-      return 'Not logged in';
-    }
-
-    final url = Uri.parse('$baseUrl/auth/delete/$id');
+    final url = id != null
+        ? Uri.parse('$baseUrl/auth/delete/$id')
+        : Uri.parse('$baseUrl/auth/delete');
     try {
       final response = await http
           .delete(url, headers: _headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
+        await logout();
+        return null;
+      }
+
+      // If the API row is already gone, still wipe the Supabase session.
+      if (response.statusCode == 401 || response.statusCode == 404) {
         await logout();
         return null;
       }
@@ -420,7 +497,8 @@ class ApiService {
       return _errorFromResponse(response, fallback: 'Could not delete account');
     } catch (e) {
       print('Delete Account Error ($url): $e');
-      return 'Cannot reach API at $baseUrl. Is the server running?';
+      await logout();
+      return 'Cannot reach API at $baseUrl. Signed out locally.';
     }
   }
 
