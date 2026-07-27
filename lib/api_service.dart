@@ -386,6 +386,10 @@ class ApiService {
 
   /// Submits a report as multipart/form-data so photos go to Supabase Storage
   /// (API stores only the public URL in Postgres).
+  ///
+  /// Pass [draftId] to update/publish an existing draft in place (so it leaves
+  /// the drafts list). Pass [existingImageUrl] to keep a server photo when no
+  /// new local file is uploaded.
   static Future<bool> submitReport({
     required String title,
     required String description,
@@ -397,6 +401,8 @@ class ApiService {
     double longitude = 0.0,
     int? userId,
     String? imagePath,
+    int? draftId,
+    String? existingImageUrl,
   }) async {
     final effectiveUserId = userId ?? ApiService.userId;
     if (effectiveUserId == null) {
@@ -404,13 +410,16 @@ class ApiService {
       return false;
     }
 
-    final url = Uri.parse('$baseUrl/reports');
+    final updating = draftId != null;
+    final url = updating
+        ? Uri.parse('$baseUrl/reports/$draftId')
+        : Uri.parse('$baseUrl/reports');
     final hasImage = imagePath != null &&
         imagePath.isNotEmpty &&
         await File(imagePath).exists();
 
     try {
-      final request = http.MultipartRequest('POST', url);
+      final request = http.MultipartRequest(updating ? 'PUT' : 'POST', url);
       final t = token;
       if (t != null && t.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $t';
@@ -433,6 +442,10 @@ class ApiService {
         request.files.add(
           await http.MultipartFile.fromPath('image', imagePath!),
         );
+      } else if (updating &&
+          existingImageUrl != null &&
+          existingImageUrl.trim().isNotEmpty) {
+        request.fields['existing_image_url'] = existingImageUrl.trim();
       }
 
       final streamed = await request.send().timeout(
@@ -446,12 +459,27 @@ class ApiService {
       }
       if (response.statusCode != 200 && response.statusCode != 201) {
         print('submitReport failed: ${response.statusCode} ${response.body}');
+        return false;
       }
-      return response.statusCode == 200 || response.statusCode == 201;
+
+      // Profile shows cached drafts first — bust so published drafts disappear.
+      await clearUserReportCaches();
+      return true;
     } catch (e) {
       print('Connection Error: $e');
       return false;
     }
+  }
+
+  static Future<void> clearUserReportCaches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheDraftReports);
+    await prefs.remove(_cacheSubmittedReports);
+    await prefs.remove(_cacheTopUsers);
+    await prefs.remove(_cacheHomeFeeds);
+    await prefs.remove(_cacheHomeHasMore);
+    await prefs.remove(_cacheRecentReports);
+    await prefs.remove(_cacheReportStats);
   }
 
   static Future<List<dynamic>> getRecentReports({int amount = 3}) async {
