@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/auth_service.dart';
+import 'dart:io' show File, Platform;
 
 class ApiService {
   static const _sessionKey = 'current_user';
@@ -29,7 +30,7 @@ class ApiService {
           : 'localhost';
 
   static int get _devPort =>
-      int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8001;
+      int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8000;
 
   // Automatically switch base URL depending on the platform
   static String get baseUrl {
@@ -40,9 +41,16 @@ class ApiService {
       return cloudUrl;
     }
 
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:$_devPort';
+    if (kIsWeb) {
+      return 'http://localhost:$_devPort';
     }
+
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:$_devPort';
+      }
+    } catch (_) {}
+
     return 'http://$_devHost:$_devPort';
   }
 
@@ -80,8 +88,10 @@ class ApiService {
   }
 
   static String? get token {
-    final supabaseToken = AuthService.accessToken;
-    if (supabaseToken != null && supabaseToken.isNotEmpty) return supabaseToken;
+    if (AuthService.isConfigured) {
+      final supabaseToken = AuthService.accessToken;
+      if (supabaseToken != null && supabaseToken.isNotEmpty) return supabaseToken;
+    }
     return currentUser?['access_token'] as String?;
   }
 
@@ -92,7 +102,7 @@ class ApiService {
   }
 
   static Future<void> loadSession() async {
-    if (AuthService.isSignedIn) {
+    if (AuthService.isConfigured && AuthService.isSignedIn) {
       final error = await syncFromSupabase();
       if (error == null) return;
       print('loadSession sync error: $error');
@@ -843,5 +853,26 @@ class ApiService {
       print('Error fetching top users: $e');
     }
     return [];
+  }
+
+  static Future<String> generateAITitle(String description) async {
+    final url = Uri.parse('$baseUrl/reports/generate-title');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'description': description}),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['title'] ?? 'New Issue';
+      }
+    } catch (e) {
+      print('Error generating AI title: $e');
+    }
+    return 'New Issue';
   }
 }

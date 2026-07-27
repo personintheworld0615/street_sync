@@ -81,7 +81,6 @@ def get_all_reports_by_user_notdraft(db, user_id: int):
     rows = (
         db.query(Report)
         .filter(Report.user_id == user_id, Report.is_draft == False)
-        .order_by(Report.time.desc())
         .all()
     )
     return [report_to_schema(report) for report in rows]
@@ -91,7 +90,6 @@ def get_all_reports_by_user_draft(db, user_id: int):
     rows = (
         db.query(Report)
         .filter(Report.user_id == user_id, Report.is_draft == True)
-        .order_by(Report.time.desc())
         .all()
     )
     return [report_to_schema(report) for report in rows]
@@ -211,55 +209,10 @@ def delete_account(db, user_id: int):
     db.delete(user)
     db.commit()
     return {"message": "Account deleted successfully"}
-def delete_report(db, report_id: int, current_user: User):
+def delete_report(db, report_id: int):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not allowed to delete this report")
     db.delete(report)
     db.commit()
     return {"message": "Report deleted successfully"}
-
-
-def update_report(db, report_id: int, report: Reports, current_user: User):
-    """Update an owned report. Used to edit/publish drafts in place."""
-    row = db.query(Report).filter(Report.id == report_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Report not found")
-    if row.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not allowed to update this report")
-
-    was_draft = row.is_draft
-
-    row.title = report.title
-    row.description = report.description
-    row.category = report.category
-    row.latitude = report.latitude
-    row.longitude = report.longitude
-    row.location = report.location
-    row.severity = report.severity
-    row.time = report.time
-    row.is_draft = report.isDraft
-
-    # New image URL/data → upload; None means keep existing photo
-    if report.image is not None:
-        image_value = report.image.strip()
-        if image_value:
-            if image_value.startswith("http://") or image_value.startswith("https://"):
-                row.image = image_value
-            else:
-                row.image = persist_report_image(image_value)
-
-    if report.isDraft:
-        row.status = "Draft"
-    elif was_draft or row.status == "Draft":
-        row.status = "Open"
-
-    db.commit()
-    db.refresh(row)
-
-    if was_draft and not report.isDraft:
-        bump_user_report_count(db, report.user_id)
-
-    return report_to_schema(row)
