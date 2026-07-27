@@ -41,12 +41,15 @@ class _MapScreenState extends State<MapScreen> {
 
   Map<String, dynamic>? _selectedReport;
 
-<<<<<<< Updated upstream
   Future<void> _paintCachedReports() async {
     final cached = await ApiService.getCachedRecentReports();
     if (!mounted) return;
     if (cached == null || cached.isEmpty) return;
-=======
+
+    _recentReports = List<dynamic>.from(cached);
+    _updateMarkers();
+  }
+
   late BitmapDescriptor redSmall;
   late BitmapDescriptor redLarge;
 
@@ -62,14 +65,6 @@ class _MapScreenState extends State<MapScreen> {
       const ImageConfiguration(size: Size(45, 72)),
       "assets/images/markers/Selected_Red.png",
     );
-  }
-
-  Future<void> _loadRecentReports() async {
-  _recentReports = await ApiService.getRecentReports(amount: 100);
->>>>>>> Stashed changes
-
-    _recentReports = List<dynamic>.from(cached);
-    _updateMarkers();
   }
 
   /// Show cache immediately (if any), then refresh from network in the background.
