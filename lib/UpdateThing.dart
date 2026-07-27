@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'Confirmation.dart';
+import 'ConfirmationVoiceReport.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/report_categories.dart';
@@ -138,7 +139,7 @@ class _UpdateThingState extends State<Updatething> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Camera report',
+                      'Review and finish your report',
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
@@ -147,19 +148,12 @@ class _UpdateThingState extends State<Updatething> {
                         height: 1.15,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Capture and report issues as you walk',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: _muted,
-                        height: 1.35,
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     _buildTitleCard(),
-                    const SizedBox(height: 14),
-                    _buildPhotoCard(),
+                    if (_imageWasProvided) ...[
+                      const SizedBox(height: 14),
+                      _buildPhotoCard(),
+                    ],
                     const SizedBox(height: 14),
                     _buildCategoryCard(),
                     const SizedBox(height: 14),
@@ -235,6 +229,14 @@ class _UpdateThingState extends State<Updatething> {
   bool get _hasPhoto =>
       _image != null ||
       (_existingImageUrl != null && _existingImageUrl!.isNotEmpty);
+
+  /// True when a local path or server image URL was passed into this screen.
+  bool get _imageWasProvided {
+    final path = widget.imagePath;
+    if (path != null && path.isNotEmpty) return true;
+    final url = widget.existingImageUrl?.trim();
+    return url != null && url.isNotEmpty;
+  }
 
   String _normalizeSeverity(String severity) {
     switch (severity.toLowerCase()) {
@@ -923,7 +925,7 @@ class _UpdateThingState extends State<Updatething> {
           if (_submitting) return;
           final errors = <String>[];
           if (_titleController.text.trim().isEmpty) errors.add('title');
-          if (!_hasPhoto) errors.add('photo');
+          if (_imageWasProvided && !_hasPhoto) errors.add('photo');
           if (_selectedCategory == null) errors.add('category');
           if (_selectedSeverity == null) errors.add('severity');
           if (_descriptionController.text.trim().isEmpty) {
@@ -948,13 +950,34 @@ class _UpdateThingState extends State<Updatething> {
             if (!mounted) return;
             setState(() => _submitting = false);
 
+            final title = _titleController.text.trim();
+            final description = _descriptionController.text.trim();
+            final othercat = _selectedCategory == 'Other'
+                ? _otherCategoryController.text.trim()
+                : '';
+
+            if (!_imageWasProvided) {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ConfirmationVoiceReport(
+                    title: title,
+                    description: description,
+                    location: address,
+                    othercat: othercat,
+                  ),
+                ),
+              );
+              return;
+            }
+
             await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => Confirmation(
                   category: _selectedCategory!,
-                  title: _titleController.text.trim(),
-                  description: _descriptionController.text.trim(),
+                  title: title,
+                  description: description,
                   image: _image,
                   existingImageUrl: _existingImageUrl,
                   draftId: widget.draftId,
@@ -962,6 +985,7 @@ class _UpdateThingState extends State<Updatething> {
                   location: address,
                   latitude: position.latitude,
                   longitude: position.longitude,
+                  othercat: othercat,
                 ),
               ),
             );

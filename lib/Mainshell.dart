@@ -13,36 +13,38 @@ class MainShell extends StatefulWidget{
 }
 
 class _MainShellState extends State<MainShell> {
-       int _index = 0;
-        final _screens = [
-            const HomeScreen(),
-            const MapScreen(),
-            const Leaderboard(),
-            const Profile(),
-        ];
-    @override
-    Widget build(BuildContext context) {
-     
-        return Scaffold(
-            body: IndexedStack(
-                index: _index,
-                children: _screens,
-            ),
-            bottomNavigationBar: BottomNavigationBar(
-                selectedItemColor: const Color(0xFF2196F3),
-                unselectedItemColor: const Color(0xFF5B677A),
-                backgroundColor: Colors.white,
-                type: BottomNavigationBarType.fixed,
-                elevation: 8,
-                currentIndex: _index,
-                onTap: (index) => setState(() => _index = index),
-                items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-                    BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-                    BottomNavigationBarItem(icon: Icon(Icons.leaderboard), label: 'Leaderboard'),
-                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-                ],
-            ),
-        );
-    }
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _index,
+        children: [
+          const HomeScreen(),
+          MapScreen(isActive: _index == 1),
+          const Leaderboard(),
+          const Profile(),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        selectedItemColor: const Color(0xFF2196F3),
+        unselectedItemColor: const Color(0xFF5B677A),
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+        currentIndex: _index,
+        onTap: (index) => setState(() => _index = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.leaderboard),
+            label: 'Leaderboard',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+      ),
+    );
+  }
 }

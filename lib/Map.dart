@@ -18,7 +18,10 @@ enum IssueCategory {
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.isActive = true});
+
+  /// When false→true (Map tab focused), reloads markers: cache first, then network.
+  final bool isActive;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -32,16 +35,41 @@ class _MapScreenState extends State<MapScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   List<dynamic> _recentReports = [];
+  bool _loadingReports = false;
 
   String? _selectedCategory; // null = show all
 
   Map<String, dynamic>? _selectedReport;
 
-  Future<void> _loadRecentReports() async {
-  _recentReports = await ApiService.getRecentReports(amount: 100);
+  Future<void> _paintCachedReports() async {
+    final cached = await ApiService.getCachedRecentReports();
+    if (!mounted) return;
+    if (cached == null || cached.isEmpty) return;
 
-  _updateMarkers();
-}
+    _recentReports = List<dynamic>.from(cached);
+    _updateMarkers();
+  }
+
+  /// Show cache immediately (if any), then refresh from network in the background.
+  /// On network failure, keep whatever markers are already on screen.
+  Future<void> _loadRecentReports({bool paintCache = true}) async {
+    if (_loadingReports) return;
+    _loadingReports = true;
+    try {
+      if (paintCache) {
+        await _paintCachedReports();
+      }
+
+      final reports = await ApiService.getRecentReports(amount: 100);
+      if (!mounted) return;
+      if (reports == null) return; // keep cache / in-memory markers
+
+      _recentReports = reports;
+      _updateMarkers();
+    } finally {
+      _loadingReports = false;
+    }
+  }
 
 void _updateMarkers() {
   final reports = _selectedCategory == null
@@ -185,7 +213,19 @@ Widget _categoryChip(
     _goToUser();
   }
 
+  @override
+  void didUpdateWidget(MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Tab focused again: paint cache, then fetch fresh markers in the bg.
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadRecentReports();
+    }
+  }
+
   Future<void> _goToUser() async {
+    // Markers can paint from cache while location permission resolves.
+    await _loadRecentReports();
+
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -203,11 +243,9 @@ Widget _categoryChip(
     );
 
     setState(() {
-       _center = userLatLng;
+      _center = userLatLng;
       _ready = true;
     });
-
-    await _loadRecentReports();
 
     await _controller?.animateCamera(
       CameraUpdate.newLatLngZoom(_center, 15),

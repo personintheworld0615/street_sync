@@ -482,12 +482,17 @@ class ApiService {
     await prefs.remove(_cacheReportStats);
   }
 
-  static Future<List<dynamic>> getRecentReports({int amount = 3}) async {
+  /// Returns null on network/HTTP failure so callers can keep cached UI.
+  static Future<List<dynamic>?> getRecentReports({int amount = 3}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
       final response = await http
           .get(url, headers: _headers)
           .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 401) {
+        await logout();
+        return null;
+      }
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         await cacheRecentReports(list);
@@ -496,7 +501,7 @@ class ApiService {
     } catch (e) {
       print('Error fetching reports: $e');
     }
-    return [];
+    return null;
   }
 
   /// Cursor feed for Home "Show more". Pass [before] as the oldest loaded
