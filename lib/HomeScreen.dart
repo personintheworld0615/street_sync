@@ -42,26 +42,29 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!forceNetwork) {
       final cached = await ApiService.getCachedRecentReports();
 
-      if (cached != null && mounted) {
+      if (cached != null && mounted && _selectedCat == null) {
         setState(() {
-          _recentReports = cached;
+          _recentReports = cached.take(_pageSize).toList();
           _isLoading = false;
+          _hasMore = cached.length >= _pageSize;
         });
       }
     }
 
-    // TEMP: use old /reports/recent until /reports/feed is deployed on Render
-    // final reports = await ApiService.getReportsFeed(
-    //   amount: _pageSize,
-    //   category: _selectedCat,
-    // );
-    final reports = await ApiService.getRecentReports(amount: _pageSize);
+    final reports = await ApiService.getReportsFeed(
+      amount: _pageSize,
+      category: _selectedCat,
+    );
     final stats = await ApiService.getReportStats();
+
+    if (_selectedCat == null && reports.isNotEmpty) {
+      await ApiService.cacheRecentReports(reports);
+    }
 
     if (mounted) {
       setState(() {
         _recentReports = reports;
-        _hasMore = false; // TEMP: Show more needs /reports/feed
+        _hasMore = reports.length >= _pageSize;
         _nearbyCount = stats['nearby'] ?? 0;
         _inProgressCount = stats['in_progress'] ?? 0;
         _resolvedCount = stats['resolved'] ?? 0;
@@ -71,27 +74,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadMore() async {
-    // TEMP: disabled until Render has /reports/feed
-    // if (_isLoadingMore || !_hasMore || _recentReports.isEmpty) return;
-    //
-    // final lastTime = _recentReports.last['time']?.toString();
-    // if (lastTime == null || lastTime.isEmpty) return;
-    //
-    // setState(() => _isLoadingMore = true);
-    //
-    // final more = await ApiService.getReportsFeed(
-    //   amount: _pageSize,
-    //   category: _selectedCat,
-    //   before: lastTime,
-    // );
-    //
-    // if (!mounted) return;
-    //
-    // setState(() {
-    //   _recentReports = [..._recentReports, ...more];
-    //   _hasMore = more.length >= _pageSize;
-    //   _isLoadingMore = false;
-    // });
+    if (_isLoadingMore || !_hasMore || _recentReports.isEmpty) return;
+
+    final lastTime = _recentReports.last['time']?.toString();
+    if (lastTime == null || lastTime.isEmpty) return;
+
+    setState(() => _isLoadingMore = true);
+
+    final more = await ApiService.getReportsFeed(
+      amount: _pageSize,
+      category: _selectedCat,
+      before: lastTime,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentReports = [..._recentReports, ...more];
+      _hasMore = more.length >= _pageSize;
+      _isLoadingMore = false;
+    });
   }
 
   Future<void> _fetchReports() => _loadReports(forceNetwork: true);
@@ -101,18 +103,6 @@ class _HomeScreenState extends State<HomeScreen> {
         fontWeight: FontWeight.w700,
         color: _ink,
       );
-
-  List<dynamic> get _filteredReports {
-    if (_selectedCat == null) return _recentReports;
-    if (_selectedCat == ReportCategories.other) {
-      return _recentReports
-          .where((r) => !ReportCategories.isPrimary(r['category'] as String?))
-          .toList();
-    }
-    return _recentReports
-        .where((r) => r['category'] == _selectedCat)
-        .toList();
-  }
 
   String _formatTime(String timeStr) {
     try {
@@ -171,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (_isLoading)
                       const ReportListSkeleton(count: 4)
                     else
-                      ..._filteredReports.map(
+                      ..._recentReports.map(
                         (r) => _buildReportCard(
                           icon: _iconFromCat(r['category']),
                           severity: r['severity'] as String,
@@ -182,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           time: _formatTime(r['time'] as String),
                         ),
                       ),
-                    if (!_isLoading && _filteredReports.isEmpty)
+                    if (!_isLoading && _recentReports.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Center(
@@ -192,35 +182,34 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    // TEMP: Show more needs /reports/feed on Render
-                    // if (!_isLoading && _hasMore && _recentReports.isNotEmpty)
-                    //   Padding(
-                    //     padding: const EdgeInsets.only(top: 8, bottom: 4),
-                    //     child: Center(
-                    //       child: ElevatedButton(
-                    //         onPressed: _isLoadingMore ? null : _loadMore,
-                    //         style: ElevatedButton.styleFrom(
-                    //           backgroundColor: _blue,
-                    //           foregroundColor: Colors.white,
-                    //           disabledBackgroundColor: _blue.withValues(alpha: 0.6),
-                    //           disabledForegroundColor: Colors.white,
-                    //           elevation: 0,
-                    //           padding: const EdgeInsets.symmetric(
-                    //             horizontal: 28,
-                    //             vertical: 12,
-                    //           ),
-                    //           shape: RoundedRectangleBorder(
-                    //             borderRadius: BorderRadius.circular(12),
-                    //           ),
-                    //           textStyle: const TextStyle(
-                    //             fontSize: 14,
-                    //             fontWeight: FontWeight.w400,
-                    //           ),
-                    //         ),
-                    //         child: Text(_isLoadingMore ? 'Loading...' : 'Show more'),
-                    //       ),
-                    //     ),
-                    //   ),
+                    if (!_isLoading && _hasMore && _recentReports.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 4),
+                        child: Center(
+                          child: ElevatedButton(
+                            onPressed: _isLoadingMore ? null : _loadMore,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _blue,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: _blue.withValues(alpha: 0.6),
+                              disabledForegroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            child: Text(_isLoadingMore ? 'Loading...' : 'Show more'),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -248,7 +237,13 @@ class _HomeScreenState extends State<HomeScreen> {
             label: Text(label),
             selected: selected,
             onSelected: (_) {
-              setState(() => _selectedCat = label == 'All' ? null : label);
+              setState(() {
+                _selectedCat = label == 'All' ? null : label;
+                _isLoading = true;
+                _hasMore = true;
+                _recentReports = [];
+              });
+              _loadReports(forceNetwork: true);
             },
             selectedColor: _blue.withValues(alpha: 0.15),
             labelStyle: TextStyle(

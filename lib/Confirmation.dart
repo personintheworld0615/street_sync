@@ -35,6 +35,10 @@ class Confirmation extends StatefulWidget {
 
 class _ConfirmationState extends State<Confirmation> {
   static const _primaryBlue = Color(0xFF2196F3);
+  bool _submitting = false;
+  bool _savingDraft = false;
+
+  bool get _busy => _submitting || _savingDraft;
 
   Color get _severityColor {
     switch (widget.severity.toLowerCase()) {
@@ -49,8 +53,11 @@ class _ConfirmationState extends State<Confirmation> {
     }
   }
 
-  void _saveAsDraft() async {
-    await ApiService.submitReport(
+  Future<void> _saveAsDraft() async {
+    if (_busy) return;
+    setState(() => _savingDraft = true);
+
+    final success = await ApiService.submitReport(
       title: widget.title,
       description: widget.description,
       category: widget.category,
@@ -62,14 +69,109 @@ class _ConfirmationState extends State<Confirmation> {
       imagePath: widget.image.path,
     );
 
-
     if (!mounted) return;
+
+    if (!success) {
+      setState(() => _savingDraft = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save draft. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saved as draft'),
         behavior: SnackBarBehavior.floating,
       ),
     );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _confirmAndSubmit() async {
+    if (_busy) return;
+    setState(() => _submitting = true);
+
+    final success = await ApiService.submitReport(
+      title: widget.title,
+      description: widget.description,
+      category: widget.category,
+      location: widget.location,
+      severity: widget.severity,
+      isDraft: false,
+      latitude: widget.latitude,
+      longitude: widget.longitude,
+      imagePath: widget.image.path,
+    );
+
+    if (!mounted) return;
+
+    if (!success) {
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to submit report. Please try again.')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: _primaryBlue.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: _primaryBlue,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Report submitted!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Thanks your report is on its way.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    Navigator.pop(context);
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MainShell()),
       (route) => false,
@@ -382,136 +484,84 @@ class _ConfirmationState extends State<Confirmation> {
           SizedBox(
             height: 52,
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => const Center(child: CircularProgressIndicator()),
-                );
-
-                final success = await ApiService.submitReport(
-                  title: widget.title,
-                  description: widget.description,
-                  category: widget.category,
-                  location: widget.location,
-                  severity: widget.severity,
-                  isDraft: false,
-                  latitude: widget.latitude,
-                  longitude: widget.longitude,
-                  imagePath: widget.image.path,
-                );
-
-                if (!mounted) return;
-                Navigator.pop(context);
-
-                if (!success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to submit report. Please try again.')),
-                  );
-                  return;
-                }
-
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => Dialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check_circle_rounded,
-                              color: _primaryBlue,
-                              size: 44,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Report submitted!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Thanks your report is on its way.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-                await Future.delayed(const Duration(seconds: 2));
-                if (!mounted) return;
-                Navigator.pop(context);
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const MainShell()),
-                  (route) => false,
-                );
-              },
-              icon:  const Icon(Icons.send_rounded, size: 20),
-              label:  const Text(
-                'Confirm and Submit',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            child: ElevatedButton(
+              onPressed: _busy ? null : _confirmAndSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryBlue,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: _primaryBlue.withValues(alpha: 0.5),
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.send_rounded, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Confirm and Submit',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 10),
           SizedBox(
             height: 48,
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _saveAsDraft,
-              icon: Icon(
-                Icons.bookmark_add_outlined,
-                size: 20,
-                color: Colors.grey[800],
-              ),
-              label: Text(
-                'Save as draft',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
+            child: OutlinedButton(
+              onPressed: _busy ? null : _saveAsDraft,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.grey[400]!),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+              child: _savingDraft
+                  ? SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.grey[800],
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bookmark_add_outlined,
+                          size: 20,
+                          color: Colors.grey[800],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Save as draft',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 10),
@@ -519,7 +569,7 @@ class _ConfirmationState extends State<Confirmation> {
             height: 48,
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: _busy ? null : () => Navigator.pop(context, true),
               icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[800]),
               label: Text(
                 'Go Back To Edit',

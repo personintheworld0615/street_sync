@@ -24,6 +24,10 @@ class ConfirmationVoiceReport extends StatefulWidget {
 
 class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   static const _primaryBlue = Color(0xFF2196F3);
+  bool _submitting = false;
+  bool _savingDraft = false;
+
+  bool get _busy => _submitting || _savingDraft;
 
   String get _inferredCategory => inferCategory(widget.description);
 
@@ -66,14 +70,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   }
 
   Future<void> _showSubmittedThenGoHome() async {
-    // 1. Show a loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
+    if (_busy) return;
+    setState(() => _submitting = true);
 
-    // 2. Send the data to the backend
     final success = await ApiService.submitReport(
       title: widget.title,
       description: widget.description,
@@ -83,12 +82,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       isDraft: false,
     );
 
-    // 3. Close the loading indicator
     if (!mounted) return;
-    Navigator.pop(context);
 
     if (success) {
-      // 4. Show success dialog
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -146,7 +142,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
         (route) => false,
       );
     } else {
-      // 5. Show error if connection failed
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not reach the server. Please try again later.'),
@@ -156,9 +152,11 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     }
   }
 
-  void _saveAsDraft() async {
-    // Send to backend as a draft
-    await ApiService.submitReport(
+  Future<void> _saveAsDraft() async {
+    if (_busy) return;
+    setState(() => _savingDraft = true);
+
+    final success = await ApiService.submitReport(
       title: widget.title,
       description: widget.description,
       category: _inferredCategory,
@@ -168,6 +166,18 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     );
 
     if (!mounted) return;
+
+    if (!success) {
+      setState(() => _savingDraft = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save draft. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Saved as draft'),
@@ -504,51 +514,84 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
           SizedBox(
             height: 52,
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _showSubmittedThenGoHome,
-              icon: const Icon(Icons.send_rounded, size: 20),
-              label: const Text(
-                'Confirm and Submit',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            child: ElevatedButton(
+              onPressed: _busy ? null : _showSubmittedThenGoHome,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryBlue,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: _primaryBlue.withValues(alpha: 0.5),
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.send_rounded, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Confirm and Submit',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 10),
           SizedBox(
             height: 48,
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _saveAsDraft,
-              icon: Icon(
-                Icons.bookmark_add_outlined,
-                size: 20,
-                color: Colors.grey[800],
-              ),
-              label: Text(
-                'Save as draft',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
+            child: OutlinedButton(
+              onPressed: _busy ? null : _saveAsDraft,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.grey[400]!),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+              child: _savingDraft
+                  ? SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.grey[800],
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bookmark_add_outlined,
+                          size: 20,
+                          color: Colors.grey[800],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Save as draft',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],

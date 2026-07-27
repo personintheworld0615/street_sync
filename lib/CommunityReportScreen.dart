@@ -39,6 +39,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   bool _showSeverity = false;
    GoogleMapController? _controller;
    bool _ready =false;
+  bool _submitting = false;
+  bool _savingDraft = false;
+
+  bool get _busy => _submitting || _savingDraft;
 
   @override
   void dispose() {
@@ -796,6 +800,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     );
   }
   Future<void> _saveAsDraft() async {
+    if (_busy) return;
+    setState(() => _savingDraft = true);
+
     String location = 'Location not set';
     try {
       location = await _addressFromLatLng(position);
@@ -823,6 +830,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     );
 
     if (!mounted) return;
+    setState(() => _savingDraft = false);
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -833,7 +841,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       );
       return;
     }
-
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -866,6 +873,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         children: [
           _Pressable(
             onTap: () async {
+              if (_busy) return;
               final errors = <String>[];
               if (_titleController.text.trim().isEmpty) errors.add('title');
               if (_image == null) errors.add('photo');
@@ -889,24 +897,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 return;
               }
 
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                barrierLabel: "Processing your report",
-                builder: (_) => const Center(
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(color: _blue),
-                    ),
-                  ),
-                ),
-              );
-
+              setState(() => _submitting = true);
               try {
                 final address = await _addressFromLatLng(position);
                 if (!mounted) return;
-                Navigator.pop(context);
+                setState(() => _submitting = false);
 
                 await Navigator.push(
                   context,
@@ -924,7 +919,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   ),
                 );
               } catch (_) {
-                if (mounted) Navigator.pop(context);
+                if (mounted) setState(() => _submitting = false);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -939,7 +934,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
               height: 52,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _blue,
+                color: _busy ? _blue.withValues(alpha: 0.5) : _blue,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
@@ -949,41 +944,66 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                   ),
                 ],
               ),
-              child: const Text(
-                'Submit Report',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Submit Report',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 10),
           SizedBox(
             height: 48,
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _saveAsDraft,
-              icon: Icon(
-                Icons.bookmark_add_outlined,
-                size: 20,
-                color: Colors.grey[800],
-              ),
-              label: Text(
-                'Save as draft',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
+            child: OutlinedButton(
+              onPressed: _busy ? null : _saveAsDraft,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.grey[400]!),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+              child: _savingDraft
+                  ? SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.grey[800],
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bookmark_add_outlined,
+                          size: 20,
+                          color: Colors.grey[800],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Save as draft',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],

@@ -77,6 +77,7 @@ class _UpdateThingState extends State<Updatething> {
   bool _showSeverity = false;
    GoogleMapController? _controller;
    bool _ready =false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -872,6 +873,7 @@ class _UpdateThingState extends State<Updatething> {
       child: _Pressable(
 
         onTap: () async {
+          if (_submitting) return;
           final errors = <String>[];
           if (_titleController.text.trim().isEmpty) errors.add('title');
           if (_image == null) errors.add('photo');
@@ -892,24 +894,11 @@ class _UpdateThingState extends State<Updatething> {
             return;
           }
 
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            barrierLabel: "Processing your report",
-            builder: (_) => const Center(
-              child: Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(color: _blue),
-                ),
-              ),
-            ),
-          );
-
+          setState(() => _submitting = true);
           try {
             final address = await _addressFromLatLng(position);
             if (!mounted) return;
-            Navigator.pop(context);
+            setState(() => _submitting = false);
 
             final edited = await Navigator.push(
               context,
@@ -925,7 +914,7 @@ class _UpdateThingState extends State<Updatething> {
               ),
             );
           } catch (_) {
-            if (mounted) Navigator.pop(context); // close loading on error
+            if (mounted) setState(() => _submitting = false);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -940,7 +929,7 @@ class _UpdateThingState extends State<Updatething> {
           height: 52,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _blue,
+            color: _submitting ? _blue.withValues(alpha: 0.5) : _blue,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
@@ -950,14 +939,23 @@ class _UpdateThingState extends State<Updatething> {
               ),
             ],
           ),
-          child: const Text(
-            'Submit Report',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
+          child: _submitting
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'Submit Report',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );
