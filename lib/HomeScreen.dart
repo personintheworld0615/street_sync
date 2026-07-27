@@ -37,62 +37,93 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadReports();
   }
 
-  Future<void> _loadReports({bool forceNetwork = false}) async {
-    // Show cached home data immediately so remounts (e.g. after submitting a
-    // report via pushAndRemoveUntil MainShell) don't flash the skeleton.
-    if (!forceNetwork && _selectedCat == null) {
-      final cachedReports = await ApiService.getCachedRecentReports();
-      final cachedStats = await ApiService.getCachedReportStats();
-      final hasCache =
-          (cachedReports != null && cachedReports.isNotEmpty) ||
-          cachedStats != null;
+  Future<void> _paintCachedFeed() async {
+    final cachedReports = await ApiService.getCachedHomeFeed(_selectedCat);
+    final cachedHasMore = await ApiService.getCachedHomeHasMore(_selectedCat);
+    final cachedStats = _selectedCat == null
+        ? await ApiService.getCachedReportStats()
+        : null;
 
-      if (hasCache && mounted) {
-        setState(() {
-          if (cachedReports != null && cachedReports.isNotEmpty) {
-            _recentReports = cachedReports.take(_pageSize).toList();
-            _hasMore = cachedReports.length >= _pageSize;
-          }
-          if (cachedStats != null) {
-            _nearbyCount = cachedStats['nearby'] ?? 0;
-            _inProgressCount = cachedStats['in_progress'] ?? 0;
-            _resolvedCount = cachedStats['resolved'] ?? 0;
-          }
+    if (!mounted) return;
+
+    final hasFeed = cachedReports != null && cachedReports.isNotEmpty;
+
+    setState(() {
+      if (hasFeed) {
+        _recentReports = List<dynamic>.from(cachedReports);
+        _hasMore = cachedHasMore ?? false;
+        _isLoading = false;
+      } else {
+        // No cache for this category — clear so All items don't linger.
+        _recentReports = [];
+        _hasMore = cachedHasMore ?? false;
+        // Keep skeleton only on cold first paint with no cache at all.
+        if (_isLoading) {
+          // leave _isLoading true until network
+        } else {
           _isLoading = false;
-        });
+        }
       }
+      if (cachedStats != null) {
+        _nearbyCount = cachedStats['nearby'] ?? 0;
+        _inProgressCount = cachedStats['in_progress'] ?? 0;
+        _resolvedCount = cachedStats['resolved'] ?? 0;
+      }
+    });
+  }
+
+  Future<void> _persistFeed(List<dynamic> reports, bool hasMore) async {
+    await ApiService.cacheHomeFeed(_selectedCat, reports);
+    await ApiService.cacheHomeHasMore(_selectedCat, hasMore);
+  }
+
+  Future<void> _loadReports({bool forceNetwork = false}) async {
+    // Show cached feed + hasMore for this category immediately.
+    if (!forceNetwork) {
+      await _paintCachedFeed();
     }
 
     final results = await Future.wait([
       ApiService.getReportsFeed(
-        amount: _pageSize,
+        amount: _pageSize + 1, // +1 so hasMore is real, not a guess
         category: _selectedCat,
       ),
       ApiService.getReportStats(),
     ]);
 
-    final reports = results[0] as List<dynamic>?;
+    final raw = results[0] as List<dynamic>?;
     final stats = results[1] as Map<String, int>?;
-
-    if (_selectedCat == null && reports != null && reports.isNotEmpty) {
-      await ApiService.cacheRecentReports(reports);
-    }
 
     if (!mounted) return;
 
-    setState(() {
-      // Only replace list on a real response — keep cache if the request failed.
-      if (reports != null) {
-        _recentReports = reports;
-        _hasMore = reports.length >= _pageSize;
-      }
-      if (stats != null) {
-        _nearbyCount = stats['nearby'] ?? 0;
-        _inProgressCount = stats['in_progress'] ?? 0;
-        _resolvedCount = stats['resolved'] ?? 0;
-      }
-      _isLoading = false;
-    });
+    if (raw != null) {
+      final page = ApiService.trimFeedPage(raw, _pageSize);
+      await _persistFeed(page.items, page.hasMore);
+      if (!mounted) return;
+      setState(() {
+        _recentReports = page.items;
+        _hasMore = page.hasMore;
+        if (stats != null) {
+          _nearbyCount = stats['nearby'] ?? 0;
+          _inProgressCount = stats['in_progress'] ?? 0;
+          _resolvedCount = stats['resolved'] ?? 0;
+        }
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Network failed — keep whatever cache/UI we already have.
+    if (mounted) {
+      setState(() {
+        if (stats != null) {
+          _nearbyCount = stats['nearby'] ?? 0;
+          _inProgressCount = stats['in_progress'] ?? 0;
+          _resolvedCount = stats['resolved'] ?? 0;
+        }
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadMore() async {
@@ -103,22 +134,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() => _isLoadingMore = true);
 
-    final more = await ApiService.getReportsFeed(
-      amount: _pageSize,
+    final raw = await ApiService.getReportsFeed(
+      amount: _pageSize + 1,
       category: _selectedCat,
       before: lastTime,
     );
 
     if (!mounted) return;
 
-    if (more == null) {
+    if (raw == null) {
       setState(() => _isLoadingMore = false);
       return;
     }
 
+    final page = ApiService.trimFeedPage(raw, _pageSize);
+    final merged = [..._recentReports, ...page.items];
+    await _persistFeed(merged, page.hasMore);
+
+    if (!mounted) return;
+
     setState(() {
-      _recentReports = [..._recentReports, ...more];
-      _hasMore = more.length >= _pageSize;
+      _recentReports = merged;
+      _hasMore = page.hasMore;
       _isLoadingMore = false;
     });
   }
@@ -233,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w400,
                               ),
                             ),
-                            child: Text(_isLoadingMore ? 'Loading...' : 'Show more'),
+                            child: Text(_isLoadingMore ? 'Loading...' : 'Show more',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold),),
                           ),
                         ),
                       ),
@@ -270,10 +307,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
               setState(() {
                 _selectedCat = nextCat;
-                // Hide Show more until the new feed response sets it.
-                _hasMore = false;
+                // Don't force-hide Show more — cached hasMore paints next.
               });
-              _loadReports(forceNetwork: true);
+              // Use cache for this category (feed + hasMore), then refresh.
+              _loadReports();
             },
             selectedColor: _blue.withValues(alpha: 0.15),
             labelStyle: TextStyle(

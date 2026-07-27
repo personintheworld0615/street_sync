@@ -8,10 +8,19 @@ class ApiService {
   static const _sessionKey = 'current_user';
   static const _cacheRecentReports = 'cache_recent_reports';
   static const _cacheReportStats = 'cache_report_stats';
+  static const _cacheHomeFeeds = 'cache_home_feeds';
+  static const _cacheHomeHasMore = 'cache_home_has_more';
   static const _cacheDraftReports = 'cache_draft_reports';
   static const _cacheSubmittedReports = 'cache_submitted_reports';
   static const _cacheTopUsers = 'cache_top_users';
   static const _cacheUserScopedId = 'cache_user_scoped_id';
+
+  /// Prefs key for a home feed category (`null` / empty → All).
+  static String homeFeedKey(String? category) {
+    final c = category?.trim();
+    if (c == null || c.isEmpty) return 'All';
+    return c;
+  }
 
   static String get _devHost =>
       dotenv.maybeGet('DEV_HOST')?.trim().isNotEmpty == true
@@ -95,6 +104,8 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheRecentReports);
     await prefs.remove(_cacheReportStats);
+    await prefs.remove(_cacheHomeFeeds);
+    await prefs.remove(_cacheHomeHasMore);
     await prefs.remove(_cacheDraftReports);
     await prefs.remove(_cacheSubmittedReports);
     await prefs.remove(_cacheTopUsers);
@@ -134,6 +145,67 @@ class ApiService {
 
   static Future<void> cacheRecentReports(List<dynamic> reports) =>
       _writeListCache(_cacheRecentReports, reports);
+
+  static Future<Map<String, dynamic>> _readJsonMap(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (e) {
+      print('cache read error ($key): $e');
+    }
+    return {};
+  }
+
+  static Future<void> _writeJsonMap(String key, Map<String, dynamic> value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, jsonEncode(value));
+  }
+
+  /// Full home feed list for a category (All includes Show more pages).
+  static Future<List<dynamic>?> getCachedHomeFeed(String? category) async {
+    final map = await _readJsonMap(_cacheHomeFeeds);
+    final raw = map[homeFeedKey(category)];
+    if (raw is List) return List<dynamic>.from(raw);
+    return null;
+  }
+
+  static Future<void> cacheHomeFeed(
+    String? category,
+    List<dynamic> reports,
+  ) async {
+    final map = await _readJsonMap(_cacheHomeFeeds);
+    map[homeFeedKey(category)] = reports;
+    await _writeJsonMap(_cacheHomeFeeds, map);
+  }
+
+  static Future<bool?> getCachedHomeHasMore(String? category) async {
+    final map = await _readJsonMap(_cacheHomeHasMore);
+    final value = map[homeFeedKey(category)];
+    if (value is bool) return value;
+    return null;
+  }
+
+  static Future<void> cacheHomeHasMore(String? category, bool hasMore) async {
+    final map = await _readJsonMap(_cacheHomeHasMore);
+    map[homeFeedKey(category)] = hasMore;
+    await _writeJsonMap(_cacheHomeHasMore, map);
+  }
+
+  /// Request [pageSize]+1 items; return at most [pageSize] plus a real hasMore.
+  static ({List<dynamic> items, bool hasMore}) trimFeedPage(
+    List<dynamic> raw,
+    int pageSize,
+  ) {
+    final hasMore = raw.length > pageSize;
+    final items = hasMore ? raw.sublist(0, pageSize) : List<dynamic>.from(raw);
+    return (items: items, hasMore: hasMore);
+  }
 
   static Future<Map<String, int>?> getCachedReportStats() async {
     final prefs = await SharedPreferences.getInstance();
