@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
@@ -22,9 +25,11 @@ class _ProfileState extends State<Profile> {
   bool pushNotifications = true;
   bool locationSharing = true;
   bool _isLoading = true;
+  bool _uploadingPicture = false;
+  String? _localPicturePath;
   List<Map<String, dynamic>> _draftReports = [];
   List<Map<String, dynamic>> _submittedReports = [];
-
+  final ImagePicker _picker = ImagePicker();
   @override
   void initState() {
     super.initState();
@@ -81,6 +86,38 @@ class _ProfileState extends State<Profile> {
   }
 
   Future<void> _fetchUserReports() => _loadUserReports(forceNetwork: true);
+
+  Future<void> _pickProfilePicture() async {
+    if (_uploadingPicture) return;
+    final XFile? picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 70,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _localPicturePath = picked.path;
+      _uploadingPicture = true;
+    });
+
+    final url = await ApiService.uploadProfilePicture(picked.path);
+    if (!mounted) return;
+
+    setState(() {
+      _uploadingPicture = false;
+      // Prefer server URL; clear local preview either way.
+      _localPicturePath = null;
+    });
+
+    if (url == null) {
+      await showErrorPopup(
+        context,
+        'Could not upload profile picture. Please try again.',
+      );
+    }
+  }
 
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
@@ -709,21 +746,7 @@ class _ProfileState extends State<Profile> {
           const SizedBox(height: 20),
           Row(
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                  image: const DecorationImage(
-                    image: NetworkImage('https://i.pravatar.cc/150?u=alex'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+              _profileAvatar(),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -762,6 +785,100 @@ class _ProfileState extends State<Profile> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _profileAvatar() {
+    final localPath = _localPicturePath;
+    final remoteUrl = ApiService.userPicture;
+
+    Widget face;
+    if (localPath != null &&
+        localPath.isNotEmpty &&
+        File(localPath).existsSync()) {
+      face = Image.file(
+        File(localPath),
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+      );
+    } else if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      face = Image.network(
+        remoteUrl,
+        width: 72,
+        height: 72,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _defaultAvatarFace(),
+      );
+    } else {
+      face = _defaultAvatarFace();
+    }
+
+    return SizedBox(
+      width: 80,
+      height: 80,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            top: 4,
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 2,
+                ),
+                color: Colors.white.withValues(alpha: 0.2),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: face,
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _uploadingPicture ? null : _pickProfilePicture,
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: _uploadingPicture
+                      ? const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _blue,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.edit_rounded,
+                          size: 14,
+                          color: _blue,
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _defaultAvatarFace() {
+    return const ColoredBox(
+      color: Color(0x33FFFFFF),
+      child: Center(
+        child: Icon(Icons.person, size: 40, color: Colors.white),
       ),
     );
   }
@@ -890,7 +1007,7 @@ class _ProfileState extends State<Profile> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 3),
       child: GridView.count(
         crossAxisCount: 3, // 3 columns
         shrinkWrap: true,

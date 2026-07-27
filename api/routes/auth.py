@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models.reports import User
-from api.schemas.auth import LoginRequest, SignupRequest, TokenResponse
+from api.schemas.auth import LoginRequest, PictureResponse, SignupRequest, TokenResponse
 from api.services.auth import (
     create_access_token,
     get_current_user,
@@ -11,8 +11,21 @@ from api.services.auth import (
     verify_password,
 )
 from api.services.reports import delete_account
+from api.services.storage import upload_user_picture
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _token_for(user: User) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+        token_type="bearer",
+        user_id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        picture=user.picture,
+    )
 
 
 @router.post("/signup", response_model=TokenResponse)
@@ -32,15 +45,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    access_token = create_access_token(user.id)
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user_id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
-    )
+    return _token_for(user)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -51,15 +56,33 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    access_token = create_access_token(user.id)
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user_id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        email=user.email,
+    return _token_for(user)
+
+
+@router.post("/picture", response_model=PictureResponse)
+async def upload_picture(
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a profile photo to Supabase Storage; store public URL on the user."""
+    data = await image.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty image upload",
+        )
+    picture_url = upload_user_picture(
+        user_id=current_user.id,
+        data=data,
+        content_type=image.content_type or "image/jpeg",
+        filename=image.filename,
     )
+    current_user.picture = picture_url
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return PictureResponse(picture=picture_url)
 
 
 @router.delete("/delete/{user_id}", response_model=dict)

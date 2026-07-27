@@ -1,9 +1,10 @@
-"""Upload report images to Supabase Storage; DB only stores the public URL."""
+"""Upload images to Supabase Storage; DB only stores the public URL."""
 
 from __future__ import annotations
 
 import base64
 import os
+import time
 import uuid
 from typing import Optional, Tuple
 from urllib.error import HTTPError, URLError
@@ -20,10 +21,9 @@ _MIME_TO_EXT = {
 }
 
 
-def _config() -> Tuple[str, str, str]:
+def _credentials() -> Tuple[str, str]:
     supabase_url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
     service_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY") or ""
-    bucket = os.getenv("SUPABASE_STORAGE_BUCKET") or "report-images"
     if not supabase_url or not service_key:
         raise HTTPException(
             status_code=503,
@@ -32,27 +32,25 @@ def _config() -> Tuple[str, str, str]:
                 "SUPABASE_SERVICE_KEY in the API .env."
             ),
         )
-    return supabase_url, service_key, bucket
+    return supabase_url, service_key
 
 
-def upload_report_image(
+def _report_bucket() -> str:
+    return os.getenv("SUPABASE_STORAGE_BUCKET") or "report-images"
+
+
+def _avatar_bucket() -> str:
+    return os.getenv("SUPABASE_AVATAR_BUCKET") or "profile-pictures"
+
+
+def _upload_bytes(
+    *,
+    bucket: str,
+    object_path: str,
     data: bytes,
-    content_type: str = "image/jpeg",
-    filename: Optional[str] = None,
+    content_type: str,
 ) -> str:
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty image upload")
-
-    supabase_url, service_key, bucket = _config()
-    content_type = (content_type or "image/jpeg").split(";")[0].strip().lower()
-    ext = _MIME_TO_EXT.get(content_type)
-    if not ext and filename and "." in filename:
-        ext = filename.rsplit(".", 1)[-1].lower()
-    if not ext:
-        ext = "jpg"
-        content_type = "image/jpeg"
-
-    object_path = f"reports/{uuid.uuid4().hex}.{ext}"
+    supabase_url, service_key = _credentials()
     upload_url = f"{supabase_url}/storage/v1/object/{bucket}/{object_path}"
 
     req = Request(upload_url, data=data, method="POST")
@@ -82,6 +80,63 @@ def upload_report_image(
         ) from e
 
     return f"{supabase_url}/storage/v1/object/public/{bucket}/{object_path}"
+
+
+def _resolve_ext_and_type(
+    content_type: str,
+    filename: Optional[str],
+) -> Tuple[str, str]:
+    content_type = (content_type or "image/jpeg").split(";")[0].strip().lower()
+    ext = _MIME_TO_EXT.get(content_type)
+    if not ext and filename and "." in filename:
+        ext = filename.rsplit(".", 1)[-1].lower()
+    if not ext:
+        ext = "jpg"
+        content_type = "image/jpeg"
+    return ext, content_type
+
+
+def upload_report_image(
+    data: bytes,
+    content_type: str = "image/jpeg",
+    filename: Optional[str] = None,
+) -> str:
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+
+    ext, content_type = _resolve_ext_and_type(content_type, filename)
+    object_path = f"reports/{uuid.uuid4().hex}.{ext}"
+    return _upload_bytes(
+        bucket=_report_bucket(),
+        object_path=object_path,
+        data=data,
+        content_type=content_type,
+    )
+
+
+def upload_user_picture(
+    *,
+    user_id: int,
+    data: bytes,
+    content_type: str = "image/jpeg",
+    filename: Optional[str] = None,
+) -> str:
+    """Upload (or replace) a profile avatar in the dedicated avatars bucket."""
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+
+    # Always JPEG path so re-uploads upsert the same object.
+    # content_type/filename kept for API compatibility with multipart uploads.
+    _ = (content_type, filename)
+    object_path = f"{user_id}.jpg"
+    url = _upload_bytes(
+        bucket=_avatar_bucket(),
+        object_path=object_path,
+        data=data,
+        content_type="image/jpeg",
+    )
+    # Bust CDN / client caches when the same object path is overwritten.
+    return f"{url}?v={int(time.time())}"
 
 
 def persist_report_image(image: Optional[str]) -> Optional[str]:

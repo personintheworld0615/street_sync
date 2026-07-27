@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field, EmailStr
 
 class SignupRequest(BaseModel):
@@ -15,3 +17,8 @@ class TokenResponse(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+    picture: Optional[str] = None
+
+
+class PictureResponse(BaseModel):
+    picture: str

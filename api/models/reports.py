@@ -15,6 +15,8 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(255),unique=True,index=True)
     password: Mapped[str] = mapped_column(String(255))
+    ## Public Supabase Storage URL for profile avatar (nullable).
+    picture: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     total_reports: Mapped[int] = mapped_column(Integer, default=0)
     reports: Mapped[List["Report"]] = relationship(
         back_populates="user",

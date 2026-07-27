@@ -70,7 +70,21 @@ class ApiService {
 
   static String? get userEmail => currentUser?['email'] as String?;
 
+  /// Public Supabase URL for the user's profile photo, if set.
+  static String? get userPicture {
+    final raw = currentUser?['picture'];
+    if (raw is! String) return null;
+    final trimmed = raw.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   static String? get token => currentUser?['access_token'] as String?;
+
+  static Future<void> updateUserPicture(String pictureUrl) async {
+    if (currentUser == null) return;
+    currentUser = {...currentUser!, 'picture': pictureUrl};
+    await _saveSession();
+  }
 
   static Future<void> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -337,6 +351,52 @@ class ApiService {
     } catch (e) {
       print('Login Error ($url): $e');
       return 'Cannot reach API at $baseUrl. Is the server running?';
+    }
+  }
+
+  /// Uploads a profile photo to Supabase via the API.
+  /// Returns the public URL on success, or null on failure.
+  static Future<String?> uploadProfilePicture(String imagePath) async {
+    if (userId == null) {
+      print('uploadProfilePicture: no logged-in user');
+      return null;
+    }
+    if (!await File(imagePath).exists()) {
+      print('uploadProfilePicture: file missing');
+      return null;
+    }
+
+    final url = Uri.parse('$baseUrl/auth/picture');
+    try {
+      final request = http.MultipartRequest('POST', url);
+      final t = token;
+      if (t != null && t.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $t';
+      }
+      request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+
+      final streamed = await request.send().timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode == 401) {
+        await logout();
+        return null;
+      }
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        print(
+          'uploadProfilePicture failed: ${response.statusCode} ${response.body}',
+        );
+        return null;
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final picture = body['picture'] as String?;
+      if (picture == null || picture.trim().isEmpty) return null;
+      await updateUserPicture(picture.trim());
+      return picture.trim();
+    } catch (e) {
+      print('uploadProfilePicture Error: $e');
+      return null;
     }
   }
 
