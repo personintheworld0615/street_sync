@@ -41,32 +41,10 @@ class _MapScreenState extends State<MapScreen> {
 
   Map<String, dynamic>? _selectedReport;
 
-<<<<<<< Updated upstream
   Future<void> _paintCachedReports() async {
     final cached = await ApiService.getCachedRecentReports();
     if (!mounted) return;
     if (cached == null || cached.isEmpty) return;
-=======
-  late BitmapDescriptor redSmall;
-  late BitmapDescriptor redLarge;
-
-  String? _selectedMarkerId;
-
-  Future<void> _loadMarkerIcons() async {
-    redSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
-      "assets/images/markers/Normal_Red.png",
-    );
-
-    redLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
-      "assets/images/markers/Selected_Red.png",
-    );
-  }
-
-  Future<void> _loadRecentReports() async {
-  _recentReports = await ApiService.getRecentReports(amount: 100);
->>>>>>> Stashed changes
 
     _recentReports = List<dynamic>.from(cached);
     _updateMarkers();
@@ -114,16 +92,12 @@ void _updateMarkers() {
         ),
         onTap: () {
           setState(() {
-            _selectedMarkerId = report["id"].toString();
             _selectedReport = report;
           });
-
-          _updateMarkers();
         },
-        icon: report["id"].toString() == _selectedMarkerId
-            ? redLarge
-            : redSmall,
-        zIndexInt: report["id"].toString() == _selectedMarkerId ? 10 : 0,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _getMarkerColor(report["category"]),
+        ),
       );
     }).toSet();
   });
@@ -236,10 +210,7 @@ Widget _categoryChip(
   @override
   void initState() {
     super.initState();
-
-    _loadMarkerIcons().then((_) {
-      _goToUser();
-    });
+    _goToUser();
   }
 
   @override
