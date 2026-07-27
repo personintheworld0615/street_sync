@@ -18,6 +18,8 @@ class Updatething extends StatefulWidget {
     this.severity,
     this.otherCategory,
     this.imagePath,
+    this.existingImageUrl,
+    this.draftId,
     this.latitude,
     this.longitude,
   });
@@ -28,29 +30,43 @@ class Updatething extends StatefulWidget {
   final String? severity;
   final String? otherCategory;
   final String? imagePath;
+  /// Public Storage URL from a saved draft (when no local file).
+  final String? existingImageUrl;
+  final int? draftId;
   final double? latitude;
   final double? longitude;
 
   factory Updatething.fromDraft(Map<String, dynamic> draft) {
+    final image = draft['image'] as String?;
+    final imagePath = draft['imagePath'] as String?;
+    final serverUrl = (image != null &&
+            (image.startsWith('http://') || image.startsWith('https://')))
+        ? image
+        : null;
+    final id = draft['id'];
     return Updatething(
       category: draft['category'] as String?,
       title: draft['title'] as String?,
       description: draft['description'] as String?,
       severity: draft['severity'] as String?,
       otherCategory: draft['othercat'] as String?,
-      imagePath: draft['imagePath'] as String?,
+      imagePath: imagePath,
+      existingImageUrl: serverUrl,
+      draftId: id is int ? id : (id is num ? id.toInt() : null),
       latitude: (draft['latitude'] as num?)?.toDouble(),
       longitude: (draft['longitude'] as num?)?.toDouble(),
     );
   }
 
   bool get hasDraftData =>
+      draftId != null ||
       category != null ||
       title != null ||
       description != null ||
       severity != null ||
       otherCategory != null ||
       imagePath != null ||
+      existingImageUrl != null ||
       latitude != null ||
       longitude != null;
 
@@ -67,6 +83,7 @@ class _UpdateThingState extends State<Updatething> {
   static const _muted = Color(0xFF5B677A);
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
+  String? _existingImageUrl;
   String? _selectedCategory;
   final _otherCategoryController = TextEditingController();
   final _titleController = TextEditingController();
@@ -207,8 +224,17 @@ class _UpdateThingState extends State<Updatething> {
     final imagePath = widget.imagePath;
     if (imagePath != null && File(imagePath).existsSync()) {
       _image = XFile(imagePath);
+    } else {
+      final url = widget.existingImageUrl?.trim();
+      if (url != null && url.isNotEmpty) {
+        _existingImageUrl = url;
+      }
     }
   }
+
+  bool get _hasPhoto =>
+      _image != null ||
+      (_existingImageUrl != null && _existingImageUrl!.isNotEmpty);
 
   String _normalizeSeverity(String severity) {
     switch (severity.toLowerCase()) {
@@ -239,7 +265,7 @@ class _UpdateThingState extends State<Updatething> {
   }
 
   Widget _buildPhotoCard() {
-    if (_image == null) {
+    if (!_hasPhoto) {
       return Card(
         color: Colors.white,
         elevation: 2,
@@ -339,17 +365,33 @@ class _UpdateThingState extends State<Updatething> {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Stack(
-        children: [
-          Image.file(
+    final Widget photo = _image != null
+        ? Image.file(
             File(_image!.path),
             height: 280,
             width: double.infinity,
             fit: BoxFit.cover,
             cacheWidth: 900,
-          ),
+          )
+        : Image.network(
+            _existingImageUrl!,
+            height: 280,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              height: 280,
+              color: Colors.grey[300],
+              child: const Center(
+                child: Icon(Icons.broken_image_outlined, size: 48),
+              ),
+            ),
+          );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Stack(
+        children: [
+          photo,
           Positioned(
             left: 0,
             right: 0,
@@ -374,7 +416,10 @@ class _UpdateThingState extends State<Updatething> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Pressable(
-                      onTap: () => setState(() => _image = null),
+                      onTap: () => setState(() {
+                        _image = null;
+                        _existingImageUrl = null;
+                      }),
                       child: _overlayBtn(
                         Icons.delete_outline_rounded,
                         'Remove',
@@ -715,6 +760,7 @@ class _UpdateThingState extends State<Updatething> {
     if (image != null) {
       setState(() {
         _image = image;
+        _existingImageUrl = null;
       });
     }
   }
@@ -729,6 +775,7 @@ class _UpdateThingState extends State<Updatething> {
     if (image != null) {
       setState(() {
         _image = image;
+        _existingImageUrl = null;
       });
     }
   }
@@ -876,8 +923,9 @@ class _UpdateThingState extends State<Updatething> {
           if (_submitting) return;
           final errors = <String>[];
           if (_titleController.text.trim().isEmpty) errors.add('title');
-          if (_image == null) errors.add('photo');
+          if (!_hasPhoto) errors.add('photo');
           if (_selectedCategory == null) errors.add('category');
+          if (_selectedSeverity == null) errors.add('severity');
           if (_descriptionController.text.trim().isEmpty) {
             errors.add('description');
           }
@@ -900,16 +948,20 @@ class _UpdateThingState extends State<Updatething> {
             if (!mounted) return;
             setState(() => _submitting = false);
 
-            final edited = await Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => Confirmation(
                   category: _selectedCategory!,
                   title: _titleController.text.trim(),
                   description: _descriptionController.text.trim(),
-                  image: _image!,
+                  image: _image,
+                  existingImageUrl: _existingImageUrl,
+                  draftId: widget.draftId,
                   severity: _selectedSeverity!,
                   location: address,
+                  latitude: position.latitude,
+                  longitude: position.longitude,
                 ),
               ),
             );

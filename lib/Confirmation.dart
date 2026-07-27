@@ -13,7 +13,9 @@ class Confirmation extends StatefulWidget {
      required this.title,
      required this.description,
     required this.severity,
-    required this.image,
+     this.image,
+     this.existingImageUrl,
+     this.draftId,
      this.latitude = 0.0,
      this.longitude = 0.0,
      this.othercat = ""
@@ -24,7 +26,11 @@ class Confirmation extends StatefulWidget {
   final String title;
   final String description;
   final String severity;
-  final XFile image;
+  final XFile? image;
+  /// Server photo URL when continuing a draft without a new local file.
+  final String? existingImageUrl;
+  /// When set, submit updates this draft in place instead of creating a new row.
+  final int? draftId;
   final double latitude;
   final double longitude;
   final String othercat;
@@ -66,7 +72,9 @@ class _ConfirmationState extends State<Confirmation> {
       isDraft: true,
       latitude: widget.latitude,
       longitude: widget.longitude,
-      imagePath: widget.image.path,
+      imagePath: widget.image?.path,
+      draftId: widget.draftId,
+      existingImageUrl: widget.existingImageUrl,
     );
 
     if (!mounted) return;
@@ -107,7 +115,9 @@ class _ConfirmationState extends State<Confirmation> {
       isDraft: false,
       latitude: widget.latitude,
       longitude: widget.longitude,
-      imagePath: widget.image.path,
+      imagePath: widget.image?.path,
+      draftId: widget.draftId,
+      existingImageUrl: widget.existingImageUrl,
     );
 
     if (!mounted) return;
@@ -215,20 +225,43 @@ class _ConfirmationState extends State<Confirmation> {
     );
   }
 
-  Widget _buildPicture(){
+  Widget _buildPicture() {
+    final local = widget.image;
+    final url = widget.existingImageUrl?.trim();
+
+    Widget image;
+    if (local != null) {
+      image = Image.file(
+        File(local.path),
+        height: 280,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        cacheWidth: 900,
+      );
+    } else if (url != null && url.isNotEmpty) {
+      image = Image.network(
+        url,
+        height: 280,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _photoFallback(),
+      );
+    } else {
+      image = _photoFallback();
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
-      child: Stack(
-        children: [
-          Image.file(
-            File(widget.image.path),
-            height: 280,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            cacheWidth: 900,
-          ),
-        ],
-      ),
+      child: image,
+    );
+  }
+
+  Widget _photoFallback() {
+    return Container(
+      height: 280,
+      width: double.infinity,
+      color: Colors.grey[300],
+      child: Icon(Icons.image_outlined, size: 56, color: Colors.grey[600]),
     );
   }
   Widget _buildHeader() {

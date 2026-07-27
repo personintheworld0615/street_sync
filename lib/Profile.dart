@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
+import 'package:street_sync/ReportDetails.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/error_popup.dart';
 import 'package:street_sync/report_categories.dart';
@@ -452,12 +453,22 @@ class _ProfileState extends State<Profile> {
     final name = (report['title'] as String?)?.trim().isNotEmpty == true
         ? report['title'] as String
         : report['category'] as String? ?? 'Report';
-    return _buildReportCard(
-      icon: _iconFromCategory(report['category'] as String?),
-      status: _formatStatus(report['status'] as String?),
-      name: name,
-      location: report['location'] as String? ?? '',
-      time: _formatDraftTime(report['time']),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportDetailsScreen(report: report),
+          ),
+        );
+      },
+      child: _buildReportCard(
+        icon: _iconFromCategory(report['category'] as String?),
+        status: _formatStatus(report['status'] as String?),
+        name: name,
+        location: report['location'] as String? ?? '',
+        time: _formatDraftTime(report['time']),
+      ),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/ReportDetails.dart';
 import 'package:street_sync/report_categories.dart';
 
 class MyReportsScreen extends StatelessWidget {
@@ -32,13 +33,27 @@ class MyReportsScreen extends StatelessWidget {
                     : report['name'] as String? ??
                         report['category'] as String? ??
                         'Report';
-                return _reportCard(
-                  icon: report['icon'] as IconData? ??
-                      _iconFromCategory(report['category'] as String?),
-                  status: _formatStatus(report['status'] as String?),
-                  name: name,
-                  location: report['location'] as String? ?? '',
-                  time: _formatTime(report['time']),
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ReportDetailsScreen(report: report),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: _reportCard(
+                      icon: report['icon'] as IconData? ??
+                          _iconFromCategory(report['category'] as String?),
+                      status: _formatStatus(report['status'] as String?),
+                      name: name,
+                      location: report['location'] as String? ?? '',
+                      time: _formatTime(report['time']),
+                    ),
+                  ),
                 );
               },
             ),
