@@ -9,12 +9,16 @@ class ConfirmationVoiceReport extends StatefulWidget {
     required this.location,
     required this.title,
     required this.description,
+    this.latitude = 0.0,
+    this.longitude = 0.0,
     this.othercat = '',
   });
 
   final String location;
   final String title;
   final String description;
+  final double latitude;
+  final double longitude;
   final String othercat;
 
   @override
@@ -51,23 +55,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
 
   Color get _severityColor => _getColorForSeverity(_autoSeverity);
 
-  Map<String, dynamic> _reportMap({required String status}) {
-    final category = _inferredCategory;
-    return {
-      'category': category,
-      'location': widget.location,
-      'title': widget.title,
-      'description': widget.description,
-      'severity': _autoSeverity,
-      'othercat': widget.othercat,
-      'status': status,
-      'time': DateTime.now().toIso8601String(),
-      'source': 'voice',
-      'icon': Icons.mic_outlined,
-      'name': widget.title,
-      'bgColor': Colors.orange[100]!,
-    };
-  }
+
 
   Future<void> _showSubmittedThenGoHome() async {
     if (_busy) return;
@@ -80,6 +68,8 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       location: widget.location,
       severity: _autoSeverity,
       isDraft: false,
+      latitude: widget.latitude,
+      longitude: widget.longitude,
     );
 
     if (!mounted) return;
@@ -163,6 +153,8 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       location: widget.location,
       severity: _autoSeverity,
       isDraft: true,
+      latitude: widget.latitude,
+      longitude: widget.longitude,
     );
 
     if (!mounted) return;

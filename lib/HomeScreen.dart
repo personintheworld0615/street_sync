@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/ViewReportsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
@@ -520,6 +521,10 @@ class _HomeScreenState extends State<HomeScreen> {
           iconColor: Colors.red,
           value: _nearbyCount.toString(),
           label: 'Nearby',
+          onTap: () => _openStatusReports(
+            filter: 'nearby',
+            title: 'Nearby',
+          ),
         ),
         const SizedBox(width: 10),
         _statCard(
@@ -527,6 +532,10 @@ class _HomeScreenState extends State<HomeScreen> {
           iconColor: Colors.orange,
           value: _inProgressCount.toString(),
           label: 'In progress',
+          onTap: () => _openStatusReports(
+            filter: 'in_progress',
+            title: 'In progress',
+          ),
         ),
         const SizedBox(width: 10),
         _statCard(
@@ -534,8 +543,27 @@ class _HomeScreenState extends State<HomeScreen> {
           iconColor: Colors.green,
           value: _resolvedCount.toString(),
           label: 'Resolved',
+          onTap: () => _openStatusReports(
+            filter: 'resolved',
+            title: 'Resolved',
+          ),
         ),
       ],
+    );
+  }
+
+  void _openStatusReports({
+    required String filter,
+    required String title,
+  }) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ViewReportsScreen(
+          filter: filter,
+          title: title,
+        ),
+      ),
     );
   }
 
@@ -544,38 +572,46 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color iconColor,
     required String value,
     required String label,
+    required VoidCallback onTap,
   }) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 15,
-              backgroundColor: iconColor.withValues(alpha: 0.15),
-              child: Icon(icon, size: 18, color: iconColor),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
             ),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: _ink,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 15,
+                  backgroundColor: iconColor.withValues(alpha: 0.15),
+                  child: Icon(icon, size: 18, color: iconColor),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: _ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 12, color: _muted),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: _muted),
-            ),
-          ],
+          ),
         ),
       ),
     );

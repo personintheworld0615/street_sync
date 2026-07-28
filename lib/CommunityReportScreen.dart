@@ -286,13 +286,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   }
   Future<void> _gotouser() async{
     final userLocation = await Geolocator.getCurrentPosition();
+    final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
     setState(() {
-       position = LatLng(userLocation.latitude, userLocation.longitude);
+       position = userLatLng;
+       _markers = {
+         Marker(
+           markerId: const MarkerId('report'),
+           position: userLatLng,
+         ),
+       };
        _ready = true;
     });
     await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
-
-
   }
 
   Widget _buildLocationCard(){

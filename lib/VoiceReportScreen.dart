@@ -20,12 +20,14 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   static const _muted = Color(0xFF5B677A);
 
   final SpeechToText _speech = SpeechToText();
+  bool _speechReady = false;
   bool _isRecording = false;
   bool _isSubmitting = false;
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
   double? _lat;
   double? _long;
+  Future<void>? _locationFuture;
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
 
@@ -39,13 +41,73 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _speech.initialize();
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    final available = await _speech.initialize(
+      onStatus: _onSpeechStatus,
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _isRecording = false;
+          _animationController.stop();
+          _animationController.reset();
+          _statusText = _transcript.isEmpty
+              ? 'Couldn’t catch that. Tap the mic to try again.'
+              : 'Recording stopped. Review below or tap to re-record.';
+        });
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _speechReady = available;
+      if (!available) {
+        _statusText = 'Speech recognition unavailable on this device.';
+      }
+    });
+  }
+
+  void _onSpeechStatus(String status) {
+    if (!mounted) return;
+    // Engine stopped on its own (pause timeout / done) — sync the UI.
+    if (status == SpeechToText.doneStatus ||
+        status == SpeechToText.notListeningStatus) {
+      if (!_isRecording) return;
+      setState(() {
+        _isRecording = false;
+        _animationController.stop();
+        _animationController.reset();
+        _statusText = _transcript.isEmpty
+            ? 'Sorry, we couldn’t hear you. Tap the mic to try again.'
+            : 'Recording complete. Review below or tap to re-record.';
+      });
+    }
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _speech.stop();
     super.dispose();
+  }
+
+  Future<void> _captureLocation() async {
+    try {
+      var permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      _lat = pos.latitude;
+      _long = pos.longitude;
+    } catch (_) {
+      // Location is best-effort; recording should still work.
+    }
   }
 
   Future<void> _toggleRecording() async {
@@ -61,26 +123,43 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       });
       return;
     }
-    var permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+
+    if (!_speechReady) {
+      await _initSpeech();
+      if (!_speechReady) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Speech recognition is not available.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
     }
-    //TODO later we have to do smth if permission is denied
-    final pos = await Geolocator.getCurrentPosition();
-    _lat = pos.latitude;
-    _long = pos.longitude;
+
+    // Capture GPS in parallel so it doesn't delay the mic opening.
+    _locationFuture = _captureLocation();
 
     setState(() {
       _transcript = '';
       _isRecording = true;
-      _statusText = 'Listening… speak clearly about the issue';
+      _statusText = 'Listening… describe the issue in a few sentences';
       _animationController.repeat(reverse: true);
     });
 
     await _speech.listen(
       onResult: (result) {
+        if (!mounted) return;
         setState(() => _transcript = result.recognizedWords);
       },
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation,
+        partialResults: true,
+        cancelOnError: true,
+        listenFor: const Duration(minutes: 2),
+        pauseFor: const Duration(seconds: 5),
+      ),
     );
   }
 
@@ -108,10 +187,11 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     if (_transcript.isEmpty || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
-      // 1. Get AI Title from Backend
+      // Finish GPS if still in flight from the mic tap.
+      await _locationFuture;
+
       final aiTitle = await ApiService.generateAITitle(_transcript);
 
-      // 2. Get Location Address
       final lat = _lat;
       final lng = _long;
       final location = (lat != null && lng != null)
@@ -120,7 +200,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
       if (!mounted) return;
 
-      // 3. Navigate with the real AI-generated title
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -128,11 +207,21 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
             title: aiTitle,
             description: _transcript,
             location: location,
+            latitude: lat ?? 0.0,
+            longitude: lng ?? 0.0,
           ),
         ),
       );
     } catch (e) {
       print('Error in voice report flow: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -333,7 +422,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
               ),
               const SizedBox(width: 6),
               Text(
-                'Transcript',
+                'Description',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -347,7 +436,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           Text(
             hasText
                 ? _transcript
-                : 'Your words will show up here as you speak…',
+                : 'Your description will show up here as you speak…',
             style: TextStyle(
               fontSize: 15,
               height: 1.4,

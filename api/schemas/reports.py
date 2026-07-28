@@ -1,7 +1,27 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
+
+
+class VoiceReportInput(BaseModel):
+    """Input for voice-report AI analysis."""
+
+    description: str = Field(min_length=1, description="Spoken report transcript")
+
+
+class ModelOutput(BaseModel):
+    """Structured AI output for a voice report."""
+
+    title: str = Field(description="Short civic issue title, max ~3 words")
+    severity: Literal["low", "medium", "high"]
+    category: Literal[
+        "Road Damage",
+        "Public Works",
+        "Environmental",
+        "Accessibility",
+        "Other",
+    ]
 
 
 class Reports(BaseModel):

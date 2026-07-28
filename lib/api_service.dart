@@ -771,6 +771,35 @@ class ApiService {
     return null;
   }
 
+  /// Home stat lists: [filter] is `nearby`, `in_progress`, or `resolved`.
+  static Future<List<dynamic>?> getReportsByFilter(String filter) async {
+    final path = switch (filter) {
+      'nearby' => '/reports/nearme',
+      'in_progress' => '/reports/in_progress',
+      'resolved' => '/reports/resolved',
+      _ => null,
+    };
+    if (path == null) return null;
+
+    final url = Uri.parse('$baseUrl$path');
+    try {
+      final response = await http
+          .get(url, headers: _headers)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 401) {
+        await logout();
+        return null;
+      }
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      print('getReportsByFilter ($path): ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching $path: $e');
+    }
+    return null;
+  }
+
   /// Returns null if any stats request fails (keep cached counts).
   static Future<Map<String, int>?> getReportStats() async {
     final counts = await Future.wait([
@@ -856,7 +885,13 @@ class ApiService {
   }
 
   static Future<String> generateAITitle(String description) async {
-    final url = Uri.parse('$baseUrl/reports/generate-title');
+    final result = await analyzeVoiceReport(description);
+    return result['title'] as String? ?? 'New Issue';
+  }
+
+  /// Calls POST /reports/analyze-voice → { title, severity, category }.
+  static Future<Map<String, String>> analyzeVoiceReport(String description) async {
+    final url = Uri.parse('$baseUrl/reports/analyze-voice');
     try {
       final response = await http
           .post(
@@ -864,15 +899,27 @@ class ApiService {
             headers: _headers,
             body: jsonEncode({'description': description}),
           )
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['title'] ?? 'New Issue';
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {
+          'title': (data['title'] as String?)?.trim().isNotEmpty == true
+              ? data['title'] as String
+              : 'New Issue',
+          'severity': (data['severity'] as String?)?.toLowerCase() ?? 'medium',
+          'category': (data['category'] as String?)?.trim().isNotEmpty == true
+              ? data['category'] as String
+              : 'Other',
+        };
       }
     } catch (e) {
-      print('Error generating AI title: $e');
+      print('Error analyzing voice report: $e');
     }
-    return 'New Issue';
+    return {
+      'title': 'New Issue',
+      'severity': 'medium',
+      'category': 'Other',
+    };
   }
 }

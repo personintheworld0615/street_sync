@@ -438,8 +438,15 @@ class _UpdateThingState extends State<Updatething> {
   }
   Future<void> _gotouser() async{
     final userLocation = await Geolocator.getCurrentPosition();
+    final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
     setState(() {
-       position = LatLng(userLocation.latitude, userLocation.longitude);
+       position = userLatLng;
+       _markers = {
+         Marker(
+           markerId: const MarkerId('report'),
+           position: userLatLng,
+         ),
+       };
        _ready = true;
     });
     await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
@@ -964,6 +971,8 @@ class _UpdateThingState extends State<Updatething> {
                     title: title,
                     description: description,
                     location: address,
+                    latitude: position.latitude,
+                    longitude: position.longitude,
                     othercat: othercat,
                   ),
                 ),
