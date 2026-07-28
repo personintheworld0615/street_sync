@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -100,24 +101,232 @@ def fetch_supabase_user(access_token: str) -> dict[str, Any]:
         ) from exc
 
 
-def delete_supabase_user(supabase_user_id: str) -> None:
-    """Best-effort delete of the Auth user (requires service role key)."""
+def _supabase_admin_request(
+    method: str,
+    path: str,
+    *,
+    body: dict[str, Any] | None = None,
+    query: str = "",
+) -> tuple[int, dict[str, Any] | list[Any] | None]:
+    """Call Supabase Auth Admin API. Returns (status_code, parsed JSON or None)."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase admin auth is not configured on the API",
+        )
+    url = f"{SUPABASE_URL}/auth/v1{path}"
+    if query:
+        url = f"{url}?{query}"
+    data = None
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Content-Type": "application/json",
+    }
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+            parsed = json.loads(raw) if raw else None
+            return resp.status, parsed
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8")
+        try:
+            parsed = json.loads(raw) if raw else None
+        except json.JSONDecodeError:
+            parsed = {"msg": raw or str(exc.reason)}
+        return exc.code, parsed
+
+
+def delete_supabase_user(supabase_user_id: str) -> bool:
+    """Delete the Auth user. Returns True on success."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY or not supabase_user_id:
-        return
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/auth/v1/admin/users/{supabase_user_id}",
-        headers={
-            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-            "apikey": SUPABASE_SERVICE_KEY,
+        print(
+            "delete_supabase_user skipped: missing SUPABASE_URL, "
+            "SUPABASE_SERVICE_KEY, or user id"
+        )
+        return False
+    try:
+        status_code, payload = _supabase_admin_request(
+            "DELETE", f"/admin/users/{supabase_user_id}"
+        )
+        if status_code in (200, 204):
+            return True
+        print(
+            f"delete_supabase_user failed ({status_code}): {payload}"
+        )
+        return False
+    except Exception as exc:
+        print(f"delete_supabase_user error: {exc}")
+        return False
+
+
+def supabase_user_id_from_access_token(access_token: str) -> str | None:
+    """Read the Auth user UUID from a Supabase access token (unverified decode)."""
+    try:
+        parts = access_token.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        padding = "=" * (-len(payload_b64) % 4)
+        raw = __import__("base64").urlsafe_b64decode(payload_b64 + padding)
+        payload = json.loads(raw.decode("utf-8"))
+        sub = payload.get("sub")
+        return sub if isinstance(sub, str) and sub else None
+    except Exception:
+        return None
+
+
+def admin_find_user_id_by_email(email: str) -> str | None:
+    """Return the Supabase Auth user id for an email, if any."""
+    target = email.strip().lower()
+    status_code, payload = _supabase_admin_request(
+        "GET",
+        "/admin/users",
+        query=f"page=1&per_page=200&email={urllib.parse.quote(target)}",
+    )
+    if status_code >= 400 or not isinstance(payload, dict):
+        return None
+    users = payload.get("users") or []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        user_email = str(user.get("email") or "").strip().lower()
+        if user_email == target:
+            uid = user.get("id")
+            return uid if isinstance(uid, str) else None
+    return None
+
+
+def admin_create_confirmed_user(
+    *,
+    email: str,
+    password: str,
+    first_name: str,
+    last_name: str,
+) -> dict[str, Any]:
+    """Create a Supabase Auth user with email already confirmed (no confirm email)."""
+    status_code, payload = _supabase_admin_request(
+        "POST",
+        "/admin/users",
+        body={
+            "email": email.strip().lower(),
+            "password": password,
+            "email_confirm": True,
+            "user_metadata": {
+                "first_name": first_name,
+                "last_name": last_name,
+            },
         },
-        method="DELETE",
+    )
+    if status_code in (200, 201) and isinstance(payload, dict):
+        return payload
+
+    msg = ""
+    if isinstance(payload, dict):
+        msg = str(
+            payload.get("msg")
+            or payload.get("message")
+            or payload.get("error_description")
+            or ""
+        )
+    # Already registered — confirm so next login works without email OTP.
+    if status_code in (400, 422) and "already" in msg.lower():
+        admin_confirm_user_email(email)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=msg or "Could not create auth user",
+    )
+
+
+def admin_confirm_user_email(email: str) -> bool:
+    """Mark a Supabase Auth user's email as confirmed. Returns True if updated."""
+    uid = admin_find_user_id_by_email(email)
+    if not uid:
+        return False
+    status_code, _payload = _supabase_admin_request(
+        "PUT",
+        f"/admin/users/{uid}",
+        body={"email_confirm": True},
+    )
+    return status_code < 400
+
+
+def ensure_email_confirmed_for_login(email: str, password: str) -> None:
+    """
+    If login is blocked by unconfirmed email / confirm-email rate limits,
+    confirm the account (after verifying the password) so the client can sign in.
+    """
+    grant = supabase_password_grant(email, password)
+    if grant.get("access_token"):
+        return
+
+    err = str(grant.get("error") or grant.get("error_code") or "").lower()
+    desc = str(grant.get("msg") or grant.get("error_description") or grant.get("message") or "").lower()
+    blocked = (
+        "email_not_confirmed" in err
+        or "email not confirmed" in desc
+        or "rate limit" in desc
+        or "rate_limit" in err
+    )
+    if not blocked:
+        detail = grant.get("error_description") or grant.get("msg") or grant.get("message") or "Invalid credentials"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(detail),
+        )
+
+    if not admin_confirm_user_email(email):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    # Verify password after confirming; wrong password must still fail.
+    grant2 = supabase_password_grant(email, password)
+    if not grant2.get("access_token"):
+        detail = grant2.get("error_description") or grant2.get("msg") or "Invalid credentials"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(detail),
+        )
+
+
+def supabase_password_grant(email: str, password: str) -> dict[str, Any]:
+    """Exchange email/password for a Supabase session (no emails sent)."""
+    if not SUPABASE_URL or not _supabase_apikey():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase auth is not configured on the API",
+        )
+    body = json.dumps(
+        {"email": email.strip().lower(), "password": password}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+        data=body,
+        headers={
+            "apikey": _supabase_apikey(),
+            "Content-Type": "application/json",
+        },
+        method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=10):
-            return
-    except Exception:
-        # Local DB delete should still succeed even if Auth cleanup fails.
-        return
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8")
+        try:
+            return json.loads(raw) if raw else {"msg": str(exc.reason)}
+        except json.JSONDecodeError:
+            return {"msg": raw or str(exc.reason)}
 
 
 def _names_from_supabase(sb_user: dict[str, Any]) -> tuple[str, str]:

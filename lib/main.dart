@@ -10,10 +10,14 @@ import 'package:street_sync/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: 'assets/.env', isOptional: true);
-  await AuthService.initialize();
-  await ApiService.loadSession();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await dotenv.load(fileName: 'assets/.env', isOptional: true);
+    await AuthService.initialize();
+    await ApiService.loadSession();
+  } catch (e) {
+    debugPrint('Startup error: $e');
+  }
   runApp(const StreetSyncApp());
 }
 
@@ -50,7 +54,16 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
 
   @override
   Widget build(BuildContext context) {
-    final signedIn = ApiService.userId != null || AuthService.isSignedIn;
+    // Safely check sign-in status only if Supabase is actually initialized
+    bool signedIn = false;
+    if (AuthService.isConfigured) {
+      try {
+        signedIn = ApiService.userId != null || AuthService.isSignedIn;
+      } catch (e) {
+        debugPrint('Auth check error: $e');
+      }
+    }
+
     return MaterialApp(
       navigatorKey: _navKey,
       debugShowCheckedModeBanner: false,

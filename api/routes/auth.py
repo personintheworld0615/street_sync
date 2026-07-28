@@ -12,12 +12,16 @@ from api.schemas.auth import (
     TokenResponse,
 )
 from api.services.auth import (
+    admin_create_confirmed_user,
+    admin_find_user_id_by_email,
     create_access_token,
     delete_supabase_user,
+    ensure_email_confirmed_for_login,
     fetch_supabase_user,
     get_current_user,
     hash_password,
     security,
+    supabase_user_id_from_access_token,
     upsert_user_from_supabase,
     verify_password,
 )
@@ -41,22 +45,40 @@ def _token_for(user: User, access_token: str | None = None) -> TokenResponse:
 
 @router.post("/signup", response_model=TokenResponse)
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
-    """Legacy email/password signup (kept for older clients)."""
-    existing = db.query(User).filter(User.email == body.email).first()
+    """Create a confirmed Supabase user (no email OTP / confirm) and local profile."""
+    email = str(body.email).strip().lower()
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
+
+    try:
+        admin_create_confirmed_user(
+            email=email,
+            password=body.password,
+            first_name=body.first_name,
+            last_name=body.last_name,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not create auth user",
+        ) from exc
+
     user = User(
         first_name=body.first_name,
         last_name=body.last_name,
-        email=body.email,
+        email=email,
         password=hash_password(body.password),
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    # Client signs into Supabase next; legacy JWT is a fallback for older builds.
     return _token_for(user)
 
 
@@ -70,6 +92,17 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid credentials",
         )
     return _token_for(user)
+
+
+@router.post("/ensure-confirmed")
+def ensure_confirmed(body: LoginRequest):
+    """
+    Confirm the user's email in Supabase (no 2FA / no confirm email) when
+    login is blocked by email confirmation or email rate limits.
+    Verifies the password first.
+    """
+    ensure_email_confirmed_for_login(str(body.email), body.password)
+    return {"ok": True}
 
 
 @router.post("/sync", response_model=TokenResponse)
@@ -138,14 +171,36 @@ def delete_account_route(
             detail="Not allowed to delete another user's account",
         )
 
-    supabase_uid = None
+    token = credentials.credentials
+    supabase_uid: str | None = None
     try:
-        sb_user = fetch_supabase_user(credentials.credentials)
-        supabase_uid = sb_user.get("id")
+        sb_user = fetch_supabase_user(token)
+        raw_id = sb_user.get("id")
+        if isinstance(raw_id, str) and raw_id:
+            supabase_uid = raw_id
     except HTTPException:
         supabase_uid = None
 
+    if not supabase_uid:
+        supabase_uid = supabase_user_id_from_access_token(token)
+
+    if not supabase_uid and current_user.email:
+        try:
+            supabase_uid = admin_find_user_id_by_email(current_user.email)
+        except Exception as exc:
+            print(f"admin_find_user_id_by_email failed: {exc}")
+            supabase_uid = None
+
+    # Delete Auth user first so they can't keep signing in with Google/email.
+    auth_deleted = False
+    if supabase_uid:
+        auth_deleted = delete_supabase_user(supabase_uid)
+
     result = delete_account(db, current_user.id)
-    if isinstance(supabase_uid, str):
-        delete_supabase_user(supabase_uid)
+    result["supabase_auth_deleted"] = auth_deleted
+    if supabase_uid and not auth_deleted:
+        result["warning"] = (
+            "App profile deleted, but Supabase Auth user may still exist. "
+            "Check SUPABASE_SERVICE_KEY on Render and redeploy."
+        )
     return result

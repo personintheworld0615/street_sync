@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/auth_service.dart';
+import 'dart:io' show File, Platform;
 
 class ApiService {
   static const _sessionKey = 'current_user';
@@ -29,7 +30,7 @@ class ApiService {
           : 'localhost';
 
   static int get _devPort =>
-      int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8001;
+      int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8000;
 
   // Automatically switch base URL depending on the platform
   static String get baseUrl {
@@ -40,9 +41,16 @@ class ApiService {
       return cloudUrl;
     }
 
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:$_devPort';
+    if (kIsWeb) {
+      return 'http://localhost:$_devPort';
     }
+
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:$_devPort';
+      }
+    } catch (_) {}
+
     return 'http://$_devHost:$_devPort';
   }
 
@@ -80,8 +88,10 @@ class ApiService {
   }
 
   static String? get token {
-    final supabaseToken = AuthService.accessToken;
-    if (supabaseToken != null && supabaseToken.isNotEmpty) return supabaseToken;
+    if (AuthService.isConfigured) {
+      final supabaseToken = AuthService.accessToken;
+      if (supabaseToken != null && supabaseToken.isNotEmpty) return supabaseToken;
+    }
     return currentUser?['access_token'] as String?;
   }
 
@@ -92,7 +102,7 @@ class ApiService {
   }
 
   static Future<void> loadSession() async {
-    if (AuthService.isSignedIn) {
+    if (AuthService.isConfigured && AuthService.isSignedIn) {
       final error = await syncFromSupabase();
       if (error == null) return;
       print('loadSession sync error: $error');
@@ -378,7 +388,8 @@ class ApiService {
     return headers;
   }
 
-  /// Email/password signup via Supabase Auth, then profile sync with the API.
+  /// Email/password signup: API creates a confirmed Supabase user (no email
+  /// OTP), then we sign in and sync the profile.
   /// Returns null on success, or an error message on failure.
   static Future<String?> signup({
     required String firstname,
@@ -386,36 +397,104 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    final error = await AuthService.signUp(
-      email: email,
+    if (!AuthService.isConfigured) {
+      return 'Supabase is not configured. Add SUPABASE_URL and '
+          'SUPABASE_ANON_KEY to assets/.env';
+    }
+
+    final url = Uri.parse('$baseUrl/auth/signup');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'first_name': firstname,
+              'last_name': lastname,
+              'email': email.trim(),
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        final detail = _errorDetail(response.body) ??
+            'Sign up failed (${response.statusCode})';
+        return detail;
+      }
+    } catch (e) {
+      return 'Sign up failed: $e';
+    }
+
+    final error = await AuthService.signIn(
+      email: email.trim(),
       password: password,
-      firstName: firstname,
-      lastName: lastname,
     );
     if (error != null) return error;
-    if (!AuthService.isSignedIn) {
-      // Email confirmation required — no session yet.
-      return null;
-    }
+
     final syncError = await syncFromSupabase(
       firstName: firstname,
       lastName: lastname,
     );
-    // Treat unreachable API as soft failure only when we already have a session.
     if (syncError != null && userId == null) return syncError;
     return null;
   }
 
   /// Email/password login via Supabase Auth, then profile sync with the API.
-  /// Returns null on success, or an error message on failure.
+  /// If Supabase blocks on email confirmation / rate limit, the API confirms
+  /// the account (no 2FA email) and we retry once.
   static Future<String?> login({
     required String email,
     required String password,
   }) async {
-    final error = await AuthService.signIn(email: email, password: password);
+    var error = await AuthService.signIn(email: email, password: password);
+    if (AuthService.isEmailConfirmBlocker(error)) {
+      final confirmError = await _ensureEmailConfirmed(
+        email: email,
+        password: password,
+      );
+      if (confirmError != null) return confirmError;
+      error = await AuthService.signIn(email: email, password: password);
+    }
     if (error != null) return error;
     final syncError = await syncFromSupabase();
     if (syncError != null && userId == null) return syncError;
+    return null;
+  }
+
+  static Future<String?> _ensureEmailConfirmed({
+    required String email,
+    required String password,
+  }) async {
+    final url = Uri.parse('$baseUrl/auth/ensure-confirmed');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email.trim(),
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode == 200) return null;
+      return _errorDetail(response.body) ??
+          'Could not confirm account (${response.statusCode})';
+    } catch (e) {
+      return 'Could not confirm account: $e';
+    }
+  }
+
+  static String? _errorDetail(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['detail'] != null) {
+        final detail = decoded['detail'];
+        if (detail is String) return detail;
+        return detail.toString();
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -774,5 +853,26 @@ class ApiService {
       print('Error fetching top users: $e');
     }
     return [];
+  }
+
+  static Future<String> generateAITitle(String description) async {
+    final url = Uri.parse('$baseUrl/reports/generate-title');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'description': description}),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['title'] ?? 'New Issue';
+      }
+    } catch (e) {
+      print('Error generating AI title: $e');
+    }
+    return 'New Issue';
   }
 }

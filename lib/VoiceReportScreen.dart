@@ -3,6 +3,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
+import 'package:street_sync/api_service.dart';
 
 class VoiceReportScreen extends StatefulWidget {
   const VoiceReportScreen({super.key});
@@ -107,22 +108,31 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     if (_transcript.isEmpty || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
+      // 1. Get AI Title from Backend
+      final aiTitle = await ApiService.generateAITitle(_transcript);
+
+      // 2. Get Location Address
       final lat = _lat;
       final lng = _long;
       final location = (lat != null && lng != null)
           ? await _addressFromCoords(lat, lng)
           : 'Location unavailable';
+
       if (!mounted) return;
+
+      // 3. Navigate with the real AI-generated title
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationVoiceReport(
-            title: 'tofillin',//TODO implement the api call
+            title: aiTitle,
             description: _transcript,
             location: location,
           ),
         ),
       );
+    } catch (e) {
+      print('Error in voice report flow: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
