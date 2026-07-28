@@ -58,12 +58,12 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _loadMarkerIcons() async {
     redSmall = await BitmapDescriptor.asset(
       const ImageConfiguration(size: Size(30, 48)),
-      "assets/images/markers/Normal_Red.png",
+      "assets/images/markers/Small_Red.png",
     );
 
     redLarge = await BitmapDescriptor.asset(
       const ImageConfiguration(size: Size(45, 72)),
-      "assets/images/markers/Selected_Red.png",
+      "assets/images/markers/Big_Red.png",
     );
   }
 
@@ -88,93 +88,96 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-void _updateMarkers() {
-  final reports = _selectedCategory == null
-      ? _recentReports
-      : _recentReports.where((report) {
-          if (_selectedCategory == ReportCategories.other) {
-            return !ReportCategories.isPrimary(report["category"] as String?);
-          }
+  void _updateMarkers() {
+    final reports = _selectedCategory == null
+        ? _recentReports
+        : _recentReports.where((report) {
+            if (_selectedCategory == ReportCategories.other) {
+              return !ReportCategories.isPrimary(report["category"] as String?);
+            }
 
-          return report["category"] == _selectedCategory;
-        });
+            return report["category"] == _selectedCategory;
+          });
 
-  setState(() {
-    _markers = reports.map<Marker>((report) {
-      return Marker(
-        markerId: MarkerId(report["id"].toString()),
-        position: LatLng(
-          report["latitude"],
-          report["longitude"],
+    setState(() {
+      _markers = reports.map<Marker>((report) {
+        return Marker(
+          markerId: MarkerId(report["id"].toString()),
+          position: LatLng(
+            report["latitude"],
+            report["longitude"],
+          ),
+          onTap: () {
+            setState(() {
+              _selectedMarkerId = report["id"].toString();
+              _selectedReport = report;
+            });
+
+            print(redSmall);
+            print(redLarge);
+
+            _updateMarkers();
+          },
+          icon: report["id"].toString() == _selectedMarkerId
+              ? redLarge
+              : redSmall,
+          zIndexInt: report["id"].toString() == _selectedMarkerId ? 10 : 0,
+        );
+      }).toSet();
+    });
+  }
+
+  double _getMarkerColor(String category) {
+    switch (category) {
+      case ReportCategories.roadDamage:
+        return BitmapDescriptor.hueRed;
+
+      case ReportCategories.publicWorks:
+        return BitmapDescriptor.hueOrange;
+
+      case ReportCategories.environmental:
+        return BitmapDescriptor.hueGreen;
+
+      case ReportCategories.accessibility:
+        return BitmapDescriptor.hueAzure;
+
+      default:
+        return BitmapDescriptor.hueViolet;
+    }
+  }
+
+  Widget _categoryChip(
+    String label,
+    String? category,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        showCheckmark: false,
+        label: Text(
+          label,
+          style: TextStyle(
+            color: _selectedCategory == category
+                ? Colors.white
+                : Colors.black,
+          ),
         ),
-        onTap: () {
+        selected: _selectedCategory == category,
+        selectedColor: color,
+        backgroundColor: Colors.white,
+        checkmarkColor: Colors.white,
+        onSelected: (_) {
           setState(() {
-            _selectedMarkerId = report["id"].toString();
-            _selectedReport = report;
+            _selectedCategory = category;
+            _selectedReport = null;
           });
 
           _updateMarkers();
         },
-        icon: report["id"].toString() == _selectedMarkerId
-            ? redLarge
-            : redSmall,
-        zIndexInt: report["id"].toString() == _selectedMarkerId ? 10 : 0,
-      );
-    }).toSet();
-  });
-}
-
-double _getMarkerColor(String category) {
-  switch (category) {
-    case ReportCategories.roadDamage:
-      return BitmapDescriptor.hueRed;
-
-    case ReportCategories.publicWorks:
-      return BitmapDescriptor.hueOrange;
-
-    case ReportCategories.environmental:
-      return BitmapDescriptor.hueGreen;
-
-    case ReportCategories.accessibility:
-      return BitmapDescriptor.hueAzure;
-
-    default:
-      return BitmapDescriptor.hueViolet;
-  }
-}
-
-Widget _categoryChip(
-  String label,
-  String? category,
-  Color color,
-) {
-  return Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: FilterChip(
-      showCheckmark: false,
-      label: Text(
-        label,
-        style: TextStyle(
-          color: _selectedCategory == category
-              ? Colors.white
-              : Colors.black,
-        ),
       ),
-      selected: _selectedCategory == category,
-      selectedColor: color,
-      backgroundColor: Colors.white,
-      checkmarkColor: Colors.white,
-      onSelected: (_) {
-        setState(() {
-          _selectedCategory = category;
-          _selectedReport = null;
-        });
-
-        _updateMarkers();
-      },
-    ),
-  );
-}
+    );
+  }
 
   List<dynamic> _suggestions = [];
 

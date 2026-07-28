@@ -69,9 +69,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/profile.jpg
-    - assets/images/markers/Normal_Red.png
-    - assets/images/markers/Selected_Red.png
+    - assets/images/markers/Big_Red.png
+    - assets/images/markers/Small_Red.png
+    - assets/images/markers/Big_Red.png
     - assets/.env
 
   # An image asset can refer to one or more resolution-specific "variants", see
