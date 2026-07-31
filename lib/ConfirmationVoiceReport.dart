@@ -12,6 +12,11 @@ class ConfirmationVoiceReport extends StatefulWidget {
     this.latitude = 0.0,
     this.longitude = 0.0,
     this.othercat = '',
+    this.category,
+    this.severity,
+    this.aiConfidence,
+    this.aiRationale,
+    this.rawTranscript,
   });
 
   final String location;
@@ -20,6 +25,14 @@ class ConfirmationVoiceReport extends StatefulWidget {
   final double latitude;
   final double longitude;
   final String othercat;
+  /// AI-provided category (preferred). Falls back to keyword inference if null.
+  final String? category;
+  /// AI-provided severity (preferred). Falls back to keyword inference if null.
+  final String? severity;
+  final double? aiConfidence;
+  final String? aiRationale;
+  /// Original speech transcript when description was AI-polished.
+  final String? rawTranscript;
 
   @override
   State<ConfirmationVoiceReport> createState() =>
@@ -33,12 +46,24 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
 
   bool get _busy => _submitting || _savingDraft;
 
-  String get _inferredCategory => inferCategory(widget.description);
+  bool get _fromAi =>
+      widget.category != null ||
+      widget.severity != null ||
+      widget.aiRationale != null;
 
-  String get _autoSeverity => autoSeverity(
-        category: _inferredCategory,
-        description: widget.description,
-      );
+  String get _inferredCategory =>
+      widget.category?.trim().isNotEmpty == true
+          ? widget.category!.trim()
+          : inferCategory(widget.description);
+
+  String get _autoSeverity {
+    final ai = widget.severity?.trim().toLowerCase();
+    if (ai == 'low' || ai == 'medium' || ai == 'high') return ai!;
+    return autoSeverity(
+      category: _inferredCategory,
+      description: widget.rawTranscript ?? widget.description,
+    );
+  }
 
   Color _getColorForSeverity(String sev) {
     switch (sev.toLowerCase()) {
@@ -263,6 +288,15 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   }
 
   Widget _buildSummaryCard() {
+    final confidencePct = widget.aiConfidence == null
+        ? null
+        : (widget.aiConfidence!.clamp(0.0, 1.0) * 100).round();
+    final rationale = widget.aiRationale?.trim();
+    final raw = widget.rawTranscript?.trim();
+    final showRaw = raw != null &&
+        raw.isNotEmpty &&
+        raw != widget.description.trim();
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -275,13 +309,54 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(
-                'Report Summary',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Report Summary',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ),
+                  if (_fromAi)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _primaryBlue.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome,
+                            size: 14,
+                            color: _primaryBlue,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            confidencePct == null
+                                ? 'AI analyzed'
+                                : 'AI · $confidencePct%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
             _buildSummaryRow(
@@ -289,6 +364,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               iconColor: Colors.indigo,
               label: 'Title',
               value: widget.title,
+              isSuggested: _fromAi,
             ),
             _summaryDivider(),
             _buildSummaryRow(
@@ -296,6 +372,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               iconColor: Colors.blue,
               label: 'Category',
               value: _inferredCategory,
+              isSuggested: _fromAi,
             ),
             _summaryDivider(),
             _buildSummaryRow(
@@ -308,17 +385,37 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             _buildSummaryRow(
               icon: Icons.description_outlined,
               iconColor: Colors.purple,
-              label: 'Description',
+              label: _fromAi ? 'AI description' : 'Description',
               value: widget.description,
+              isSuggested: _fromAi,
             ),
+            if (showRaw) ...[
+              _summaryDivider(),
+              _buildSummaryRow(
+                icon: Icons.mic_none_rounded,
+                iconColor: Colors.teal,
+                label: 'What you said',
+                value: raw!,
+              ),
+            ],
             _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.warning_amber_rounded,
               iconColor: _severityColor,
-              label: 'Severity (Auto-detected)',
+              label: _fromAi ? 'Severity' : 'Severity (Auto-detected)',
               value: _autoSeverity,
               isSuggested: true,
             ),
+            if (rationale != null && rationale.isNotEmpty) ...[
+              _summaryDivider(),
+              _buildSummaryRow(
+                icon: Icons.lightbulb_outline_rounded,
+                iconColor: Colors.amber.shade800,
+                label: 'AI rationale',
+                value: rationale,
+                isSuggested: true,
+              ),
+            ],
           ],
         ),
       ),
@@ -377,7 +474,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                           border: Border.all(color: iconColor.withOpacity(0.3)),
                         ),
                         child: Text(
-                          'SUGGESTED',
+                          _fromAi ? 'AI' : 'SUGGESTED',
                           style: TextStyle(
                             fontSize: 8,
                             fontWeight: FontWeight.bold,

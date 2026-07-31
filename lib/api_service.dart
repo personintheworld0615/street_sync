@@ -884,42 +884,57 @@ class ApiService {
     return [];
   }
 
-  static Future<String> generateAITitle(String description) async {
-    final result = await analyzeVoiceReport(description);
-    return result['title'] as String? ?? 'New Issue';
+  /// Calls POST /reports/analyze-voice → AI title, description, severity, category.
+  static Future<Map<String, dynamic>> analyzeVoiceReport(String description) async {
+    final url = Uri.parse('$baseUrl/reports/analyze-voice');
+    final response = await http
+        .post(
+          url,
+          headers: _headers,
+          body: jsonEncode({'description': description}),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200) {
+      String detail = 'AI analysis failed (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['detail'] != null) {
+          detail = body['detail'].toString();
+        }
+      } catch (_) {}
+      throw Exception(detail);
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final title = (data['title'] as String?)?.trim() ?? '';
+    if (title.isEmpty) {
+      throw Exception('AI returned an empty title.');
+    }
+
+    final confidenceRaw = data['confidence'];
+    final confidence = confidenceRaw is num
+        ? confidenceRaw.toDouble()
+        : double.tryParse('$confidenceRaw') ?? 0.75;
+
+    final polished = (data['description'] as String?)?.trim().isNotEmpty == true
+        ? (data['description'] as String).trim()
+        : (data['summary'] as String?)?.trim() ?? '';
+
+    return {
+      'title': title,
+      'description': polished,
+      'severity': (data['severity'] as String?)?.toLowerCase() ?? 'medium',
+      'category': (data['category'] as String?)?.trim().isNotEmpty == true
+          ? data['category'] as String
+          : 'Other',
+      'confidence': confidence.clamp(0.0, 1.0),
+      'rationale': (data['rationale'] as String?)?.trim() ?? '',
+    };
   }
 
-  /// Calls POST /reports/analyze-voice → { title, severity, category }.
-  static Future<Map<String, String>> analyzeVoiceReport(String description) async {
-    final url = Uri.parse('$baseUrl/reports/analyze-voice');
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: _headers,
-            body: jsonEncode({'description': description}),
-          )
-          .timeout(const Duration(seconds: 20));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        return {
-          'title': (data['title'] as String?)?.trim().isNotEmpty == true
-              ? data['title'] as String
-              : 'New Issue',
-          'severity': (data['severity'] as String?)?.toLowerCase() ?? 'medium',
-          'category': (data['category'] as String?)?.trim().isNotEmpty == true
-              ? data['category'] as String
-              : 'Other',
-        };
-      }
-    } catch (e) {
-      print('Error analyzing voice report: $e');
-    }
-    return {
-      'title': 'New Issue',
-      'severity': 'medium',
-      'category': 'Other',
-    };
+  static Future<String> generateAITitle(String description) async {
+    final result = await analyzeVoiceReport(description);
+    return result['title'] as String;
   }
 }

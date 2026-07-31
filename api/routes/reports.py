@@ -16,12 +16,11 @@ from sqlalchemy.orm import Session
 from api.database import get_db
 from api.models.reports import User
 from api.schemas.reports import (
-    ModelOutput,
     Reports,
     ReportsFull,
     UsersDetailed,
-    VoiceReportInput,
 )
+from api.schemas.voice import ModelOutput, VoiceReportInput
 from api.services import reports as reports_service
 from api.services.auth import get_current_user, get_optional_user
 from api.services.storage import upload_report_image

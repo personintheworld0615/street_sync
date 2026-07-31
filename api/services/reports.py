@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed, ModelOutput
+from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed
+from api.schemas.voice import ModelOutput
 from fastapi import HTTPException
 from api.models.reports import User, Report
 from api.services.storage import persist_report_image
