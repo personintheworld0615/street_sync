@@ -53,3 +53,14 @@ api/**/*.pyc
 api/**/*.db
 .env
 app.db
+
+# YOLO / ML training
+yolomodel/.venv/
+yolomodel/**/__pycache__/
+yolomodel/data/
+yolomodel/datasets/
+yolomodel/runs/
+yolomodel/*.pt
+yolomodel/*.onnx
+yolomodel/*.tflite
+yolomodel/*.mlpackage/

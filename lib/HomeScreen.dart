@@ -55,12 +55,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasMore = cachedHasMore ?? false;
         _isLoading = false;
       } else {
-        // No cache for this category — clear so All items don't linger.
         _recentReports = [];
         _hasMore = cachedHasMore ?? false;
-        // Keep skeleton only on cold first paint with no cache at all.
         if (_isLoading) {
-          // leave _isLoading true until network
         } else {
           _isLoading = false;
         }
@@ -79,14 +76,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadReports({bool forceNetwork = false}) async {
-    // Show cached feed + hasMore for this category immediately.
     if (!forceNetwork) {
       await _paintCachedFeed();
     }
 
     final results = await Future.wait([
       ApiService.getReportsFeed(
-        amount: _pageSize + 1, // +1 so hasMore is real, not a guess
+        amount: _pageSize + 1, // +1 so hasMore
         category: _selectedCat,
       ),
       ApiService.getReportStats(),
@@ -113,8 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return;
     }
-
-    // Network failed — keep whatever cache/UI we already have.
     if (mounted) {
       setState(() {
         if (stats != null) {

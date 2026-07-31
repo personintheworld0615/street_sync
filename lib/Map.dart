@@ -1,12 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'config.dart';
-import 'api_service.dart';
+
 import 'ReportDetails.dart';
+import 'api_service.dart';
+import 'config.dart';
 import 'report_categories.dart';
 
 enum IssueCategory {
@@ -50,21 +52,33 @@ class _MapScreenState extends State<MapScreen> {
     _updateMarkers();
   }
 
-  late BitmapDescriptor redSmall;
-  late BitmapDescriptor redLarge;
+  BitmapDescriptor? redSmall;
+  BitmapDescriptor? redLarge;
 
   String? _selectedMarkerId;
 
   Future<void> _loadMarkerIcons() async {
     redSmall = await BitmapDescriptor.asset(
       const ImageConfiguration(size: Size(30, 48)),
-      "assets/images/markers/Small_Red.png",
+      'assets/images/markers/Small_Red.png',
     );
-
     redLarge = await BitmapDescriptor.asset(
       const ImageConfiguration(size: Size(45, 72)),
-      "assets/images/markers/Big_Red.png",
+      'assets/images/markers/Big_Red.png',
     );
+  }
+
+  void _selectReport(dynamic report) {
+    _selectedMarkerId = report["id"].toString();
+    _selectedReport = Map<String, dynamic>.from(report as Map);
+    _updateMarkers();
+  }
+
+  void _clearSelection() {
+    if (_selectedMarkerId == null && _selectedReport == null) return;
+    _selectedMarkerId = null;
+    _selectedReport = null;
+    _updateMarkers();
   }
 
   /// Show cache immediately (if any), then refresh from network in the background.
@@ -89,6 +103,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateMarkers() {
+    final small = redSmall;
+    final large = redLarge;
+    if (small == null || large == null) return;
+
     final reports = _selectedCategory == null
         ? _recentReports
         : _recentReports.where((report) {
@@ -101,27 +119,19 @@ class _MapScreenState extends State<MapScreen> {
 
     setState(() {
       _markers = reports.map<Marker>((report) {
+        final id = report["id"].toString();
+        final isSelected = id == _selectedMarkerId;
         return Marker(
-          markerId: MarkerId(report["id"].toString()),
+          markerId: MarkerId(id),
           position: LatLng(
             report["latitude"],
             report["longitude"],
           ),
-          onTap: () {
-            setState(() {
-              _selectedMarkerId = report["id"].toString();
-              _selectedReport = report;
-            });
-
-            print(redSmall);
-            print(redLarge);
-
-            _updateMarkers();
-          },
-          icon: report["id"].toString() == _selectedMarkerId
-              ? redLarge
-              : redSmall,
-          zIndexInt: report["id"].toString() == _selectedMarkerId ? 10 : 0,
+          consumeTapEvents: true,
+          onTap: () => _selectReport(report),
+          icon: isSelected ? large : small,
+          zIndexInt: isSelected ? 10 : 0,
+          anchor: const Offset(0.5, 1.0),
         );
       }).toSet();
     });
@@ -170,9 +180,9 @@ class _MapScreenState extends State<MapScreen> {
         onSelected: (_) {
           setState(() {
             _selectedCategory = category;
+            _selectedMarkerId = null;
             _selectedReport = null;
           });
-
           _updateMarkers();
         },
       ),
@@ -291,6 +301,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             myLocationEnabled: true,
             markers: _markers,
+            onTap: (_) => _clearSelection(),
             onMapCreated: (c) {
               _controller = c;
             },
@@ -537,7 +548,7 @@ class _MapScreenState extends State<MapScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   InkWell(
-                    onTap: () => setState(() => _selectedReport = null),
+                    onTap: _clearSelection,
                     borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.all(4),
