@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -41,11 +42,15 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
    bool _ready =false;
   bool _submitting = false;
   bool _savingDraft = false;
+  bool _generatingTitle = false;
+  String _reportMode = 'manual'; // 'manual', 'auto', 'voice'
 
   bool get _busy => _submitting || _savingDraft;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _otherCategoryController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
@@ -106,6 +111,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                     ),
                     const SizedBox(height: 14),
                     _buildPhotoCard(),
+                    const SizedBox(height: 16),
+                    _buildModeSelector(),
                     const SizedBox(height: 16),
                     _buildTitleCard(),
                     const SizedBox(height: 14),
@@ -284,6 +291,77 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
       ),
     );
   }
+
+  Widget _buildModeSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          _buildModeButton(
+            mode: 'manual',
+            label: 'Manual',
+            icon: Icons.edit_note_rounded,
+          ),
+          _buildModeButton(
+            mode: 'auto',
+            label: 'Auto',
+            icon: Icons.auto_awesome_rounded,
+          ),
+          _buildModeButton(
+            mode: 'voice',
+            label: 'Voice',
+            icon: Icons.mic_none_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton({
+    required String mode,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _reportMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _reportMode = mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? _blue : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : _muted,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : _muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _gotouser() async{
     final userLocation = await Geolocator.getCurrentPosition();
     final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
@@ -562,13 +640,45 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Title',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Title',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                if (_generatingTitle)
+                  const SizedBox(
+                    height: 14,
+                    width: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _blue,
+                    ),
+                  )
+                else
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'AI ASSIST',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: _blue,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             Container(
@@ -628,6 +738,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                 controller: _descriptionController,
                 onChanged: (value) {
                   _descirption = value;
+                  _onDescriptionChanged(value);
                 },
                 onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
@@ -641,6 +752,25 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
         ),
       ),
     );
+  }
+
+  void _onDescriptionChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 1500), () async {
+      if (value.trim().length > 10 && _titleController.text.trim().isEmpty) {
+        setState(() => _generatingTitle = true);
+        try {
+          final aiTitle = await ApiService.generateAITitle(value);
+          if (mounted && _titleController.text.trim().isEmpty) {
+            setState(() {
+              _titleController.text = aiTitle;
+            });
+          }
+        } finally {
+          if (mounted) setState(() => _generatingTitle = false);
+        }
+      }
+    });
   }
   Future<void> _captureImage() async {
     final XFile? image = await _picker.pickImage(
