@@ -70,7 +70,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
   void _onSpeechStatus(String status) {
     if (!mounted) return;
-    // Engine stopped on its own (pause timeout / done) — sync the UI.
     if (status == SpeechToText.doneStatus ||
         status == SpeechToText.notListeningStatus) {
       if (!_isRecording) return;
@@ -190,7 +189,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       // Finish GPS if still in flight from the mic tap.
       await _locationFuture;
 
-      final aiTitle = await ApiService.generateAITitle(_transcript);
+      final analysis = await ApiService.analyzeVoiceReport(_transcript);
 
       final lat = _lat;
       final lng = _long;
@@ -200,15 +199,23 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
       if (!mounted) return;
 
+      final polished = (analysis['description'] as String?)?.trim();
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationVoiceReport(
-            title: aiTitle,
-            description: _transcript,
+            title: analysis['title'] as String,
+            description: (polished != null && polished.isNotEmpty)
+                ? polished
+                : _transcript,
             location: location,
             latitude: lat ?? 0.0,
             longitude: lng ?? 0.0,
+            category: analysis['category'] as String?,
+            severity: analysis['severity'] as String?,
+            aiConfidence: analysis['confidence'] as double?,
+            aiRationale: analysis['rationale'] as String?,
+            rawTranscript: _transcript,
           ),
         ),
       );
@@ -216,8 +223,10 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       print('Error in voice report flow: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Something went wrong. Please try again.'),
+          SnackBar(
+            content: Text(
+              e.toString().replaceFirst('Exception: ', ''),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -248,6 +257,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
+            color: _ink,
           ),
         ),
       ),
