@@ -52,19 +52,82 @@ class _MapScreenState extends State<MapScreen> {
     _updateMarkers();
   }
 
-  BitmapDescriptor? redSmall;
-  BitmapDescriptor? redLarge;
+  BitmapDescriptor _getMarkerIcon(String category, bool isSelected) {
+  switch (category) {
+    case ReportCategories.roadDamage:
+      return isSelected ? redLarge! : redSmall!;
+
+    case ReportCategories.publicWorks:
+      return isSelected ? orangeLarge! : orangeSmall!;
+
+    case ReportCategories.environmental:
+      return isSelected ? greenLarge! : greenSmall!;
+
+    case ReportCategories.accessibility:
+      return isSelected ? blueLarge! : blueSmall!;
+
+    default:
+      return isSelected ? purpleLarge! : purpleSmall!;
+  }
+}
+
+  BitmapDescriptor? redSmall, redLarge;
+  BitmapDescriptor? orangeSmall, orangeLarge;
+  BitmapDescriptor? greenSmall, greenLarge;
+  BitmapDescriptor? blueSmall, blueLarge;
+  BitmapDescriptor? purpleSmall, purpleLarge;
 
   String? _selectedMarkerId;
 
   Future<void> _loadMarkerIcons() async {
     redSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
-      'assets/images/markers/Small_Red.png',
+    const ImageConfiguration(size: Size(30, 48)),
+    'assets/images/markers/Small_Red.png',
     );
+
     redLarge = await BitmapDescriptor.asset(
       const ImageConfiguration(size: Size(45, 72)),
       'assets/images/markers/Big_Red.png',
+    );
+
+    orangeSmall = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(30, 48)),
+      'assets/images/markers/Small_Orange.png',
+    );
+
+    orangeLarge = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(45, 72)),
+      'assets/images/markers/Big_Orange.png',
+    );
+
+    greenSmall = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(30, 48)),
+      'assets/images/markers/Small_Green.png',
+    );
+
+    greenLarge = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(45, 72)),
+      'assets/images/markers/Big_Green.png',
+    );
+
+    blueSmall = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(30, 48)),
+      'assets/images/markers/Small_Blue.png',
+    );
+
+    blueLarge = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(45, 72)),
+      'assets/images/markers/Big_Blue.png',
+    );
+
+    purpleSmall = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(30, 48)),
+      'assets/images/markers/Small_Purple.png',
+    );
+
+    purpleLarge = await BitmapDescriptor.asset(
+      const ImageConfiguration(size: Size(45, 72)),
+      'assets/images/markers/Big_Purple.png',
     );
   }
 
@@ -103,9 +166,19 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateMarkers() {
-    final small = redSmall;
-    final large = redLarge;
-    if (small == null || large == null) return;
+
+    if (redSmall == null ||
+        redLarge == null ||
+        orangeSmall == null ||
+        orangeLarge == null ||
+        greenSmall == null ||
+        greenLarge == null ||
+        blueSmall == null ||
+        blueLarge == null ||
+        purpleSmall == null ||
+        purpleLarge == null) {
+      return;
+    }
 
     final reports = _selectedCategory == null
         ? _recentReports
@@ -129,7 +202,10 @@ class _MapScreenState extends State<MapScreen> {
           ),
           consumeTapEvents: true,
           onTap: () => _selectReport(report),
-          icon: isSelected ? large : small,
+          icon: _getMarkerIcon(
+            report["category"] as String,
+            isSelected,
+          ),
           zIndexInt: isSelected ? 10 : 0,
           anchor: const Offset(0.5, 1.0),
         );
