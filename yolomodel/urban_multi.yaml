@@ -1,0 +1,16 @@
+path: /Users/nehasaboo/StudioProjects/street_sync/yolomodel/datasets/urban_multi
+train: train/images
+val: valid/images
+test: test/images
+
+names:
+  0: Damaged Road issues
+  1: Pothole Issues
+  2: Illegal Parking Issues
+  3: Broken Road Sign Issues
+  4: Fallen trees
+  5: Littering/Garbage
+  6: Vandalism/Graffiti
+  7: Dead Animal Pollution
+  8: Damaged concrete structures
+  9: Damaged Electric wires and poles

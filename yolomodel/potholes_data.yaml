@@ -1,0 +1,8 @@
+
+path: /Users/nehasaboo/.cache/kagglehub/datasets/akinduhiman/urban-issues-dataset/versions/19/Potholes and RoadCracks/Potholes and RoadCracks
+train: train/images
+val: valid/images
+test: test/images
+names:
+  0: Damaged Road issues
+  1: Pothole Issues
