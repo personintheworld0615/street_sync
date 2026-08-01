@@ -1,9 +1,13 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlalchemy import inspect, text
 
-# Load environment variables from .env as early as possible
+# Load environment variables from project root .env as early as possible
+_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT / ".env")
 load_dotenv()
 
 from api.routes.auth import router as auth_router

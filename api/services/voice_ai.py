@@ -1,4 +1,4 @@
-"""Gemini-backed analysis for voice reports (title, severity, category)."""
+"""OpenRouter-backed analysis for voice reports (AI-only, no keyword heuristics)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,9 @@ import os
 import re
 from typing import Optional
 
-from api.schemas.reports import ModelOutput
+from fastapi import HTTPException
+
+from api.schemas.voice import ModelOutput
 
 CATEGORIES = (
     "Road Damage",
@@ -17,81 +19,20 @@ CATEGORIES = (
     "Other",
 )
 
-_CATEGORY_KEYWORDS = {
-    "Accessibility": [
-        "wheelchair",
-        "ramp",
-        "curb cut",
-        "accessible",
-        "ada",
-        "crosswalk signal",
-        "blind",
-        "cane",
-    ],
-    "Road Damage": [
-        "pothole",
-        "crack",
-        "pavement",
-        "asphalt",
-        "road",
-        "sidewalk broken",
-        "sinkhole",
-    ],
-    "Public Works": [
-        "streetlight",
-        "lamp",
-        "traffic light",
-        "sign",
-        "hydrant",
-        "manhole",
-        "trash",
-        "dumpster",
-        "graffiti",
-    ],
-    "Environmental": [
-        "flood",
-        "flooding",
-        "tree",
-        "branch",
-        "litter",
-        "spill",
-        "pollution",
-        "drainage",
-        "storm drain",
-    ],
-}
+_SYSTEM_PROMPT = """You are Street Sync's civic intelligence layer — the same kind of
+assistant a city 311 / public-works desk would trust.
 
-_URGENCY = [
-    "blocked",
-    "unsafe",
-    "injury",
-    "injured",
-    "flooding",
-    "fallen",
-    "no ramp",
-    "entire lane",
-    "emergency",
-    "dangerous",
-    "collapsed",
-    "fire",
-    "gas leak",
-]
+Given a spoken street-issue transcript, extract a polished structured report.
 
-_DOWNGRADE = [
-    "minor",
-    "small",
-    "cosmetic",
-    "faded",
-    "slowly",
-    "not urgent",
-]
-
-_SYSTEM_PROMPT = """You analyze municipal street/civic issue reports from spoken descriptions.
-
-Return structured fields only:
-- title: short, clear issue title (about 3–8 words). No quotes. No trailing period.
+Return a JSON object with exactly these fields:
+- title: Punchy work-order style title, 3–8 words. Title Case. No quotes. No period.
+  Prefer specificity ("Deep Pothole Blocking Lane") over vague ("Road Issue").
+- description: About 20 words (18–22). One polished sentence a dispatcher could use as
+  the report body. Fix speech grammar, keep the key facts, sound professional.
 - severity: one of low, medium, high
 - category: one of Road Damage, Public Works, Environmental, Accessibility, Other
+- confidence: number from 0.0 to 1.0 — how sure you are about category + severity
+- rationale: one short sentence explaining why you chose that severity/category
 
 Category guide:
 - Road Damage: potholes, cracks, pavement, sinkholes, broken roadway/sidewalk surface
@@ -101,109 +42,183 @@ Category guide:
 - Other: anything that does not fit above
 
 Severity guide:
-- high: unsafe, blocked, injury risk, emergency, collapsed, gas/fire
+- high: unsafe, blocked travel, injury risk, emergency, collapsed, gas/fire
 - medium: noticeable problem that should be fixed soon
 - low: minor, cosmetic, faded, non-urgent
+
+Be decisive and impressive — cities want clarity, not hedged fluff.
+Respond with JSON only. No markdown.
 """
 
 
-def _keyword_hits(text: str, keywords: list[str]) -> int:
-    return sum(1 for kw in keywords if kw in text)
+def _extract_json(text: str) -> Optional[dict]:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        data = json.loads(cleaned)
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if not match:
+            return None
+        try:
+            data = json.loads(match.group(0))
+            return data if isinstance(data, dict) else None
+        except json.JSONDecodeError:
+            return None
 
 
-def _heuristic_analyze(description: str) -> ModelOutput:
-    """Offline fallback when Gemini is unavailable."""
-    desc = description.lower().strip()
-
-    best_category = "Other"
-    best_hits = 0
-    for category in ("Accessibility", "Road Damage", "Public Works", "Environmental"):
-        hits = _keyword_hits(desc, _CATEGORY_KEYWORDS[category])
-        if hits > best_hits:
-            best_hits = hits
-            best_category = category
-    if best_hits == 0:
-        best_category = "Other"
-
-    score = {
-        "Accessibility": 3,
-        "Road Damage": 2,
-        "Public Works": 2,
-        "Environmental": 1,
-    }.get(best_category, 2)
-    score += min(_keyword_hits(desc, _URGENCY), 2)
-    score -= min(_keyword_hits(desc, _DOWNGRADE), 2)
-
-    if score >= 3:
-        severity = "high"
-    elif score <= 1:
-        severity = "low"
-    else:
+def _normalize_output(data: dict) -> ModelOutput:
+    """Coerce model quirks into a valid ModelOutput."""
+    title = str(data.get("title") or "").strip().strip('"').rstrip(".")
+    # Prefer description; accept legacy "summary" key if a model still uses it.
+    description = str(
+        data.get("description") or data.get("summary") or ""
+    ).strip()
+    rationale = str(data.get("rationale") or "").strip()
+    severity = str(data.get("severity") or "medium").strip().lower()
+    if severity not in ("low", "medium", "high"):
         severity = "medium"
 
-    words = re.findall(r"[A-Za-z0-9']+", description.strip())
-    title_words = words[:6] if words else ["New", "Issue"]
-    title = " ".join(title_words)
-    if title:
-        title = title[0].upper() + title[1:]
+    category = str(data.get("category") or "Other").strip()
+    # Light alias cleanup only — not keyword classification.
+    aliases = {
+        "road damage": "Road Damage",
+        "public works": "Public Works",
+        "environmental": "Environmental",
+        "accessibility": "Accessibility",
+        "other": "Other",
+    }
+    category = aliases.get(category.lower(), category)
+    if category not in CATEGORIES:
+        category = "Other"
 
-    return ModelOutput(title=title, severity=severity, category=best_category)  # type: ignore[arg-type]
+    try:
+        confidence = float(data.get("confidence", 0.75))
+    except (TypeError, ValueError):
+        confidence = 0.75
+    confidence = max(0.0, min(1.0, confidence))
+
+    if not title:
+        raise ValueError("Model returned empty title")
+    if not description:
+        description = title
+    else:
+        # Soft-trim runaway descriptions toward ~20 words.
+        words = description.split()
+        if len(words) > 28:
+            description = " ".join(words[:22]).rstrip(".,;") + "."
+    if not rationale:
+        rationale = f"Classified as {category} with {severity} severity."
+
+    return ModelOutput(
+        title=title,
+        description=description,
+        severity=severity,  # type: ignore[arg-type]
+        category=category,  # type: ignore[arg-type]
+        confidence=confidence,
+        rationale=rationale,
+    )
 
 
-def _gemini_analyze(description: str) -> Optional[ModelOutput]:
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+def _openrouter_analyze(description: str) -> ModelOutput:
+    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
     if not api_key:
-        return None
-
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return None
-
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-            system_instruction=_SYSTEM_PROMPT,
+        raise HTTPException(
+            status_code=503,
+            detail="OPENROUTER_API_KEY is not configured on the API server.",
         )
-        # Flat schema avoids $defs/$ref issues with Gemini structured output.
-        schema = {
-            "type": "object",
-            "properties": {
-                "title": {"type": "string"},
-                "severity": {"type": "string", "enum": ["low", "medium", "high"]},
-                "category": {
-                    "type": "string",
-                    "enum": list(CATEGORIES),
+
+    try:
+        from openai import OpenAI
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="openai package not installed. Run: pip install openai",
+        ) from e
+
+    model = (os.getenv("OPENROUTER_MODEL") or "openai/gpt-5.6-luna-pro").strip()
+
+    # trust_env=False avoids broken HTTP(S)_PROXY settings on some hosts (e.g. Render)
+    # that otherwise surface as opaque "Connection error" failures.
+    try:
+        import httpx
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="httpx package not installed (required by openai).",
+        ) from e
+
+    http_client = httpx.Client(
+        timeout=httpx.Timeout(45.0, connect=15.0),
+        trust_env=False,
+        follow_redirects=True,
+    )
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+        timeout=45.0,
+        max_retries=2,
+        http_client=http_client,
+    )
+    extra_headers: dict[str, str] = {}
+    referer = os.getenv("OPENROUTER_HTTP_REFERER")
+    app_title = os.getenv("OPENROUTER_APP_TITLE", "Street Sync")
+    if referer:
+        extra_headers["HTTP-Referer"] = referer
+    if app_title:
+        extra_headers["X-Title"] = app_title
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "Turn this spoken civic report into structured JSON.\n\n"
+                        f"Transcript:\n{description.strip()}"
+                    ),
                 },
-            },
-            "required": ["title", "severity", "category"],
-        }
-        response = model.generate_content(
-            f"Voice report description:\n{description.strip()}",
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-                temperature=0.2,
-            ),
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.35,
+            extra_headers=extra_headers or None,
         )
-        text = (response.text or "").strip()
-        if not text:
-            return None
-        data = json.loads(text)
-        return ModelOutput.model_validate(data)
     except Exception as e:
-        print(f"Gemini voice analyze failed, using heuristic: {e}")
-        return None
+        print(f"OpenRouter voice analyze request failed ({model}): {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenRouter request failed: {e}",
+        ) from e
+
+    text = (response.choices[0].message.content or "").strip()
+    if not text:
+        raise HTTPException(status_code=502, detail="OpenRouter returned an empty response.")
+
+    data = _extract_json(text)
+    if not data:
+        raise HTTPException(
+            status_code=502,
+            detail="OpenRouter returned non-JSON content.",
+        )
+
+    try:
+        return _normalize_output(data)
+    except Exception as e:
+        print(f"OpenRouter voice analyze parse failed: {e}; raw={text[:400]}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not parse AI analysis: {e}",
+        ) from e
 
 
 def analyze_voice_report(description: str) -> ModelOutput:
     cleaned = (description or "").strip()
     if not cleaned:
-        return ModelOutput(title="New Issue", severity="medium", category="Other")
+        raise HTTPException(status_code=400, detail="Description is required.")
 
-    # Prefer Gemini structured output; fall back to local heuristics.
-    result = _gemini_analyze(cleaned)
-    if result is not None:
-        return result
-    return _heuristic_analyze(cleaned)
+    return _openrouter_analyze(cleaned)

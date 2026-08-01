@@ -108,7 +108,11 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       // Location is best-effort; recording should still work.
     }
   }
-
+  String _fixSomeTypeos(String text) {
+return text.replaceAllMapped(
+    RegExp(r'\bbottle\b', caseSensitive: false),
+    (_) => 'pothole',
+  );
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       await _speech.stop();
@@ -150,7 +154,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     await _speech.listen(
       onResult: (result) {
         if (!mounted) return;
-        setState(() => _transcript = result.recognizedWords);
+        setState(() => _transcript = _fixSomeTypeos(result.recognizedWords));
       },
       listenOptions: SpeechListenOptions(
         listenMode: ListenMode.dictation,
