@@ -109,10 +109,12 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     }
   }
   String _fixSomeTypeos(String text) {
-return text.replaceAllMapped(
-    RegExp(r'\bbottle\b', caseSensitive: false),
-    (_) => 'pothole',
-  );
+    return text.replaceAllMapped(
+      RegExp(r'\bbottle\b', caseSensitive: false),
+      (_) => 'pothole',
+    );
+  }
+
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       await _speech.stop();
