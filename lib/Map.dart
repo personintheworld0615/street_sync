@@ -81,52 +81,52 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadMarkerIcons() async {
     redSmall = await BitmapDescriptor.asset(
-    const ImageConfiguration(size: Size(30, 48)),
-    'assets/images/markers/Small_Red.png',
+      const ImageConfiguration(size: Size(19, 24.5)),
+      'assets/images/markers/Small_Red.png',
     );
 
     redLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
+      const ImageConfiguration(size: Size(25, 30)),
       'assets/images/markers/Big_Red.png',
     );
 
     orangeSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
+      const ImageConfiguration(size: Size(19, 24.5)),
       'assets/images/markers/Small_Orange.png',
     );
 
     orangeLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
+      const ImageConfiguration(size: Size(25, 30)),
       'assets/images/markers/Big_Orange.png',
     );
 
     greenSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
+      const ImageConfiguration(size: Size(19, 24.5)),
       'assets/images/markers/Small_Green.png',
     );
 
     greenLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
+      const ImageConfiguration(size: Size(25, 30)),
       'assets/images/markers/Big_Green.png',
     );
 
     blueSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
+      const ImageConfiguration(size: Size(19, 24.5)),
       'assets/images/markers/Small_Blue.png',
     );
 
     blueLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
+      const ImageConfiguration(size: Size(25, 30)),
       'assets/images/markers/Big_Blue.png',
     );
 
     purpleSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(30, 48)),
+      const ImageConfiguration(size: Size(19, 24.5)),
       'assets/images/markers/Small_Purple.png',
     );
 
     purpleLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(45, 72)),
+      const ImageConfiguration(size: Size(25, 30)),
       'assets/images/markers/Big_Purple.png',
     );
   }
