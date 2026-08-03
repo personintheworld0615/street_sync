@@ -893,7 +893,7 @@ class ApiService {
           headers: _headers,
           body: jsonEncode({'description': description}),
         )
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 60));
 
     if (response.statusCode != 200) {
       String detail = 'AI analysis failed (${response.statusCode})';

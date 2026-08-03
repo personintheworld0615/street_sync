@@ -121,6 +121,109 @@ def _normalize_output(data: dict) -> ModelOutput:
     )
 
 
+def _openrouter_headers(api_key: str) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "X-Title": os.getenv("OPENROUTER_APP_TITLE", "Street Sync"),
+    }
+    referer = os.getenv("OPENROUTER_HTTP_REFERER")
+    if referer:
+        headers["HTTP-Referer"] = referer
+    return headers
+
+
+def _openrouter_post(api_key: str, model: str, description: str) -> str:
+    """Call OpenRouter chat completions via httpx (clearer errors than openai SDK)."""
+    try:
+        import httpx
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="httpx package not installed. Run: pip install httpx",
+        ) from e
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    "Turn this spoken civic report into structured JSON.\n\n"
+                    f"Transcript:\n{description.strip()}"
+                ),
+            },
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.35,
+    }
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    timeout = httpx.Timeout(45.0, connect=15.0)
+    headers = _openrouter_headers(api_key)
+
+    # Prefer trust_env=False (broken proxies on some hosts cause opaque failures),
+    # then fall back once with trust_env=True for environments that need a proxy.
+    last_error: Exception | None = None
+    for trust_env in (False, True):
+        try:
+            with httpx.Client(
+                timeout=timeout,
+                trust_env=trust_env,
+                follow_redirects=True,
+            ) as client:
+                response = client.post(url, headers=headers, json=payload)
+            break
+        except httpx.HTTPError as e:
+            last_error = e
+            print(
+                f"OpenRouter HTTP error (trust_env={trust_env}, model={model}): "
+                f"{type(e).__name__}: {e}"
+            )
+            continue
+    else:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"OpenRouter connection failed: {type(last_error).__name__}: {last_error}. "
+                "Check API server network / OPENROUTER_API_KEY / firewall."
+            ),
+        ) from last_error
+
+    if response.status_code >= 400:
+        detail = response.text[:400]
+        print(f"OpenRouter HTTP {response.status_code}: {detail}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenRouter HTTP {response.status_code}: {detail}",
+        )
+
+    try:
+        body = response.json()
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail="OpenRouter returned invalid JSON.",
+        ) from e
+
+    if isinstance(body, dict) and body.get("error"):
+        err = body["error"]
+        msg = err.get("message", err) if isinstance(err, dict) else err
+        raise HTTPException(status_code=502, detail=f"OpenRouter error: {msg}")
+
+    try:
+        text = (body["choices"][0]["message"]["content"] or "").strip()
+    except (KeyError, IndexError, TypeError) as e:
+        raise HTTPException(
+            status_code=502,
+            detail="OpenRouter response missing choices/message/content.",
+        ) from e
+
+    if not text:
+        raise HTTPException(status_code=502, detail="OpenRouter returned an empty response.")
+    return text
+
+
 def _openrouter_analyze(description: str) -> ModelOutput:
     api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
     if not api_key:
@@ -129,71 +232,8 @@ def _openrouter_analyze(description: str) -> ModelOutput:
             detail="OPENROUTER_API_KEY is not configured on the API server.",
         )
 
-    try:
-        from openai import OpenAI
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="openai package not installed. Run: pip install openai",
-        ) from e
-
     model = (os.getenv("OPENROUTER_MODEL") or "openai/gpt-5.6-luna-pro").strip()
-
-    try:
-        import httpx
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="httpx package not installed (required by openai).",
-        ) from e
-
-    http_client = httpx.Client(
-        timeout=httpx.Timeout(45.0, connect=15.0),
-        trust_env=False,
-        follow_redirects=True,
-    )
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        timeout=45.0,
-        max_retries=2,
-        http_client=http_client,
-    )
-    extra_headers: dict[str, str] = {}
-    referer = os.getenv("OPENROUTER_HTTP_REFERER")
-    app_title = os.getenv("OPENROUTER_APP_TITLE", "Street Sync")
-    if referer:
-        extra_headers["HTTP-Referer"] = referer
-    if app_title:
-        extra_headers["X-Title"] = app_title
-
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": (
-                        "Turn this spoken civic report into structured JSON.\n\n"
-                        f"Transcript:\n{description.strip()}"
-                    ),
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.35,
-            extra_headers=extra_headers or None,
-        )
-    except Exception as e:
-        print(f"OpenRouter voice analyze request failed ({model}): {e}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"OpenRouter request failed: {e}",
-        ) from e
-
-    text = (response.choices[0].message.content or "").strip()
-    if not text:
-        raise HTTPException(status_code=502, detail="OpenRouter returned an empty response.")
+    text = _openrouter_post(api_key, model, description)
 
     data = _extract_json(text)
     if not data:

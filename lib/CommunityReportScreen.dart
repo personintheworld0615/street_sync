@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'Confirmation.dart';
 import 'Mainshell.dart';
@@ -21,7 +22,8 @@ class CommunityReportScreen extends StatefulWidget {
   State<CommunityReportScreen> createState() => _CommunityReportScreenState();
 }
 
-class _CommunityReportScreenState extends State<CommunityReportScreen> {
+class _CommunityReportScreenState extends State<CommunityReportScreen>
+    with SingleTickerProviderStateMixin {
   LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
   Set<Marker> _markers = {};
   static const _blue = Color(0xFF2196F3);
@@ -45,6 +47,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   bool _generatingTitle = false;
   String _reportMode = 'manual'; // 'manual', 'auto', 'voice'
 
+  final SpeechToText _speech = SpeechToText();
+  bool _speechReady = false;
+  bool _isRecording = false;
+  String _statusText = 'Tap the microphone to start recording';
+  String _transcript = '';
+  late AnimationController _animationController;
+  late Animation<double> _pulseAnimation;
+
   bool get _busy => _submitting || _savingDraft;
   Timer? _debounce;
 
@@ -54,6 +64,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
     _otherCategoryController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _animationController.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -114,16 +126,12 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
                     const SizedBox(height: 16),
                     _buildModeSelector(),
                     const SizedBox(height: 16),
-                    _buildTitleCard(),
-                    const SizedBox(height: 14),
-                    _buildCategoryCard(),
-                    const SizedBox(height: 14),
-                    _buildDescriptionCard(),
-                    const SizedBox(height: 14),
-                    _buildLocationCard(),
-                    const SizedBox(height: 14),
-                    if (_selectedSeverity != null) _buildSeverityCard(),
-                    if (_selectedSeverity == null) _buildSeverityCardNew(),
+                    if (_reportMode == 'manual')
+                      _buildManualCard()
+                    else if (_reportMode == 'voice')
+                      _buildVoiceCard()
+                    else
+                      const SizedBox.shrink(), //TODO need to fix pls pls psl 
                   ],
                 ),
               ),
@@ -137,7 +145,290 @@ class _CommunityReportScreenState extends State<CommunityReportScreen> {
   @override
   void initState(){
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _initSpeech();
     _gotouser();
+  }
+  Widget _buildManualCard(){
+    return Column(children: [
+         _buildTitleCard(),
+                    const SizedBox(height: 14),
+                    _buildCategoryCard(),
+                    const SizedBox(height: 14),
+                    _buildDescriptionCard(),
+                    const SizedBox(height: 14),
+                    _buildLocationCard(),
+                    const SizedBox(height: 14),
+                    if (_selectedSeverity != null) _buildSeverityCard(),
+                    if (_selectedSeverity == null) _buildSeverityCardNew(),
+    ],);
+  }
+
+  Widget _buildVoiceCard() {
+    final accent = _isRecording ? Colors.red : _blue;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isRecording ? 'Recording' : 'Ready',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _statusText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: _ink,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 28),
+            ScaleTransition(
+              scale: _pulseAnimation,
+              child: GestureDetector(
+                onTap: _toggleRecording,
+                child: Container(
+                  width: 132,
+                  height: 132,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.35),
+                        blurRadius: 28,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                    size: 56,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _isRecording ? 'Tap to stop' : 'Tap to record',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 28),
+            _buildTranscriptPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTranscriptPanel() {
+    final hasText = _transcript.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 120),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: _pageBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasText
+              ? _blue.withValues(alpha: 0.25)
+              : Colors.grey.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.notes_rounded,
+                size: 16,
+                color: hasText ? _blue : _muted,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Description',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                  color: hasText ? _blue : _muted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            hasText
+                ? _transcript
+                : 'Your description will show up here as you speak…',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+              fontStyle: hasText ? FontStyle.normal : FontStyle.italic,
+              color: hasText ? _ink : Colors.grey[500],
+              fontWeight: hasText ? FontWeight.w500 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _initSpeech() async {
+    final available = await _speech.initialize(
+      onStatus: _onSpeechStatus,
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _isRecording = false;
+          _animationController.stop();
+          _animationController.reset();
+          _statusText = _transcript.isEmpty
+              ? 'Couldn’t catch that. Tap the mic to try again.'
+              : 'Recording stopped. Review below or tap to re-record.';
+        });
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _speechReady = available;
+      if (!available) {
+        _statusText = 'Speech recognition unavailable on this device.';
+      }
+    });
+  }
+
+  void _onSpeechStatus(String status) {
+    if (!mounted) return;
+    if (status == SpeechToText.doneStatus ||
+        status == SpeechToText.notListeningStatus) {
+      if (!_isRecording) return;
+      setState(() {
+        _isRecording = false;
+        _animationController.stop();
+        _animationController.reset();
+        _statusText = _transcript.isEmpty
+            ? 'Sorry, we couldn’t hear you. Tap the mic to try again.'
+            : 'Recording complete. Review below or tap to re-record.';
+      });
+    }
+  }
+
+  String _fixSomeTypeos(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'\bbottle\b', caseSensitive: false),
+      (_) => 'pothole',
+    );
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      await _speech.stop();
+      setState(() {
+        _isRecording = false;
+        _statusText = _transcript.isEmpty
+            ? 'Sorry, we couldn’t hear you. Tap the mic to try again.'
+            : 'Recording complete. Review below or tap to re-record.';
+        _animationController.stop();
+        _animationController.reset();
+      });
+      return;
+    }
+
+    if (!_speechReady) {
+      await _initSpeech();
+      if (!_speechReady) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Speech recognition is not available.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _transcript = '';
+      _isRecording = true;
+      _statusText = 'Listening… describe the issue in a few sentences';
+      _animationController.repeat(reverse: true);
+    });
+
+    await _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        final text = _fixSomeTypeos(result.recognizedWords);
+        setState(() {
+          _transcript = text;
+          _descriptionController.text = text;
+        });
+      },
+      listenOptions: SpeechListenOptions(
+        listenMode: ListenMode.dictation,
+        partialResults: true,
+        cancelOnError: true,
+        listenFor: const Duration(minutes: 2),
+        pauseFor: const Duration(seconds: 5),
+      ),
+    );
   }
 
   Widget _buildPhotoCard() {
