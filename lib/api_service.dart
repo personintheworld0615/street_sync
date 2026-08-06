@@ -904,11 +904,6 @@ class ApiService {
       throw Exception('AI returned an empty title.');
     }
 
-    final confidenceRaw = data['confidence'];
-    final confidence = confidenceRaw is num
-        ? confidenceRaw.toDouble()
-        : double.tryParse('$confidenceRaw') ?? 0.75;
-
     final polished = (data['description'] as String?)?.trim().isNotEmpty == true
         ? (data['description'] as String).trim()
         : (data['summary'] as String?)?.trim() ?? '';
@@ -920,7 +915,6 @@ class ApiService {
       'category': (data['category'] as String?)?.trim().isNotEmpty == true
           ? data['category'] as String
           : 'Other',
-      'confidence': confidence.clamp(0.0, 1.0),
       'rationale': (data['rationale'] as String?)?.trim() ?? '',
     };
   }

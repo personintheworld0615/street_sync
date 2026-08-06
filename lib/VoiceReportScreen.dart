@@ -219,7 +219,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
             longitude: lng ?? 0.0,
             category: analysis['category'] as String?,
             severity: analysis['severity'] as String?,
-            aiConfidence: analysis['confidence'] as double?,
             aiRationale: analysis['rationale'] as String?,
             rawTranscript: _transcript,
           ),

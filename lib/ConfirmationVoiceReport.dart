@@ -14,7 +14,6 @@ class ConfirmationVoiceReport extends StatefulWidget {
     this.othercat = '',
     this.category,
     this.severity,
-    this.aiConfidence,
     this.aiRationale,
     this.rawTranscript,
   });
@@ -29,7 +28,6 @@ class ConfirmationVoiceReport extends StatefulWidget {
   final String? category;
   /// AI-provided severity (preferred). Falls back to keyword inference if null.
   final String? severity;
-  final double? aiConfidence;
   final String? aiRationale;
   /// Original speech transcript when description was AI-polished.
   final String? rawTranscript;
@@ -288,9 +286,6 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   }
 
   Widget _buildSummaryCard() {
-    final confidencePct = widget.aiConfidence == null
-        ? null
-        : (widget.aiConfidence!.clamp(0.0, 1.0) * 100).round();
     final rationale = widget.aiRationale?.trim();
     final raw = widget.rawTranscript?.trim();
     final showRaw = raw != null &&
@@ -344,9 +339,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            confidencePct == null
-                                ? 'AI analyzed'
-                                : 'AI · $confidencePct%',
+                            'AI analyzed',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
