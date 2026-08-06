@@ -23,7 +23,7 @@ class CommunityReportScreen extends StatefulWidget {
 }
 
 class _CommunityReportScreenState extends State<CommunityReportScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
   Set<Marker> _markers = {};
   static const _blue = Color(0xFF2196F3);
@@ -54,6 +54,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   String _transcript = '';
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
+  late AnimationController _comingSoonController;
+  late Animation<double> _comingSoonPulse;
 
   bool get _busy => _submitting || _savingDraft;
   Timer? _debounce;
@@ -65,6 +67,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     _titleController.dispose();
     _descriptionController.dispose();
     _animationController.dispose();
+    _comingSoonController.dispose();
     _speech.stop();
     super.dispose();
   }
@@ -131,7 +134,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     else if (_reportMode == 'voice')
                       _buildVoiceCard()
                     else
-                      const SizedBox.shrink(), //TODO need to fix pls pls psl 
+                      _buildComingSoonforAI(),
                   ],
                 ),
               ),
@@ -152,6 +155,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+    _comingSoonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _comingSoonPulse = Tween<double>(begin: 0.45, end: 1.0).animate(
+      CurvedAnimation(parent: _comingSoonController, curve: Curves.easeInOut),
+    );
     _initSpeech();
     _gotouser();
   }
@@ -168,6 +178,31 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     if (_selectedSeverity != null) _buildSeverityCard(),
                     if (_selectedSeverity == null) _buildSeverityCardNew(),
     ],);
+  }
+  Widget _buildComingSoonforAI() {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SizedBox(
+        width: double.infinity,
+        height: 220,
+        child: Center(
+          child: FadeTransition(
+            opacity: _comingSoonPulse,
+            child: const Text(
+              'Coming soon',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64B5F6), 
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildVoiceCard() {

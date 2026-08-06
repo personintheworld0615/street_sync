@@ -225,14 +225,15 @@ def _openrouter_post(api_key: str, model: str, description: str) -> str:
 
 
 def _openrouter_analyze(description: str) -> ModelOutput:
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    # Render (and some .env editors) sometimes insert newlines when pasting keys.
+    api_key = "".join((os.getenv("OPENROUTER_API_KEY") or "").split())
     if not api_key:
         raise HTTPException(
             status_code=503,
             detail="OPENROUTER_API_KEY is not configured on the API server.",
         )
 
-    model = (os.getenv("OPENROUTER_MODEL") or "openai/gpt-5.6-luna-pro").strip()
+    model = "".join((os.getenv("OPENROUTER_MODEL") or "openai/gpt-5.6-luna-pro").split())
     text = _openrouter_post(api_key, model, description)
 
     data = _extract_json(text)

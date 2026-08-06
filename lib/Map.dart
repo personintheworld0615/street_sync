@@ -20,11 +20,11 @@ enum IssueCategory {
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, this.isActive = true});
+  const MapScreen({super.key, this.isActive = true, this.initialReportId});
 
   /// When false→true (Map tab focused), reloads markers: cache first, then network.
   final bool isActive;
-
+  final int? initialReportId;
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
@@ -39,7 +39,25 @@ class _MapScreenState extends State<MapScreen> {
   List<dynamic> _recentReports = [];
   bool _loadingReports = false;
 
-  String? _selectedCategory; // null = show all
+  String? _selectedCategory;
+
+  Future<void> _applyInitialSelection() async {
+    final id = widget.initialReportId;
+    if (id == null) return;
+
+    dynamic match;
+    for (final r in _recentReports) {
+      if (r['id'] == id || r['id'].toString() == id.toString()) {
+        match = r;
+        break;
+      }
+    }
+    if (match == null) return;
+
+    await _selectReport(match);
+
+    setState(() => _ready = true);
+  }
 
   Map<String, dynamic>? _selectedReport;
 
@@ -131,12 +149,21 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _selectReport(dynamic report) {
+  Future<void> _selectReport(dynamic report) async {
     _selectedMarkerId = report["id"].toString();
     _selectedReport = Map<String, dynamic>.from(report as Map);
     _updateMarkers();
+    final lat = (report['latitude'] as num).toDouble();
+    final lng = (report['longitude'] as num).toDouble();
+    await _gotothingie(LatLng(lat, lng));
   }
 
+  Future<void> _gotothingie(LatLng target) async {
+    setState(() => _center = target);
+    await _controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(target, 16),
+    );
+  }
   void _clearSelection() {
     if (_selectedMarkerId == null && _selectedReport == null) return;
     _selectedMarkerId = null;
@@ -329,15 +356,27 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void didUpdateWidget(MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Tab focused again: paint cache, then fetch fresh markers in the bg.
     if (widget.isActive && !oldWidget.isActive) {
       _loadRecentReports();
+    }
+    if (widget.initialReportId != oldWidget.initialReportId) {
+      if (widget.initialReportId != null) {
+        _applyInitialSelection();
+      } else {
+        _clearSelection();
+      }
     }
   }
 
   Future<void> _goToUser() async {
-    // Markers can paint from cache while location permission resolves.
+
     await _loadRecentReports();
+
+    if (widget.initialReportId != null) {
+      await _applyInitialSelection();
+      if (mounted && !_ready) setState(() => _ready = true);
+      return;
+    }
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {

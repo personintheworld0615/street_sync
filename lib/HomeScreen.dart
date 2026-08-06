@@ -7,7 +7,10 @@ import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onOpenOnMap});
+
+  /// Opens the Map tab; pass [reportId] to focus that pin.
+  final void Function({int? reportId})? onOpenOnMap;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -229,6 +232,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               : (r['description'] as String? ?? 'Report'),
                           location: r['location'] as String,
                           time: _formatTime(r['time'] as String),
+                          onTap: () {
+                            final raw = r['id'];
+                            final id = raw is int
+                                ? raw
+                                : int.tryParse('$raw');
+                            widget.onOpenOnMap?.call(reportId: id);
+                          },
                         ),
                       ),
                     if (!_isLoading && _recentReports.isEmpty)
@@ -346,75 +356,83 @@ class _HomeScreenState extends State<HomeScreen> {
     required String location,
     required String name,
     required String time,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: _iconBg,
-            child: Icon(icon, size: 22, color: _blue),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: _iconBg,
+                child: Icon(icon, size: 22, color: _blue),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: Colors.grey[500],
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        location,
-                        style: const TextStyle(fontSize: 12, color: _muted),
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: _ink,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: Colors.grey[500],
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location,
+                            style: const TextStyle(fontSize: 12, color: _muted),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: _severityColor(severity),
-                  shape: BoxShape.circle,
-                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                time,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _severityColor(severity),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    time,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
