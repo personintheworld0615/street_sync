@@ -4,13 +4,11 @@ from pydantic import BaseModel, Field
 
 
 class VoiceReportInput(BaseModel):
-    """Input for voice-report AI analysis."""
 
     description: str = Field(min_length=1, description="Spoken report transcript")
 
 
 class ModelOutput(BaseModel):
-    """Structured AI output for a voice report."""
 
     title: str = Field(description="Punchy work-order style title, ~3–8 words")
     description: str = Field(

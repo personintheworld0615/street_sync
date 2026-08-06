@@ -17,7 +17,6 @@ class ApiService {
   static const _cacheTopUsers = 'cache_top_users';
   static const _cacheUserScopedId = 'cache_user_scoped_id';
 
-  /// Prefs key for a home feed category (`null` / empty → All).
   static String homeFeedKey(String? category) {
     final c = category?.trim();
     if (c == null || c.isEmpty) return 'All';
@@ -32,10 +31,7 @@ class ApiService {
   static int get _devPort =>
       int.tryParse(dotenv.maybeGet('API_PORT') ?? '') ?? 8000;
 
-  // Automatically switch base URL depending on the platform
   static String get baseUrl {
-    // If you have a CLOUD_URL in your .env, use it. 
-    // Otherwise, fallback to local/emulator addresses.
     final cloudUrl = dotenv.maybeGet('CLOUD_URL');
     if (cloudUrl != null && cloudUrl.isNotEmpty) {
       return cloudUrl;
@@ -70,7 +66,6 @@ class ApiService {
   static String get lastName =>
       currentUser?['last_name'] as String? ?? '';
 
-  /// Full name for profile, leaderboard "you", etc.
   static String get userName {
     final last = lastName.trim();
     if (last.isEmpty) return firstName;
@@ -79,7 +74,6 @@ class ApiService {
 
   static String? get userEmail => currentUser?['email'] as String?;
 
-  /// Public Supabase URL for the user's profile photo, if set.
   static String? get userPicture {
     final raw = currentUser?['picture'];
     if (raw is! String) return null;
@@ -678,8 +672,6 @@ class ApiService {
         print('submitReport failed: ${response.statusCode} ${response.body}');
         return false;
       }
-
-      // Profile shows cached drafts first — bust so published drafts disappear.
       await clearUserReportCaches();
       return true;
     } catch (e) {
