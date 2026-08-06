@@ -10,7 +10,7 @@ class VoiceReportInput(BaseModel):
 
 class ModelOutput(BaseModel):
 
-    title: str = Field(description="Punchy work-order style title, ~3–8 words")
+    title: str = Field(description="Punchy work-order style title, ~3 words")
     description: str = Field(
         description="Polished report description, about 20 words"
     )
@@ -22,13 +22,3 @@ class ModelOutput(BaseModel):
         "Accessibility",
         "Other",
     ]
-    confidence: float = Field(
-        default=0.75,
-        ge=0.0,
-        le=1.0,
-        description="Model confidence in category + severity",
-    )
-    rationale: str = Field(
-        default="",
-        description="One-line explanation of severity/category choice",
-    )

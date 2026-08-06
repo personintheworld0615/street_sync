@@ -54,7 +54,7 @@ class _MapScreenState extends State<MapScreen> {
     }
     if (match == null) return;
 
-    await _selectReport(match);
+    await _selectReport(match, true);
 
     setState(() => _ready = true);
   }
@@ -149,19 +149,24 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> _selectReport(dynamic report) async {
+  Future<void> _selectReport(dynamic report, bool zoom = false) async {
     _selectedMarkerId = report["id"].toString();
     _selectedReport = Map<String, dynamic>.from(report as Map);
     _updateMarkers();
     final lat = (report['latitude'] as num).toDouble();
     final lng = (report['longitude'] as num).toDouble();
-    await _gotothingie(LatLng(lat, lng));
+    await _gotothingie(LatLng(lat, lng), zoom);
   }
 
-  Future<void> _gotothingie(LatLng target) async {
+  Future<void> _gotothingie(LatLng target, bool zoom) async {
     setState(() => _center = target);
+    final currentZoom = await _controller?.getZoomLevel()??0;
+    bool shouldzoom = false;
+    if(zoom||currentZoom<16){
+      shouldzoom = true;
+    }
     await _controller?.animateCamera(
-      CameraUpdate.newLatLngZoom(target, 16),
+      shouldzoom ? CameraUpdate.newLatLngZoom(target, 16) : CameraUpdate.newLatLng(target)
     );
   }
   void _clearSelection() {

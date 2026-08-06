@@ -7,17 +7,15 @@ from api.schemas.voice import ModelOutput
 
 
 _SYSTEM_PROMPT = """
-You are Street Sync's civic intelligence layer.
+Act as a report catagerizer for civic issues.
 
-Given a spoken street issue transcript, return JSON only with:
+We will give you a short description of a civic issue, return JSON only with:
 
 {
-  "title": "3-8 word Title Case work-order title",
+  "title": "3 word brief title",
   "description": "Professional ~20 word report description",
   "severity": "low | medium | high",
   "category": "Road Damage | Public Works | Environmental | Accessibility | Other",
-  "confidence": 0.0,
-  "rationale": "Short explanation"
 }
 
 Severity:
@@ -57,6 +55,7 @@ def analyze_voice_report(description: str) -> ModelOutput:
                 "type": "json_object"
             },
             "temperature": 0.1,
+            "max_tokens": 500,
         },
         timeout=45,
     )
