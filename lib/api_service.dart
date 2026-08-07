@@ -96,10 +96,21 @@ class ApiService {
   }
 
   static Future<void> loadSession() async {
-    if (AuthService.isConfigured && AuthService.isSignedIn) {
-      final error = await syncFromSupabase();
-      if (error == null) return;
-      print('loadSession sync error: $error');
+    if (AuthService.isConfigured) {
+      final fresh = await AuthService.ensureFreshSession();
+      if (fresh) {
+        final error = await syncFromSupabase();
+        if (error == null) return;
+        print('loadSession sync error: $error');
+        // Soft-fallback in syncFromSupabase may still have set currentUser.
+        if (userId != null) return;
+      }
+
+      // Supabase is on — don't resurrect a legacy SharedPreferences JWT.
+      currentUser = null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionKey);
+      return;
     }
 
     // Legacy SharedPreferences session (pre-Supabase installs).
@@ -113,6 +124,38 @@ class ApiService {
       currentUser = null;
       await prefs.remove(_sessionKey);
     }
+  }
+
+  static Future<void> _syncAccessTokenIntoSession() async {
+    final access = AuthService.accessToken;
+    if (currentUser == null || access == null || access.isEmpty) return;
+    currentUser = {...currentUser!, 'access_token': access};
+    await _saveSession();
+  }
+
+  /// Sends an authenticated request. On 401: refresh once, retry once.
+  /// Returns null only after logout (refresh failed or second 401).
+  static Future<http.Response?> _authorized(
+    Future<http.Response> Function() send,
+  ) async {
+    await AuthService.ensureFreshSession();
+
+    var response = await send();
+    if (response.statusCode != 401) return response;
+
+    final refreshed = await AuthService.refreshSession();
+    if (!refreshed) {
+      await logout();
+      return null;
+    }
+    await _syncAccessTokenIntoSession();
+
+    response = await send();
+    if (response.statusCode == 401) {
+      await logout();
+      return null;
+    }
+    return response;
   }
 
   static Future<void> _saveSession() async {
@@ -131,6 +174,7 @@ class ApiService {
     String? firstName,
     String? lastName,
   }) async {
+    await AuthService.ensureFreshSession();
     final access = AuthService.accessToken;
     final authUser = AuthService.user;
     if (access == null || authUser == null) {
@@ -141,26 +185,29 @@ class ApiService {
 
     final url = Uri.parse('$baseUrl/auth/sync');
     try {
-      final response = await http
-          .post(
-            url,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $access',
-            },
-            body: jsonEncode({
-              if (firstName != null && firstName.isNotEmpty)
-                'first_name': firstName,
-              if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
-            }),
-          )
-          .timeout(const Duration(seconds: 12));
+      final response = await _authorized(
+        () => http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ${AuthService.accessToken ?? access}',
+              },
+              body: jsonEncode({
+                if (firstName != null && firstName.isNotEmpty)
+                  'first_name': firstName,
+                if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
+              }),
+            )
+            .timeout(const Duration(seconds: 12)),
+      );
+      if (response == null) return 'Not signed in';
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         currentUser = {
           ...body,
-          'access_token': access,
+          'access_token': AuthService.accessToken ?? access,
         };
         await _saveSession();
         return null;
@@ -168,7 +215,7 @@ class ApiService {
 
       // Soft-fallback so the app can still open if the API is down.
       currentUser = {
-        'access_token': access,
+        'access_token': AuthService.accessToken ?? access,
         'user_id': currentUser?['user_id'],
         'first_name': firstName ??
             AuthService.firstNameFromUser ??
@@ -188,7 +235,7 @@ class ApiService {
     } catch (e) {
       print('syncFromSupabase Error ($url): $e');
       currentUser = {
-        'access_token': access,
+        'access_token': AuthService.accessToken ?? access,
         'user_id': currentUser?['user_id'],
         'first_name': firstName ?? AuthService.firstNameFromUser ?? 'Citizen',
         'last_name': lastName ?? AuthService.lastNameFromUser ?? '',
@@ -514,20 +561,20 @@ class ApiService {
 
     final url = Uri.parse('$baseUrl/auth/picture');
     try {
-      final request = http.MultipartRequest('POST', url);
-      final t = token;
-      if (t != null && t.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $t';
-      }
-      request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      final response = await _authorized(() async {
+        final request = http.MultipartRequest('POST', url);
+        final t = token;
+        if (t != null && t.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $t';
+        }
+        request.files
+            .add(await http.MultipartFile.fromPath('image', imagePath));
+        final streamed =
+            await request.send().timeout(const Duration(seconds: 60));
+        return http.Response.fromStream(streamed);
+      });
+      if (response == null) return null;
 
-      final streamed = await request.send().timeout(const Duration(seconds: 60));
-      final response = await http.Response.fromStream(streamed);
-
-      if (response.statusCode == 401) {
-        await logout();
-        return null;
-      }
       if (response.statusCode != 200 && response.statusCode != 201) {
         print(
           'uploadProfilePicture failed: ${response.statusCode} ${response.body}',
@@ -552,9 +599,10 @@ class ApiService {
         ? Uri.parse('$baseUrl/auth/delete/$id')
         : Uri.parse('$baseUrl/auth/delete');
     try {
-      final response = await http
-          .delete(url, headers: _headers)
-          .timeout(const Duration(seconds: 12));
+      final response = await _authorized(
+        () => http.delete(url, headers: _headers).timeout(const Duration(seconds: 12)),
+      );
+      if (response == null) return null; // already logged out
 
       if (response.statusCode == 200) {
         await logout();
@@ -562,7 +610,7 @@ class ApiService {
       }
 
       // If the API row is already gone, still wipe the Supabase session.
-      if (response.statusCode == 401 || response.statusCode == 404) {
+      if (response.statusCode == 404) {
         await logout();
         return null;
       }
@@ -630,44 +678,43 @@ class ApiService {
         await File(imagePath).exists();
 
     try {
-      final request = http.MultipartRequest(updating ? 'PUT' : 'POST', url);
-      final t = token;
-      if (t != null && t.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $t';
-      }
+      final response = await _authorized(() async {
+        final request = http.MultipartRequest(updating ? 'PUT' : 'POST', url);
+        final t = token;
+        if (t != null && t.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $t';
+        }
 
-      request.fields.addAll({
-        'title': title,
-        'description': description,
-        'category': category,
-        'latitude': latitude.toString(),
-        'longitude': longitude.toString(),
-        'location': location,
-        'time': DateTime.now().toIso8601String(),
-        'severity': severity.toLowerCase(),
-        'user_id': effectiveUserId.toString(),
-        'isDraft': isDraft.toString(),
-      });
+        request.fields.addAll({
+          'title': title,
+          'description': description,
+          'category': category,
+          'latitude': latitude.toString(),
+          'longitude': longitude.toString(),
+          'location': location,
+          'time': DateTime.now().toIso8601String(),
+          'severity': severity.toLowerCase(),
+          'user_id': effectiveUserId.toString(),
+          'isDraft': isDraft.toString(),
+        });
 
-      if (hasImage) {
-        request.files.add(
-          await http.MultipartFile.fromPath('image', imagePath!),
-        );
-      } else if (updating &&
-          existingImageUrl != null &&
-          existingImageUrl.trim().isNotEmpty) {
-        request.fields['existing_image_url'] = existingImageUrl.trim();
-      }
-
-      final streamed = await request.send().timeout(
-            Duration(seconds: hasImage ? 60 : 15),
+        if (hasImage) {
+          request.files.add(
+            await http.MultipartFile.fromPath('image', imagePath!),
           );
-      final response = await http.Response.fromStream(streamed);
+        } else if (updating &&
+            existingImageUrl != null &&
+            existingImageUrl.trim().isNotEmpty) {
+          request.fields['existing_image_url'] = existingImageUrl.trim();
+        }
 
-      if (response.statusCode == 401) {
-        await logout();
-        return false;
-      }
+        final streamed = await request.send().timeout(
+              Duration(seconds: hasImage ? 60 : 15),
+            );
+        return http.Response.fromStream(streamed);
+      });
+      if (response == null) return false;
+
       if (response.statusCode != 200 && response.statusCode != 201) {
         print('submitReport failed: ${response.statusCode} ${response.body}');
         return false;
@@ -695,13 +742,10 @@ class ApiService {
   static Future<List<dynamic>?> getRecentReports({int amount = 3}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 401) {
-        await logout();
-        return null;
-      }
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 5)),
+      );
+      if (response == null) return null;
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         await cacheRecentReports(list);
@@ -733,9 +777,10 @@ class ApiService {
 
     final url = Uri.parse('$baseUrl/reports/feed').replace(queryParameters: params);
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 8));
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 8)),
+      );
+      if (response == null) return null;
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as List<dynamic>;
       }
@@ -749,9 +794,10 @@ class ApiService {
   static Future<int?> _countReports(String path) async {
     final url = Uri.parse('$baseUrl$path');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 5));
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 5)),
+      );
+      if (response == null) return null;
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         return list.length;
@@ -775,13 +821,10 @@ class ApiService {
 
     final url = Uri.parse('$baseUrl$path');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode == 401) {
-        await logout();
-        return null;
-      }
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 8)),
+      );
+      if (response == null) return null;
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as List<dynamic>;
       }
@@ -815,13 +858,10 @@ class ApiService {
   static Future<List<dynamic>> getDraftReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/drafts');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 401) {
-        await logout();
-        return [];
-      }
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 5)),
+      );
+      if (response == null) return [];
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         await cacheDraftReports(userid, list);
@@ -837,13 +877,10 @@ class ApiService {
   static Future<List<dynamic>> getSubmittedReports(int userid) async {
     final url = Uri.parse('$baseUrl/reports/user/$userid/submitted');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 401) {
-        await logout();
-        return [];
-      }
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 5)),
+      );
+      if (response == null) return [];
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         await cacheSubmittedReports(userid, list);
@@ -858,13 +895,10 @@ class ApiService {
   static Future<List<dynamic>> getTopUsers(int userId) async {
     final url = Uri.parse('$baseUrl/users/top/$userId');
     try {
-      final response = await http
-          .get(url, headers: _headers)
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 401) {
-        await logout();
-        return [];
-      }
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 5)),
+      );
+      if (response == null) return [];
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List<dynamic>;
         await cacheTopUsers(userId, list);
@@ -879,13 +913,18 @@ class ApiService {
   /// Calls POST /reports/analyze-voice → AI title, description, severity, category.
   static Future<Map<String, dynamic>> analyzeVoiceReport(String description) async {
     final url = Uri.parse('$baseUrl/reports/analyze-voice');
-    final response = await http
-        .post(
-          url,
-          headers: _headers,
-          body: jsonEncode({'description': description}),
-        )
-        .timeout(const Duration(seconds: 60));
+    final response = await _authorized(
+      () => http
+          .post(
+            url,
+            headers: _headers,
+            body: jsonEncode({'description': description}),
+          )
+          .timeout(const Duration(seconds: 60)),
+    );
+    if (response == null) {
+      throw Exception('Session expired. Please sign in again.');
+    }
 
     if (response.statusCode != 200) {
       String detail = 'AI analysis failed (${response.statusCode})';

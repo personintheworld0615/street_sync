@@ -5,9 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Deep link scheme registered in AndroidManifest / Info.plist.
-/// Also add this exact URL under Supabase → Authentication → URL Configuration
-/// → Additional Redirect URLs.
+
 const kAuthRedirectUrl = 'com.example.streetsync://login-callback';
 
 class AuthService {
@@ -28,13 +26,33 @@ class AuthService {
   static bool _initialized = false;
   static bool _googleInitialized = false;
 
+  /// Ask Supabase for a new access token using the stored refresh token.
+  static Future<bool> refreshSession() async {
+    if (!isConfigured) return false;
+    try {
+      final result = await auth.refreshSession();
+      return result.session != null;
+    } catch (e) {
+      debugPrint('refreshSession failed: $e');
+      return false;
+    }
+  }
+
+  /// Returns true if we have a usable (non-expired) session.
+  static Future<bool> ensureFreshSession() async {
+    if (!isConfigured) return false;
+    final s = session;
+    if (s == null) return false;
+    if (!s.isExpired) return true;
+    return refreshSession();
+  }
+
   static String get supabaseUrl {
     final fromAssets = dotenv.maybeGet('SUPABASE_URL')?.trim();
     if (fromAssets != null && fromAssets.isNotEmpty) return fromAssets;
     return '';
   }
 
-  /// Publishable / anon key only — never the service role key.
   static String get supabaseAnonKey {
     final key = dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ??
         dotenv.maybeGet('SUPABASE_PUBLISHABLE_KEY')?.trim() ??

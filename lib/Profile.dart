@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:street_sync/WelcomeScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
-import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/ReportDetails.dart';
 import 'package:street_sync/api_service.dart';
@@ -300,7 +300,7 @@ class _ProfileState extends State<Profile> {
                 await ApiService.logout();
                 if (!mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
                   (_) => false,
                 );
               },
@@ -353,7 +353,7 @@ class _ProfileState extends State<Profile> {
     }
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
       (_) => false,
     );
   }

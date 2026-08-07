@@ -41,6 +41,15 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
           _navKey.currentState?.push(
             MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
           );
+          return;
+        }
+        // API logout / expired refresh → clear stack back to welcome.
+        if (data.event == AuthChangeEvent.signedOut) {
+          _navKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+            (_) => false,
+          );
+          setState(() {});
         }
       });
     }
