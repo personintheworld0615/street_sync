@@ -506,7 +506,7 @@ class _MapScreenState extends State<MapScreen> {
             Positioned(
               bottom: 20,
               left: 10,
-              right: 10,
+              right: 60,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
