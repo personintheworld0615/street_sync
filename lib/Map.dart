@@ -22,7 +22,6 @@ enum IssueCategory {
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.isActive = true, this.initialReportId});
 
-  /// When false→true (Map tab focused), reloads markers: cache first, then network.
   final bool isActive;
   final int? initialReportId;
   @override
@@ -149,7 +148,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> _selectReport(dynamic report, bool zoom = false) async {
+  Future<void> _selectReport(dynamic report, bool zoom) async {
     _selectedMarkerId = report["id"].toString();
     _selectedReport = Map<String, dynamic>.from(report as Map);
     _updateMarkers();
@@ -233,7 +232,7 @@ class _MapScreenState extends State<MapScreen> {
             report["longitude"],
           ),
           consumeTapEvents: true,
-          onTap: () => _selectReport(report),
+          onTap: () => _selectReport(report,false),
           icon: _getMarkerIcon(
             report["category"] as String,
             isSelected,
