@@ -167,11 +167,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
   Widget _buildManualCard(){
     return Column(children: [
-         _buildTitleCard(),
+                    _buildDescriptionCard(),
                     const SizedBox(height: 14),
                     _buildCategoryCard(),
                     const SizedBox(height: 14),
-                    _buildDescriptionCard(),
+                    _buildTitleCard(),
                     const SizedBox(height: 14),
                     _buildLocationCard(),
                     const SizedBox(height: 14),
@@ -969,13 +969,26 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Title',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Title',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => _showTitleInfo(context),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ],
                 ),
                 if (_generatingTitle)
                   const SizedBox(
@@ -995,7 +1008,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      'AI ASSIST',
+                      'AI AUTO-FILL',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -1018,7 +1031,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 textInputAction: TextInputAction.next,
                 onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
-                  hintText: 'Give your report a short title...',
+                  hintText: 'Waiting for description...',
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
                 ),
@@ -1026,6 +1039,34 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showTitleInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.auto_awesome_rounded, color: _blue),
+            SizedBox(width: 10),
+            Text('AI Title Assist'),
+          ],
+        ),
+        content: const Text(
+          'Our AI automatically generates a professional title based on your description. '
+          'This helps city workers quickly identify and prioritize issues.\n\n'
+          'You can always edit the title manually if you prefer!',
+          style: TextStyle(fontSize: 15, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -1335,6 +1376,33 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           _Pressable(
             onTap: () async {
               if (_busy) return;
+
+              // If in voice mode, analyze the transcript first to auto-fill title/desc/cat/sev
+              if (_reportMode == 'voice' && _transcript.isNotEmpty) {
+                setState(() => _submitting = true);
+                try {
+                  final aiResult = await ApiService.analyzeVoiceReport(_transcript);
+                  _titleController.text = aiResult['title'] ?? '';
+                  _descriptionController.text = aiResult['description'] ?? _transcript;
+                  
+                  // Extract matching category string from ReportCategories
+                  final aiCat = aiResult['category'];
+                  if (aiCat != null) {
+                    final match = ReportCategories.all.firstWhere(
+                      (c) => c.toLowerCase() == aiCat.toLowerCase(),
+                      orElse: () => _selectedCategory ?? ReportCategories.other,
+                    );
+                    _selectedCategory = match;
+                  }
+                  
+                  _selectedSeverity = aiResult['severity'];
+                } catch (e) {
+                  print('AI voice analysis failed: $e');
+                } finally {
+                  setState(() => _submitting = false);
+                }
+              }
+
               final errors = <String>[];
               if (_titleController.text.trim().isEmpty) errors.add('title');
               if (_image == null) errors.add('photo');
