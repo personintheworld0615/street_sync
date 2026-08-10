@@ -47,6 +47,7 @@ dependencies:
   app_links: ^6.4.0
   http: ^1.2.2
   google_sign_in: ^7.2.0
+  google_fonts: ^8.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -80,6 +81,7 @@ flutter:
     - assets/images/markers/Big_Blue.png
     - assets/images/markers/Small_Purple.png
     - assets/images/markers/Big_Purple.png
+    - assets/images/home_hero.png
     - assets/.env
 
   # An image asset can refer to one or more resolution-specific "variants", see
