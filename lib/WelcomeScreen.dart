@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/OnboardingFlow.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/auth_service.dart';
 
 /// Animated splash / welcome that then hands off to onboarding.
 class WelcomeScreen extends StatefulWidget {
@@ -61,17 +63,33 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _runSequence() async {
-    await _logoCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 120));
+    // 1. Start loading logic in parallel with animations
+    final initFuture = _initializeSystem();
+
+    // 2. Snappier Animation Sequence
+    _logoCtrl.forward(); // Start logo
+    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
-    await _textCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 1100));
+    
+    _textCtrl.forward(); // Start text while logo is still finishing
+    
+    // 3. Wait for BOTH animations and system init to finish
+    await Future.wait([
+      initFuture,
+      Future.delayed(const Duration(milliseconds: 1200)), // Minimum show time
+    ]);
+
     if (!mounted) return;
     await _exitCtrl.forward();
     if (!mounted) return;
-    final next = ApiService.userId != null
+
+    // Use hardcoded logic from main or real auth
+    const bool presentationBypass = true; // Matches user's previous preference
+    
+    final next = presentationBypass || (ApiService.userId != null)
         ? const MainShell()
         : const OnboardingFlow();
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => next,
@@ -80,6 +98,27 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
+  }
+
+  Future<void> _initializeSystem() async {
+    try {
+      await dotenv.load(fileName: 'assets/.env', isOptional: true);
+      await AuthService.initialize();
+      await ApiService.loadSession();
+      
+      // Setup mock user for bypass mode if needed
+      if (ApiService.currentUser == null) {
+        ApiService.currentUser = {
+          'user_id': 1,
+          'first_name': 'Krish',
+          'last_name': 'Sinha',
+          'email': 'krishworld432@gmail.com',
+          'access_token': 'mock-token-for-bypass',
+        };
+      }
+    } catch (e) {
+      debugPrint('Init error: $e');
+    }
   }
 
   @override
