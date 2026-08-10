@@ -10,16 +10,12 @@ import 'package:street_sync/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    await dotenv.load(fileName: 'assets/.env', isOptional: true);
-    await AuthService.initialize();
-    await ApiService.loadSession();
-  } catch (e) {
-    debugPrint('Startup error: $e');
-  }
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const StreetSyncApp());
 }
+
+
+
 
 class StreetSyncApp extends StatefulWidget {
   const StreetSyncApp({super.key});
@@ -43,7 +39,6 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
           );
           return;
         }
-        // API logout / expired refresh → clear stack back to welcome.
         if (data.event == AuthChangeEvent.signedOut) {
           _navKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const WelcomeScreen()),
@@ -63,7 +58,6 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Safely check sign-in status only if Supabase is actually initialized
     bool signedIn = false;
     if (AuthService.isConfigured) {
       try {

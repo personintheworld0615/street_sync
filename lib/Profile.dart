@@ -749,13 +749,7 @@ class _ProfileState extends State<Profile> {
                   color: Colors.white,
                 ),
               ),
-              CircleAvatar(
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                ),
-              ),
+              
             ],
           ),
           const SizedBox(height: 20),
@@ -1022,8 +1016,9 @@ class _ProfileState extends State<Profile> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.only(top: 10),
       child: GridView.count(
+        padding: EdgeInsets.zero,
         crossAxisCount: 3, // 3 columns
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),

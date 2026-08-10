@@ -63,30 +63,26 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _runSequence() async {
-    // 1. Start loading logic in parallel with animations
     final initFuture = _initializeSystem();
 
-    // 2. Snappier Animation Sequence
-    _logoCtrl.forward(); // Start logo
+    _logoCtrl.forward();
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
     
-    _textCtrl.forward(); // Start text while logo is still finishing
+    _textCtrl.forward();
     
-    // 3. Wait for BOTH animations and system init to finish
     await Future.wait([
       initFuture,
-      Future.delayed(const Duration(milliseconds: 1200)), // Minimum show time
+      Future.delayed(const Duration(milliseconds: 1200)),
     ]);
 
     if (!mounted) return;
     await _exitCtrl.forward();
     if (!mounted) return;
 
-    // Use hardcoded logic from main or real auth
-    const bool presentationBypass = true; // Matches user's previous preference
+    const bool presentationBypass = true;
     
-    final next = presentationBypass || (ApiService.userId != null)
+    final next = presentationBypass
         ? const MainShell()
         : const OnboardingFlow();
 
