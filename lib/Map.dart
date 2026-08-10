@@ -498,13 +498,13 @@ class _MapScreenState extends State<MapScreen> {
             ),
             if (_selectedReport != null)
               Positioned(
-                bottom: 90,
+                bottom: 118,
                 left: 16,
                 right: 16,
                 child: _buildSelectedReportCard(_selectedReport!),
               ),
             Positioned(
-              bottom: 13,
+              bottom: 108,
               left: 10,
               right: 78,
               child: SingleChildScrollView(

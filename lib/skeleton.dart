@@ -89,33 +89,38 @@ class ProfileSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: const Color(0xFFF7F8FA),
       body: Shimmer.fromColors(
         baseColor: Colors.grey.shade300,
         highlightColor: Colors.grey.shade100,
         child: SingleChildScrollView(
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(28, topInset + 36, 28, 24),
           child: Column(
             children: [
-              Container(
-                width: double.infinity,
-                height: 180,
-                color: Colors.white,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SkeletonBox(height: 18, width: 100),
-                    const SizedBox(height: 12),
-                    ...List.generate(2, (_) => const ReportCardSkeleton()),
-                    const SizedBox(height: 12),
-                    const SkeletonBox(height: 18, width: 110),
-                    const SizedBox(height: 12),
-                    ...List.generate(3, (_) => const ReportCardSkeleton()),
-                  ],
+              const SkeletonBox(height: 120, width: 120, radius: 60),
+              const SizedBox(height: 18),
+              const SkeletonBox(height: 30, width: 120),
+              const SizedBox(height: 10),
+              const SkeletonBox(height: 14, width: 140),
+              const SizedBox(height: 8),
+              const SkeletonBox(height: 12, width: 160),
+              const SizedBox(height: 40),
+              ...List.generate(
+                5,
+                (_) => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 15),
+                  child: Row(
+                    children: [
+                      SkeletonBox(height: 22, width: 22, radius: 6),
+                      SizedBox(width: 16),
+                      Expanded(child: SkeletonBox(height: 16)),
+                      SizedBox(width: 12),
+                      SkeletonBox(height: 16, width: 16, radius: 4),
+                    ],
+                  ),
                 ),
               ),
             ],

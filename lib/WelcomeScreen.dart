@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/OnboardingFlow.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 
-/// Animated splash / welcome that then hands off to onboarding or the app.
+/// Instagram / SeeClickFix-style load splash: logo + small spinner until ready.
 class WelcomeScreen extends StatefulWidget {
-  /// When true (returning session), keep splash brief — no full brand sequence.
+  /// Kept for call-site compat; routing still uses live auth/session state.
   final bool alreadySignedIn;
 
   const WelcomeScreen({super.key, this.alreadySignedIn = false});
@@ -16,85 +17,24 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen>
-    with TickerProviderStateMixin {
-  static const _blue = Color(0xFF2196F3);
-  static const _deep = Color(0xFF1565C0);
-  static const _ink = Color(0xFF152033);
-
-  late final AnimationController _logoCtrl;
-  late final AnimationController _textCtrl;
-  late final AnimationController _exitCtrl;
-
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
-  late final Animation<double> _textFade;
-  late final Animation<Offset> _textSlide;
-  late final Animation<double> _exitFade;
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  static const _bg = Color(0xFFF7F8FA);
+  static const _ink = Color(0xFF111827);
 
   @override
   void initState() {
     super.initState();
-
-    _logoCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _textCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _exitCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 450),
-    );
-
-    _logoScale = CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutBack);
-    _logoFade = CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOut);
-
-    _textFade = CurvedAnimation(parent: _textCtrl, curve: Curves.easeOut);
-    _textSlide = Tween<Offset>(
-      begin: const Offset(0, 0.25),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _textCtrl, curve: Curves.easeOutCubic));
-
-    _exitFade = Tween<double>(begin: 1, end: 0).animate(
-      CurvedAnimation(parent: _exitCtrl, curve: Curves.easeIn),
-    );
-
-    _runSequence();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
+    _bootstrap();
   }
 
   bool get _isSignedIn =>
       ApiService.userId != null || AuthService.isSignedIn;
 
-  Future<void> _runSequence() async {
-    final initFuture = _ensureInitialized();
-
-    if (widget.alreadySignedIn) {
-      // Returning user: show brand immediately, only wait for init + short hold.
-      _logoCtrl.value = 1;
-      _textCtrl.value = 1;
-      await Future.wait([
-        initFuture,
-        Future.delayed(const Duration(milliseconds: 450)),
-      ]);
-    } else {
-      // First-time / signed-out: full welcome animation.
-      _logoCtrl.forward();
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
-
-      _textCtrl.forward();
-
-      await Future.wait([
-        initFuture,
-        Future.delayed(const Duration(milliseconds: 1200)),
-      ]);
-    }
-
-    if (!mounted) return;
-    await _exitCtrl.forward();
+  Future<void> _bootstrap() async {
+    await _ensureInitialized();
     if (!mounted) return;
 
     final next = _isSignedIn ? const MainShell() : const OnboardingFlow();
@@ -104,7 +44,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         pageBuilder: (_, __, ___) => next,
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: const Duration(milliseconds: 280),
       ),
     );
   }
@@ -115,98 +55,39 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         await dotenv.load(fileName: 'assets/.env', isOptional: true);
       }
       await AuthService.initialize();
-      if (!_isSignedIn) {
-        await ApiService.loadSession();
-      }
+      await ApiService.loadSession();
     } catch (e) {
       debugPrint('Init error: $e');
     }
   }
 
   @override
-  void dispose() {
-    _logoCtrl.dispose();
-    _textCtrl.dispose();
-    _exitCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.sizeOf(context).height * 0.18;
+
     return Scaffold(
-      body: FadeTransition(
-        opacity: _exitFade,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE3F2FD), Color(0xFFF4F7FB), Colors.white],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: SafeArea(
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: EdgeInsets.only(top: topPad),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ScaleTransition(
-                  scale: _logoScale,
-                  child: FadeTransition(
-                    opacity: _logoFade,
-                    child: Container(
-                      width: 108,
-                      height: 108,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [_blue, _deep],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _blue.withValues(alpha: 0.35),
-                            blurRadius: 28,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.map_rounded,
-                        color: Colors.white,
-                        size: 52,
-                      ),
-                    ),
-                  ),
+                Image.asset(
+                  'assets/images/splash_logo.png',
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 28),
-                SlideTransition(
-                  position: _textSlide,
-                  child: FadeTransition(
-                    opacity: _textFade,
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Street Sync',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            color: _ink,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Your streets. Your voice.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: _ink.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: _ink,
                   ),
                 ),
               ],

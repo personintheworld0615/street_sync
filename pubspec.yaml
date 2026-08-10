@@ -48,6 +48,8 @@ dependencies:
   http: ^1.2.2
   google_sign_in: ^7.2.0
   google_fonts: ^8.2.1
+  flutter_native_splash: ^2.4.6
+  flutter_svg: ^2.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +60,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+flutter_native_splash:
+  color: "#F7F8FA"
+  image: assets/images/splash_logo.png
+  android: true
+  ios: true
+  android_12:
+    color: "#F7F8FA"
+    image: assets/images/splash_logo.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -82,6 +93,8 @@ flutter:
     - assets/images/markers/Small_Purple.png
     - assets/images/markers/Big_Purple.png
     - assets/images/home_hero.png
+    - assets/images/splash_logo.png
+    - assets/images/google_g.svg
     - assets/.env
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -339,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               header(),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
