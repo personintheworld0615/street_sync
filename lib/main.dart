@@ -62,7 +62,8 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
 
   @override
   Widget build(BuildContext context) {
-    final signedIn = ApiService.userId != null || AuthService.isSignedIn;
+    final signedIn = ApiService.userId != null ||
+        (AuthService.isConfigured && AuthService.isSignedIn);
 
     return MaterialApp(
       navigatorKey: _navKey,

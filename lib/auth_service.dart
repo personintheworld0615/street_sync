@@ -21,7 +21,10 @@ class AuthService {
 
   static String? get accessToken => session?.accessToken;
 
-  static bool get isSignedIn => session != null;
+  static bool get isSignedIn {
+    if (!_initialized) return false;
+    return session != null;
+  }
 
   static bool _initialized = false;
   static bool _googleInitialized = false;
@@ -68,11 +71,6 @@ class AuthService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    if (Supabase.instance.isInitialized) {
-      _initialized = true;
-      unawaited(_ensureGoogleInitialized());
-      return;
-    }
 
     final url = supabaseUrl;
     final anon = supabaseAnonKey;
