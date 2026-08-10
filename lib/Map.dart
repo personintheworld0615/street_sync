@@ -504,9 +504,9 @@ class _MapScreenState extends State<MapScreen> {
                 child: _buildSelectedReportCard(_selectedReport!),
               ),
             Positioned(
-              bottom: 20,
+              bottom: 13,
               left: 10,
-              right: 60,
+              right: 78,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(

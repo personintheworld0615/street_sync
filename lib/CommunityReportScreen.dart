@@ -54,9 +54,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   String _transcript = '';
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
-  late AnimationController _comingSoonController;
-  late Animation<double> _comingSoonPulse;
-
   bool get _busy => _submitting || _savingDraft;
   Timer? _debounce;
 
@@ -67,7 +64,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     _titleController.dispose();
     _descriptionController.dispose();
     _animationController.dispose();
-    _comingSoonController.dispose();
     _speech.stop();
     super.dispose();
   }
@@ -155,13 +151,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _comingSoonController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-    _comingSoonPulse = Tween<double>(begin: 0.45, end: 1.0).animate(
-      CurvedAnimation(parent: _comingSoonController, curve: Curves.easeInOut),
-    );
     _initSpeech();
     _gotouser();
   }
@@ -184,22 +173,42 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: SizedBox(
-        width: double.infinity,
-        height: 220,
-        child: Center(
-          child: FadeTransition(
-            opacity: _comingSoonPulse,
-            child: const Text(
-              'Coming soon',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF64B5F6), 
-                letterSpacing: -0.3,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                size: 28,
+                color: _blue,
               ),
             ),
-          ),
+            const SizedBox(height: 16),
+            const Text(
+              'Coming soon',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Auto will fill in report details from your photo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -656,7 +665,19 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     final isSelected = _reportMode == mode;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _reportMode = mode),
+        onTap: () async {
+          if (_reportMode == mode) return;
+          if (_reportMode == 'voice' && _isRecording) {
+            await _speech.stop();
+            _animationController.stop();
+            _animationController.reset();
+            _isRecording = false;
+            _statusText = _transcript.isEmpty
+                ? 'Tap the microphone to start recording'
+                : 'Recording stopped. Review below or tap to re-record.';
+          }
+          setState(() => _reportMode = mode);
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1376,6 +1397,17 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           _Pressable(
             onTap: () async {
               if (_busy) return;
+
+              if (_reportMode == 'voice' && _isRecording) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please stop recording before submitting.'),
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
 
               // If in voice mode, analyze the transcript first to auto-fill title/desc/cat/sev
               if (_reportMode == 'voice' && _transcript.isNotEmpty) {

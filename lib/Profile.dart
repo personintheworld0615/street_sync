@@ -2,11 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:street_sync/WelcomeScreen.dart';
+import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/ReportDetails.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
@@ -299,10 +300,14 @@ class _ProfileState extends State<Profile> {
               onTap: () async {
                 await ApiService.logout();
                 if (!mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                  (_) => false,
-                );
+                // When Supabase is live, main.dart's signedOut listener routes
+                // to Login. Handle the offline / unconfigured case here.
+                if (!AuthService.isConfigured) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (_) => false,
+                  );
+                }
               },
             ),
             Divider(color: Colors.grey[200], height: 1),
@@ -352,10 +357,12 @@ class _ProfileState extends State<Profile> {
       return;
     }
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-      (_) => false,
-    );
+    if (!AuthService.isConfigured) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
   }
 
   Widget _prefRow({
@@ -749,13 +756,7 @@ class _ProfileState extends State<Profile> {
                   color: Colors.white,
                 ),
               ),
-              CircleAvatar(
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.settings, color: Colors.white, size: 20),
-                ),
-              ),
+              
             ],
           ),
           const SizedBox(height: 20),
@@ -1022,8 +1023,9 @@ class _ProfileState extends State<Profile> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(top: 3),
+      padding: const EdgeInsets.only(top: 10),
       child: GridView.count(
+        padding: EdgeInsets.zero,
         crossAxisCount: 3, // 3 columns
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
