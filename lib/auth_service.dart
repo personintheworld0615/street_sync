@@ -67,6 +67,13 @@ class AuthService {
       dotenv.maybeGet('GOOGLE_IOS_CLIENT_ID')?.trim() ?? '';
 
   static Future<void> initialize() async {
+    if (_initialized) return;
+    if (Supabase.instance.isInitialized) {
+      _initialized = true;
+      unawaited(_ensureGoogleInitialized());
+      return;
+    }
+
     final url = supabaseUrl;
     final anon = supabaseAnonKey;
     if (url.isEmpty || anon.isEmpty) {

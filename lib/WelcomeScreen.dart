@@ -5,9 +5,12 @@ import 'package:street_sync/OnboardingFlow.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 
-/// Animated splash / welcome that then hands off to onboarding.
+/// Animated splash / welcome that then hands off to onboarding or the app.
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key});
+  /// When true (returning session), keep splash brief — no full brand sequence.
+  final bool alreadySignedIn;
+
+  const WelcomeScreen({super.key, this.alreadySignedIn = false});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -62,29 +65,39 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _runSequence();
   }
 
-  Future<void> _runSequence() async {
-    final initFuture = _initializeSystem();
+  bool get _isSignedIn =>
+      ApiService.userId != null || AuthService.isSignedIn;
 
-    _logoCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    
-    _textCtrl.forward();
-    
-    await Future.wait([
-      initFuture,
-      Future.delayed(const Duration(milliseconds: 1200)),
-    ]);
+  Future<void> _runSequence() async {
+    final initFuture = _ensureInitialized();
+
+    if (widget.alreadySignedIn) {
+      // Returning user: show brand immediately, only wait for init + short hold.
+      _logoCtrl.value = 1;
+      _textCtrl.value = 1;
+      await Future.wait([
+        initFuture,
+        Future.delayed(const Duration(milliseconds: 450)),
+      ]);
+    } else {
+      // First-time / signed-out: full welcome animation.
+      _logoCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+
+      _textCtrl.forward();
+
+      await Future.wait([
+        initFuture,
+        Future.delayed(const Duration(milliseconds: 1200)),
+      ]);
+    }
 
     if (!mounted) return;
     await _exitCtrl.forward();
     if (!mounted) return;
 
-    const bool presentationBypass = true;
-    
-    final next = presentationBypass
-        ? const MainShell()
-        : const OnboardingFlow();
+    final next = _isSignedIn ? const MainShell() : const OnboardingFlow();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -96,21 +109,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
-  Future<void> _initializeSystem() async {
+  Future<void> _ensureInitialized() async {
     try {
-      await dotenv.load(fileName: 'assets/.env', isOptional: true);
+      if (dotenv.env.isEmpty) {
+        await dotenv.load(fileName: 'assets/.env', isOptional: true);
+      }
       await AuthService.initialize();
-      await ApiService.loadSession();
-      
-      // Setup mock user for bypass mode if needed
-      if (ApiService.currentUser == null) {
-        ApiService.currentUser = {
-          'user_id': 1,
-          'first_name': 'Krish',
-          'last_name': 'Sinha',
-          'email': 'krishworld432@gmail.com',
-          'access_token': 'mock-token-for-bypass',
-        };
+      if (!_isSignedIn) {
+        await ApiService.loadSession();
       }
     } catch (e) {
       debugPrint('Init error: $e');

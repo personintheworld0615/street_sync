@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/ResetPasswordScreen.dart';
 import 'package:street_sync/WelcomeScreen.dart';
 import 'package:street_sync/api_service.dart';
@@ -11,11 +11,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: 'assets/.env', isOptional: true);
+    await AuthService.initialize();
+    await ApiService.loadSession();
+  } catch (e) {
+    debugPrint('Startup init error: $e');
+  }
   runApp(const StreetSyncApp());
 }
-
-
-
 
 class StreetSyncApp extends StatefulWidget {
   const StreetSyncApp({super.key});
@@ -40,11 +44,11 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
           return;
         }
         if (data.event == AuthChangeEvent.signedOut) {
+          ApiService.currentUser = null;
           _navKey.currentState?.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
             (_) => false,
           );
-          setState(() {});
         }
       });
     }
@@ -58,14 +62,7 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
 
   @override
   Widget build(BuildContext context) {
-    bool signedIn = false;
-    if (AuthService.isConfigured) {
-      try {
-        signedIn = ApiService.userId != null || AuthService.isSignedIn;
-      } catch (e) {
-        debugPrint('Auth check error: $e');
-      }
-    }
+    final signedIn = ApiService.userId != null || AuthService.isSignedIn;
 
     return MaterialApp(
       navigatorKey: _navKey,
@@ -74,7 +71,7 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2196F3)),
         useMaterial3: true,
       ),
-      home: signedIn ? const MainShell() : const WelcomeScreen(),
+      home: WelcomeScreen(alreadySignedIn: signedIn),
     );
   }
 }
