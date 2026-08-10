@@ -7,10 +7,19 @@ import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.onOpenOnMap});
+  const HomeScreen({
+    super.key,
+    this.onOpenOnMap,
+    this.statsTourKey,
+    this.quickActionsTourKey,
+    this.recentReportsTourKey,
+  });
 
   /// Opens the Map tab; pass [reportId] to focus that pin.
   final void Function({int? reportId})? onOpenOnMap;
+  final GlobalKey? statsTourKey;
+  final GlobalKey? quickActionsTourKey;
+  final GlobalKey? recentReportsTourKey;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -160,11 +169,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchReports() => _loadReports(forceNetwork: true);
 
-  TextStyle get _sectionTitle => const TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w700,
-        color: _ink,
-      );
+  TextStyle get _sectionTitle =>
+      const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _ink);
 
   String _formatTime(String timeStr) {
     try {
@@ -201,24 +207,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
                     Text('Quick actions', style: _sectionTitle),
                     const SizedBox(height: 12),
-                    twocardsection(context),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Recent reports', style: _sectionTitle),
-                        const Text(
-                          'Near you',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: _muted,
-                          ),
-                        ),
-                      ],
+                    KeyedSubtree(
+                      key: widget.quickActionsTourKey,
+                      child: twocardsection(context),
                     ),
-                    const SizedBox(height: 12),
-                    _buildCategoryFilters(),
+                    const SizedBox(height: 20),
+                    KeyedSubtree(
+                      key: widget.recentReportsTourKey,
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Recent reports', style: _sectionTitle),
+                              const Text(
+                                'Near you',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: _muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCategoryFilters(),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     if (_isLoading)
                       const ReportListSkeleton(count: 4)
@@ -227,16 +243,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         (r) => _buildReportCard(
                           icon: _iconFromCat(r['category']),
                           severity: r['severity'] as String,
-                          name: (r['title'] as String?)?.trim().isNotEmpty == true
+                          name:
+                              (r['title'] as String?)?.trim().isNotEmpty == true
                               ? r['title'] as String
                               : (r['description'] as String? ?? 'Report'),
                           location: r['location'] as String,
                           time: _formatTime(r['time'] as String),
                           onTap: () {
                             final raw = r['id'];
-                            final id = raw is int
-                                ? raw
-                                : int.tryParse('$raw');
+                            final id = raw is int ? raw : int.tryParse('$raw');
                             widget.onOpenOnMap?.call(reportId: id);
                           },
                         ),
@@ -260,7 +275,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _blue,
                               foregroundColor: Colors.white,
-                              disabledBackgroundColor: _blue.withValues(alpha: 0.6),
+                              disabledBackgroundColor: _blue.withValues(
+                                alpha: 0.6,
+                              ),
                               disabledForegroundColor: Colors.white,
                               elevation: 0,
                               padding: const EdgeInsets.symmetric(
@@ -275,7 +292,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w400,
                               ),
                             ),
-                            child: Text(_isLoadingMore ? 'Loading...' : 'Show more',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold),),
+                            child: Text(
+                              _isLoadingMore ? 'Loading...' : 'Show more',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -297,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: options.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final label = options[i];
           final selected = (_selectedCat ?? 'All') == label;
@@ -323,9 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 13,
             ),
-            side: BorderSide(
-              color: selected ? _blue : Colors.grey.shade300,
-            ),
+            side: BorderSide(color: selected ? _blue : Colors.grey.shade300),
             backgroundColor: Colors.white,
             showCheckmark: false,
             shape: RoundedRectangleBorder(
@@ -456,16 +477,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 12),
         _buildActionCard(
-          color:  Colors.green,
+          color: Colors.green,
           icon: Icons.camera_alt,
           title: 'Photo report',
           subtitle: 'Take a picture',
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => CommunityReportScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => CommunityReportScreen()),
             );
           },
         ),
@@ -526,55 +545,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget threecard() {
-    return Row(
-      children: [
-        _statCard(
-          icon: Icons.warning_amber_rounded,
-          iconColor: Colors.red,
-          value: _nearbyCount.toString(),
-          label: 'Nearby',
-          onTap: () => _openStatusReports(
-            filter: 'nearby',
-            title: 'Nearby',
+    return KeyedSubtree(
+      key: widget.statsTourKey,
+      child: Row(
+        children: [
+          _statCard(
+            icon: Icons.warning_amber_rounded,
+            iconColor: Colors.red,
+            value: _nearbyCount.toString(),
+            label: 'Nearby',
+            onTap: () => _openStatusReports(filter: 'nearby', title: 'Nearby'),
           ),
-        ),
-        const SizedBox(width: 10),
-        _statCard(
-          icon: Icons.build_rounded,
-          iconColor: Colors.orange,
-          value: _inProgressCount.toString(),
-          label: 'In progress',
-          onTap: () => _openStatusReports(
-            filter: 'in_progress',
-            title: 'In progress',
+          const SizedBox(width: 10),
+          _statCard(
+            icon: Icons.build_rounded,
+            iconColor: Colors.orange,
+            value: _inProgressCount.toString(),
+            label: 'In progress',
+            onTap: () =>
+                _openStatusReports(filter: 'in_progress', title: 'In progress'),
           ),
-        ),
-        const SizedBox(width: 10),
-        _statCard(
-          icon: Icons.check_circle_outline,
-          iconColor: Colors.green,
-          value: _resolvedCount.toString(),
-          label: 'Resolved',
-          onTap: () => _openStatusReports(
-            filter: 'resolved',
-            title: 'Resolved',
+          const SizedBox(width: 10),
+          _statCard(
+            icon: Icons.check_circle_outline,
+            iconColor: Colors.green,
+            value: _resolvedCount.toString(),
+            label: 'Resolved',
+            onTap: () =>
+                _openStatusReports(filter: 'resolved', title: 'Resolved'),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  void _openStatusReports({
-    required String filter,
-    required String title,
-  }) {
+  void _openStatusReports({required String filter, required String title}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ViewReportsScreen(
-          filter: filter,
-          title: title,
-        ),
+        builder: (_) => ViewReportsScreen(filter: filter, title: title),
       ),
     );
   }
