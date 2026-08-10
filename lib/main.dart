@@ -20,7 +20,7 @@ Future<void> main() async {
   }
   runApp(const StreetSyncApp());
 }
-
+//stuff pls take this
 class StreetSyncApp extends StatefulWidget {
   const StreetSyncApp({super.key});
 
