@@ -137,17 +137,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
 
-    final hasFeed = cachedReports != null && cachedReports.isNotEmpty;
+    final hasCached = cachedReports != null;
 
     setState(() {
-      if (hasFeed) {
+      if (hasCached) {
         _recentReports = List<dynamic>.from(cachedReports);
         _hasMore = cachedHasMore ?? false;
         _isLoading = false;
       } else {
         _recentReports = [];
         _hasMore = cachedHasMore ?? false;
-        // Nothing to show yet — keep / start skeleton until network paints.
+        // Cache miss — keep / start skeleton until network paints.
         _isLoading = true;
       }
       if (cachedStats != null) {
@@ -257,10 +257,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Pull-to-refresh: wipe report caches, skeleton, load active chip first,
   /// then warm every other chip into cache in the background.
-  ///
-  /// Active-chip-first is faster *to feel ready* than loading everything then
-  /// splitting — the feed API is already per-category + paged, so "All" isn't
-  /// just the sum of the other chips' first pages.
   Future<void> _fetchReports() async {
     final gen = ++_loadGen;
     final activeCat = _selectedCat;
