@@ -26,10 +26,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     with TickerProviderStateMixin {
   LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
   Set<Marker> _markers = {};
-  static const _blue = Color(0xFF2196F3);
-  static const _pageBg = Color(0xFFF4F7FB);
-  static const _ink = Color(0xFF152033);
-  static const _muted = Color(0xFF5B677A);
+  static const _pageBg = Color(0xFFF7F8FA);
+  static const _ink = Color(0xFF111827);
+  static const _muted = Color(0xFF757575);
+  static const _cta = Color(0xFF111827);
+  static const _fieldBorder = Color(0xFFE5E7EB);
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
   String? _selectedCategory;
@@ -50,6 +51,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   final SpeechToText _speech = SpeechToText();
   bool _speechReady = false;
   bool _isRecording = false;
+  bool _locationLoading = true;
+  String _locationLabel = 'Finding location…';
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
   late AnimationController _animationController;
@@ -83,10 +86,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
         ),
         title: const Text(
-          'Report',
+          'New report',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
+            color: _ink,
           ),
         ),
       ),
@@ -97,34 +101,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Camera report',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: _ink,
-                        letterSpacing: -0.6,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Capture and report issues as you walk',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: _muted,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
                     _buildPhotoCard(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     _buildModeSelector(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     if (_reportMode == 'manual')
                       _buildManualCard()
                     else if (_reportMode == 'voice')
@@ -141,6 +125,19 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       ),
     );
   }
+
+  Widget _section({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _fieldBorder),
+      ),
+      child: child,
+    );
+  }
+
   @override
   void initState(){
     super.initState();
@@ -169,10 +166,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     ],);
   }
   Widget _buildComingSoonforAI() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return _section(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
         child: Column(
@@ -180,13 +174,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: _blue.withValues(alpha: 0.1),
+                color: _cta.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(
                 Icons.auto_awesome_rounded,
                 size: 28,
-                color: _blue,
+                color: _cta,
               ),
             ),
             const SizedBox(height: 16),
@@ -215,107 +209,164 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildVoiceCard() {
-    final accent = _isRecording ? Colors.red : _blue;
+    final accent = _isRecording ? const Color(0xFFE11D48) : _cta;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+    return Column(
+      children: [
+        _buildLocationPill(),
+        const SizedBox(height: 18),
+        Text(
+          _statusText,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: _ink,
+            height: 1.35,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        ),
+        const SizedBox(height: 24),
+        ScaleTransition(
+          scale: _pulseAnimation,
+          child: GestureDetector(
+            onTap: _toggleRecording,
+            child: Container(
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isRecording ? 'Recording' : 'Ready',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: accent,
-                    ),
+                color: accent,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.22),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _statusText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: _ink,
-                height: 1.35,
+              child: Icon(
+                _isRecording ? Icons.stop_rounded : Icons.mic_none_rounded,
+                size: 48,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(height: 28),
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: GestureDetector(
-                onTap: _toggleRecording,
-                child: Container(
-                  width: 132,
-                  height: 132,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.35),
-                        blurRadius: 28,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                    size: 56,
-                    color: Colors.white,
-                  ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          _isRecording ? 'Listening...' : 'Tap to record',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _muted,
+          ),
+        ),
+        const SizedBox(height: 22),
+        _buildTranscriptPanel(),
+      ],
+    );
+  }
+
+  Widget _buildLocationPill() {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openLocationPicker,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _fieldBorder),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: _ink,
                 ),
-              ),
+                const SizedBox(width: 6),
+                if (_locationLoading)
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      color: _muted,
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    child: Text(
+                      _locationLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _ink,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              _isRecording ? 'Tap to stop' : 'Tap to record',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 28),
-            _buildTranscriptPanel(),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<String> _shortLabelFromCoords(double lat, double lng) async {
+    try {
+      final places = await placemarkFromCoordinates(lat, lng);
+      if (places.isEmpty) return 'Pinned location';
+      final p = places.first;
+      if (p.locality?.isNotEmpty == true) return p.locality!;
+      if (p.subLocality?.isNotEmpty == true) return p.subLocality!;
+      if (p.administrativeArea?.isNotEmpty == true) {
+        return p.administrativeArea!;
+      }
+      return 'Pinned location';
+    } catch (_) {
+      return 'Pinned location';
+    }
+  }
+
+  Future<void> _applyPickedLocation(LatLng latLng) async {
+    final label = await _shortLabelFromCoords(latLng.latitude, latLng.longitude);
+    if (!mounted) return;
+    setState(() {
+      position = latLng;
+      _markers = {
+        Marker(markerId: const MarkerId('report'), position: latLng),
+      };
+      _ready = true;
+      _locationLoading = false;
+      _locationLabel = label;
+    });
+    await _controller?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
+  }
+
+  Future<void> _openLocationPicker() async {
+    var draft = position;
+    final picked = await showModalBottomSheet<LatLng>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return _LocationPickerSheet(
+          initial: position,
+          onChanged: (latLng) => draft = latLng,
+          onConfirm: () => Navigator.pop(ctx, draft),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    await _applyPickedLocation(picked);
   }
 
   Widget _buildTranscriptPanel() {
@@ -326,13 +377,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       constraints: const BoxConstraints(minHeight: 120),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: _pageBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasText
-              ? _blue.withValues(alpha: 0.25)
-              : Colors.grey.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: _fieldBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,18 +387,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           Row(
             children: [
               Icon(
-                Icons.notes_rounded,
+                Icons.graphic_eq_rounded,
                 size: 16,
-                color: hasText ? _blue : _muted,
+                color: hasText ? _ink : _muted,
               ),
               const SizedBox(width: 6),
               Text(
-                'Description',
+                'Live transcript',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
-                  color: hasText ? _blue : _muted,
+                  color: hasText ? _ink : _muted,
                 ),
               ),
             ],
@@ -477,10 +524,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
   Widget _buildPhotoCard() {
     if (_image == null) {
-      return Card(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      return _section(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
           child: Column(
@@ -492,13 +536,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: _blue.withValues(alpha: 0.1),
+                        color: _cta.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
                         Icons.add_a_photo_outlined,
                         size: 40,
-                        color: _blue,
+                        color: _cta,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -506,15 +550,16 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                       'Take a photo',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
+                        color: _ink,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    const Text(
                       'Tap to capture or upload',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: _muted,
                       ),
                     ),
                   ],
@@ -526,13 +571,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   Expanded(
                     child: Divider(color: Colors.grey[300], thickness: 1),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       'or',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[500],
+                        color: _muted,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -549,21 +594,21 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: _blue.withValues(alpha: 0.08),
+                    color: _pageBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _blue.withValues(alpha: 0.25)),
+                    border: Border.all(color: _fieldBorder),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.file_upload_outlined, size: 22, color: _blue),
+                      Icon(Icons.file_upload_outlined, size: 22, color: _ink),
                       SizedBox(width: 8),
                       Text(
                         'Upload from library',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: _blue,
+                          color: _ink,
                         ),
                       ),
                     ],
@@ -633,7 +678,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: _fieldBorder),
       ),
       child: Row(
         children: [
@@ -682,7 +727,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? _blue : Colors.transparent,
+            color: isSelected ? _cta : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -710,27 +755,39 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Future<void> _gotouser() async{
-    final userLocation = await Geolocator.getCurrentPosition();
-    final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
-    setState(() {
-       position = userLatLng;
-       _markers = {
-         Marker(
-           markerId: const MarkerId('report'),
-           position: userLatLng,
-         ),
-       };
-       _ready = true;
-    });
-    await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
+    try {
+      final userLocation = await Geolocator.getCurrentPosition();
+      final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
+      final label = await _shortLabelFromCoords(
+        userLatLng.latitude,
+        userLatLng.longitude,
+      );
+      if (!mounted) return;
+      setState(() {
+         position = userLatLng;
+         _markers = {
+           Marker(
+             markerId: const MarkerId('report'),
+             position: userLatLng,
+           ),
+         };
+         _ready = true;
+         _locationLoading = false;
+         _locationLabel = label;
+      });
+      await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _locationLoading = false;
+        _locationLabel = 'Set location';
+      });
+    }
   }
 
   Widget _buildLocationCard(){
-    return  Card(
-     color: Colors.white,
-     elevation: 2,
-     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-     child: Padding(
+    return _section(
+      child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -765,15 +822,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 },
                 onTap: (latLng) {
                   FocusScope.of(context).unfocus();
-                  setState(() {
-                    position = latLng;
-                    _markers = {
-                      Marker(
-                        markerId: const MarkerId('report'),
-                        position: latLng,
-                      ),
-                    };
-                  });
+                  _applyPickedLocation(latLng);
                 },
               ),
             ),
@@ -811,10 +860,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildCategoryCard() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -917,10 +963,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       curve: Curves.easeOutCubic,
       height: 88,
       decoration: BoxDecoration(
-        color: selected ? _blue.withValues(alpha: 0.1) : Colors.grey[50],
+        color: selected ? _cta.withValues(alpha: 0.08) : Colors.white,
         border: Border.all(
-          color: selected ? _blue : Colors.grey[300]!,
-          width: selected ? 1.8 : 1,
+          color: selected ? _cta : _fieldBorder,
+          width: selected ? 1.6 : 1,
         ),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -939,7 +985,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     Icon(
                       icon,
                       size: 26,
-                      color: selected ? _blue : _muted,
+                      color: selected ? _cta : _muted,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -950,7 +996,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                         fontSize: 14,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600,
-                        color: selected ? _blue : Colors.grey[800],
+                        color: selected ? _cta : _ink,
                       ),
                     ),
                   ],
@@ -968,7 +1014,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               child: Icon(
                 Icons.info_outline,
                 size: 16,
-                color: selected ? _blue : Colors.grey[500],
+                color: selected ? _cta : Colors.grey[500],
               ),
             ),
           ),
@@ -978,10 +1024,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildTitleCard() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1017,7 +1060,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     width: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: _blue,
+                      color: _cta,
                     ),
                   )
                 else
@@ -1025,7 +1068,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: _blue.withValues(alpha: 0.1),
+                      color: _cta.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
@@ -1033,7 +1076,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: _blue,
+                        color: _cta,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -1071,7 +1114,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.auto_awesome_rounded, color: _blue),
+            Icon(Icons.auto_awesome_rounded, color: _cta),
             SizedBox(width: 10),
             Text('AI Title Assist'),
           ],
@@ -1093,10 +1136,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildDescriptionCard() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1188,11 +1228,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     }
   }
     Widget _buildSeverityCard() {
-      return Card(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
+      return _section(
+      child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1236,10 +1273,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       );
     }
   Widget _buildSeverityCardNew() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1259,8 +1293,12 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _blue,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      backgroundColor: _cta,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                     onPressed: () {
                       if (_selectedCategory == null) {
@@ -1495,15 +1533,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               height: 52,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _busy ? _blue.withValues(alpha: 0.5) : _blue,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: _blue.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: _busy ? _cta.withValues(alpha: 0.45) : _cta,
+                borderRadius: BorderRadius.circular(999),
               ),
               child: _submitting
                   ? const SizedBox(
@@ -1515,7 +1546,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                       ),
                     )
                   : const Text(
-                      'Submit Report',
+                      'Review',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1531,36 +1562,37 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             child: OutlinedButton(
               onPressed: _busy ? null : _saveAsDraft,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.grey[400]!),
+                foregroundColor: _ink,
+                side: const BorderSide(color: _fieldBorder),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
               child: _savingDraft
-                  ? SizedBox(
+                  ? const SizedBox(
                       height: 22,
                       width: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: Colors.grey[800],
+                        color: _ink,
                       ),
                     )
-                  : Row(
+                  : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.bookmark_add_outlined,
                           size: 20,
-                          color: Colors.grey[800],
+                          color: _ink,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Text(
                           'Save as draft',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                            color: _ink,
                           ),
                         ),
                       ],
@@ -1625,6 +1657,134 @@ class _PressableState extends State<_Pressable> {
           duration: const Duration(milliseconds: 120),
           child: widget.child,
         ),
+      ),
+    );
+  }
+}
+
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet({
+    required this.initial,
+    required this.onChanged,
+    required this.onConfirm,
+  });
+
+  final LatLng initial;
+  final ValueChanged<LatLng> onChanged;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  late LatLng _position;
+  late Set<Marker> _markers;
+
+  @override
+  void initState() {
+    super.initState();
+    _position = widget.initial;
+    _markers = {
+      Marker(markerId: const MarkerId('report'), position: _position),
+    };
+  }
+
+  void _setPosition(LatLng latLng) {
+    setState(() {
+      _position = latLng;
+      _markers = {
+        Marker(markerId: const MarkerId('report'), position: latLng),
+      };
+    });
+    widget.onChanged(latLng);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.62,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD1D5DB),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Choose location',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap the map to move the pin',
+            style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: GoogleMap(
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<OneSequenceGestureRecognizer>(
+                      () => EagerGestureRecognizer(),
+                    ),
+                  },
+                  initialCameraPosition: CameraPosition(
+                    target: widget.initial,
+                    zoom: 15,
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: false,
+                  markers: _markers,
+                  onTap: _setPosition,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottom),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: widget.onConfirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111827),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: const Text(
+                  'Use this location',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

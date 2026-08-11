@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/ResetPasswordScreen.dart';
 import 'package:street_sync/WelcomeScreen.dart';
@@ -24,7 +25,14 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Startup init error: $e');
   }
-  runApp(const StreetSyncApp());
+  await LiquidGlassWidgets.initialize();
+  runApp(
+    LiquidGlassWidgets.wrap(
+      child: const StreetSyncApp(),
+      adaptiveQuality: true,
+      brightnessResolver: Theme.maybeBrightnessOf,
+    ),
+  );
 }
 
 class StreetSyncApp extends StatefulWidget {

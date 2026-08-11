@@ -50,6 +50,7 @@ dependencies:
   google_fonts: ^8.2.1
   flutter_native_splash: ^2.4.6
   flutter_svg: ^2.2.0
+  liquid_glass_widgets: ^0.29.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

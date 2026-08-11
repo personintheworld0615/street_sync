@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/api_service.dart';
@@ -14,17 +18,20 @@ class VoiceReportScreen extends StatefulWidget {
 
 class _VoiceReportScreenState extends State<VoiceReportScreen>
     with SingleTickerProviderStateMixin {
-  static const _blue = Color(0xFF2196F3);
-  static const _pageBg = Color(0xFFF4F7FB);
-  static const _ink = Color(0xFF152033);
-  static const _muted = Color(0xFF5B677A);
+  static const _pageBg = Color(0xFFF7F8FA);
+  static const _ink = Color(0xFF111827);
+  static const _muted = Color(0xFF757575);
+  static const _cta = Color(0xFF111827);
+  static const _defaultLatLng = LatLng(40.3573, -74.6672);
 
   final SpeechToText _speech = SpeechToText();
   bool _speechReady = false;
   bool _isRecording = false;
   bool _isSubmitting = false;
+  bool _locationLoading = true;
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
+  String _locationLabel = 'Finding location…';
   double? _lat;
   double? _long;
   Future<void>? _locationFuture;
@@ -36,12 +43,13 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1600),
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _initSpeech();
+    _locationFuture = _captureLocation(updateUi: true);
   }
 
   Future<void> _initSpeech() async {
@@ -91,7 +99,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     super.dispose();
   }
 
-  Future<void> _captureLocation() async {
+  Future<void> _captureLocation({bool updateUi = false}) async {
     try {
       var permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -99,15 +107,53 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        if (updateUi && mounted) {
+          setState(() {
+            _locationLoading = false;
+            _locationLabel = 'Set location';
+          });
+        }
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
       _lat = pos.latitude;
       _long = pos.longitude;
+      final label = await _shortLabelFromCoords(pos.latitude, pos.longitude);
+      if (updateUi && mounted) {
+        setState(() {
+          _locationLoading = false;
+          _locationLabel = label;
+        });
+      } else {
+        _locationLabel = label;
+        _locationLoading = false;
+      }
     } catch (_) {
-      // Location is best-effort; recording should still work.
+      if (updateUi && mounted) {
+        setState(() {
+          _locationLoading = false;
+          _locationLabel = 'Set location';
+        });
+      }
     }
   }
+
+  Future<String> _shortLabelFromCoords(double lat, double lng) async {
+    try {
+      final places = await placemarkFromCoordinates(lat, lng);
+      if (places.isEmpty) return 'Pinned location';
+      final p = places.first;
+      if (p.locality?.isNotEmpty == true) return p.locality!;
+      if (p.subLocality?.isNotEmpty == true) return p.subLocality!;
+      if (p.administrativeArea?.isNotEmpty == true) {
+        return p.administrativeArea!;
+      }
+      return 'Pinned location';
+    } catch (_) {
+      return 'Pinned location';
+    }
+  }
+
   String _fixSomeTypeos(String text) {
     return text.replaceAllMapped(
       RegExp(r'\bbottle\b', caseSensitive: false),
@@ -143,14 +189,16 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       }
     }
 
-    // Capture GPS in parallel so it doesn't delay the mic opening.
-    _locationFuture = _captureLocation();
+    // Refresh GPS in parallel if we don't have one yet.
+    if (_lat == null || _long == null) {
+      _locationFuture = _captureLocation(updateUi: true);
+    }
 
     setState(() {
       _transcript = '';
       _isRecording = true;
       _statusText = 'Listening… describe the issue in a few sentences';
-      _animationController.repeat(reverse: true);
+      _animationController.repeat();
     });
 
     await _speech.listen(
@@ -188,11 +236,41 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     }
   }
 
+  Future<void> _openLocationPicker() async {
+    final initial = LatLng(
+      _lat ?? _defaultLatLng.latitude,
+      _long ?? _defaultLatLng.longitude,
+    );
+    var draft = initial;
+
+    final picked = await showModalBottomSheet<LatLng>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return _LocationPickerSheet(
+          initial: initial,
+          onChanged: (latLng) => draft = latLng,
+          onConfirm: () => Navigator.pop(ctx, draft),
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+    final label = await _shortLabelFromCoords(picked.latitude, picked.longitude);
+    if (!mounted) return;
+    setState(() {
+      _lat = picked.latitude;
+      _long = picked.longitude;
+      _locationLabel = label;
+      _locationLoading = false;
+    });
+  }
+
   Future<void> _goToConfirmation() async {
     if (_transcript.isEmpty || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
-      // Finish GPS if still in flight from the mic tap.
       await _locationFuture;
 
       final analysis = await ApiService.analyzeVoiceReport(_transcript);
@@ -225,7 +303,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         ),
       );
     } catch (e) {
-      print('Error in voice report flow: $e');
+      debugPrint('Error in voice report flow: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -244,6 +322,9 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   @override
   Widget build(BuildContext context) {
     final showSubmit = !_isRecording && _transcript.isNotEmpty;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final transcriptH = (screenH * 0.28).clamp(180.0, 260.0);
 
     return Scaffold(
       backgroundColor: _pageBg,
@@ -270,140 +351,246 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         children: [
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Speak the issue',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: _ink,
-                      letterSpacing: -0.6,
-                      height: 1.15,
+                  _buildLocationPill(),
+                  if (!_isRecording &&
+                      _statusText !=
+                          'Tap the microphone to start recording' &&
+                      _statusText !=
+                          'Listening… describe the issue in a few sentences') ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _statusText,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: _muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildMicControl(_cta),
+                        const SizedBox(height: 10),
+                        Text(
+                          _isRecording ? 'Listening...' : 'Tap to record',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _isRecording
+                                ? const Color(0xFF5B6B75)
+                                : _muted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Describe what you see and we will turn it into a report',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _muted,
-                      height: 1.35,
-                    ),
+                  SizedBox(
+                    height: transcriptH,
+                    child: _buildTranscriptPanel(),
                   ),
-                  const SizedBox(height: 16),
-                  Expanded(child: _buildRecordingCard()),
+                  SizedBox(height: showSubmit ? 10 : 20),
                 ],
               ),
             ),
           ),
-          if (showSubmit) _buildSubmitBar(),
+          if (showSubmit) _buildSubmitBar(bottomInset),
         ],
       ),
     );
   }
 
-  Widget _buildRecordingCard() {
-    final accent = _isRecording ? Colors.red : _blue;
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+  Widget _buildLocationPill() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openLocationPicker,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: _ink,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      shape: BoxShape.circle,
-                    ),
+              const SizedBox(width: 6),
+              if (_locationLoading)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.8,
+                    color: _muted,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isRecording ? 'Recording' : 'Ready',
-                    style: TextStyle(
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Text(
+                    _locationLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: accent,
+                      color: _ink,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _statusText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: _ink,
-                height: 1.35,
-              ),
-            ),
-            const Spacer(),
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: GestureDetector(
-                onTap: _toggleRecording,
-                child: Container(
-                  width: 132,
-                  height: 132,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMicControl(Color accent) {
+    const size = 268.0;
+    const core = 138.0;
+    const glassOuter = core + 42; // frosted band edge
+    const outline = size - 6; // outer outline edge
+
+    return GestureDetector(
+      onTap: _toggleRecording,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, _) {
+            final p = _isRecording ? _pulseAnimation.value : 0.0;
+            final ripples = <Widget>[];
+            if (_isRecording) {
+              for (var i = 0; i < 3; i++) {
+                final phase = (p + i / 3.0) % 1.0;
+                ripples.add(
+                  _rippleRing(
+                    diameter: glassOuter + (outline - glassOuter) * phase,
+                    opacity: (1.0 - phase) * 0.42,
+                    stroke: 1.5,
+                  ),
+                );
+              }
+            } else {
+              ripples.addAll([
+                _rippleRing(
+                  diameter: glassOuter + 28,
+                  opacity: 0.10,
+                  stroke: 1.1,
+                ),
+                _rippleRing(
+                  diameter: glassOuter + 52,
+                  opacity: 0.07,
+                  stroke: 1.1,
+                ),
+              ]);
+            }
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Fixed outer outline — pulse targets this edge
+                _rippleRing(
+                  diameter: outline,
+                  opacity: _isRecording ? 0.28 : 0.16,
+                  stroke: 1.4,
+                ),
+                ...ripples,
+                Container(
+                  width: glassOuter,
+                  height: glassOuter,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.88),
+                        const Color(0xFFE4E9F0).withValues(alpha: 0.62),
+                        const Color(0xFFC9D2DE).withValues(alpha: 0.48),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFF9AA7B5).withValues(alpha: 0.5),
+                      width: 1.3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.07),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.4),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: core,
+                  height: core,
                   decoration: BoxDecoration(
                     color: accent,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: accent.withValues(alpha: 0.35),
-                        blurRadius: 28,
-                        spreadRadius: 4,
+                        color: accent.withValues(alpha: 0.24),
+                        blurRadius: 22,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
                   child: Icon(
-                    _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                    size: 56,
+                    _isRecording ? Icons.stop_rounded : Icons.mic_none_rounded,
+                    size: 54,
                     color: Colors.white,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _isRecording ? 'Tap to stop' : 'Tap to record',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-              ),
-            ),
-            const Spacer(),
-            _buildTranscriptPanel(),
-          ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _rippleRing({
+    required double diameter,
+    required double opacity,
+    required double stroke,
+  }) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: const Color(0xFF8A96A3)
+              .withValues(alpha: opacity.clamp(0.0, 1.0)),
+          width: stroke,
         ),
       ),
     );
@@ -411,19 +598,19 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
   Widget _buildTranscriptPanel() {
     final hasText = _transcript.isNotEmpty;
+    final labelColor = hasText ? _ink : _muted;
 
-    return Container(
+    return GlassCard(
+      useOwnLayer: true,
+      quality: GlassQuality.standard,
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 120),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: _pageBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasText
-              ? _blue.withValues(alpha: 0.25)
-              : Colors.grey.withValues(alpha: 0.2),
-        ),
+      height: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      shape: const LiquidRoundedSuperellipse(borderRadius: 22),
+      settings: const LiquidGlassSettings(
+        thickness: 28,
+        blur: 12,
+        glassColor: Color(0x66FFFFFF),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,33 +618,37 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           Row(
             children: [
               Icon(
-                Icons.notes_rounded,
-                size: 16,
-                color: hasText ? _blue : _muted,
+                Icons.graphic_eq_rounded,
+                size: 18,
+                color: labelColor,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 7),
               Text(
-                'Description',
+                'Live transcript',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                  color: hasText ? _blue : _muted,
+                  letterSpacing: 0.15,
+                  color: labelColor,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            hasText
-                ? _transcript
-                : 'Your description will show up here as you speak…',
-            style: TextStyle(
-              fontSize: 15,
-              height: 1.4,
-              fontStyle: hasText ? FontStyle.normal : FontStyle.italic,
-              color: hasText ? _ink : Colors.grey[500],
-              fontWeight: hasText ? FontWeight.w500 : FontWeight.w400,
+          const SizedBox(height: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Text(
+                hasText
+                    ? _transcript
+                    : 'Your description will show up here as you speak…',
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.45,
+                  fontStyle: hasText ? FontStyle.normal : FontStyle.italic,
+                  color: hasText ? _ink : Colors.grey[500],
+                  fontWeight: hasText ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
             ),
           ),
         ],
@@ -465,32 +656,21 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
   }
 
-  Widget _buildSubmitBar() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
+  Widget _buildSubmitBar(double bottomInset) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 8, 24, 16 + bottomInset),
       child: SizedBox(
         height: 52,
         width: double.infinity,
         child: ElevatedButton(
           onPressed: _isSubmitting ? null : _goToConfirmation,
           style: ElevatedButton.styleFrom(
-            backgroundColor: _blue,
+            backgroundColor: _cta,
             foregroundColor: Colors.white,
             elevation: 0,
-            disabledBackgroundColor: _blue.withValues(alpha: 0.5),
+            disabledBackgroundColor: _cta.withValues(alpha: 0.45),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
           child: _isSubmitting
@@ -510,6 +690,134 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                   ),
                 ),
         ),
+      ),
+    );
+  }
+}
+
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet({
+    required this.initial,
+    required this.onChanged,
+    required this.onConfirm,
+  });
+
+  final LatLng initial;
+  final ValueChanged<LatLng> onChanged;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  late LatLng _position;
+  late Set<Marker> _markers;
+
+  @override
+  void initState() {
+    super.initState();
+    _position = widget.initial;
+    _markers = {
+      Marker(markerId: const MarkerId('report'), position: _position),
+    };
+  }
+
+  void _setPosition(LatLng latLng) {
+    setState(() {
+      _position = latLng;
+      _markers = {
+        Marker(markerId: const MarkerId('report'), position: latLng),
+      };
+    });
+    widget.onChanged(latLng);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.62,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD1D5DB),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Choose location',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Tap the map to move the pin',
+            style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: GoogleMap(
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<OneSequenceGestureRecognizer>(
+                      () => EagerGestureRecognizer(),
+                    ),
+                  },
+                  initialCameraPosition: CameraPosition(
+                    target: widget.initial,
+                    zoom: 15,
+                  ),
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: false,
+                  markers: _markers,
+                  onTap: _setPosition,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + bottom),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: widget.onConfirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111827),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: const Text(
+                  'Use this location',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
