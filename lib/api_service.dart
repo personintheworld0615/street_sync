@@ -754,6 +754,15 @@ class ApiService {
     await prefs.remove(_cacheReportStats);
   }
 
+  /// Home pull-to-refresh: drop feed + stats caches so the next load is fresh.
+  static Future<void> clearHomeReportCaches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheHomeFeeds);
+    await prefs.remove(_cacheHomeHasMore);
+    await prefs.remove(_cacheRecentReports);
+    await prefs.remove(_cacheReportStats);
+  }
+
   /// Returns null on network/HTTP failure so callers can keep cached UI.
   static Future<List<dynamic>?> getRecentReports({int amount = 3}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');

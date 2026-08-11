@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -115,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _nearbyCount = 0;
   int _inProgressCount = 0;
   int _resolvedCount = 0;
+  /// Bumps on each refresh so stale prefetch / loads don't overwrite newer UI.
+  int _loadGen = 0;
 
   String _locationLabel = 'Locating…';
 
@@ -144,10 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         _recentReports = [];
         _hasMore = cachedHasMore ?? false;
-        if (_isLoading) {
-        } else {
-          _isLoading = false;
-        }
+        // Nothing to show yet — keep / start skeleton until network paints.
+        _isLoading = true;
       }
       if (cachedStats != null) {
         _nearbyCount = cachedStats['nearby'] ?? 0;
@@ -157,9 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _persistFeed(List<dynamic> reports, bool hasMore) async {
-    await ApiService.cacheHomeFeed(_selectedCat, reports);
-    await ApiService.cacheHomeHasMore(_selectedCat, hasMore);
+  Future<void> _persistFeed(
+    String? category,
+    List<dynamic> reports,
+    bool hasMore,
+  ) async {
+    await ApiService.cacheHomeFeed(category, reports);
+    await ApiService.cacheHomeHasMore(category, hasMore);
   }
 
   Future<void> _loadReports({bool forceNetwork = false}) async {
@@ -167,10 +172,11 @@ class _HomeScreenState extends State<HomeScreen> {
       await _paintCachedFeed();
     }
 
+    final selected = _selectedCat;
     final results = await Future.wait([
       ApiService.getReportsFeed(
-        amount: _pageSize + 1, // +1 so hasMore
-        category: _selectedCat,
+        amount: _pageSize + 1,
+        category: selected,
       ),
       ApiService.getReportStats(),
     ]);
@@ -179,11 +185,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final stats = results[1] as Map<String, int>?;
 
     if (!mounted) return;
+    // User may have switched chips while this request was in flight.
+    if (selected != _selectedCat) return;
 
     if (raw != null) {
       final page = ApiService.trimFeedPage(raw, _pageSize);
-      await _persistFeed(page.items, page.hasMore);
-      if (!mounted) return;
+      await _persistFeed(selected, page.items, page.hasMore);
+      if (!mounted || selected != _selectedCat) return;
       setState(() {
         _recentReports = page.items;
         _hasMore = page.hasMore;
@@ -196,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return;
     }
-    if (mounted) {
+    if (mounted && selected == _selectedCat) {
       setState(() {
         if (stats != null) {
           _nearbyCount = stats['nearby'] ?? 0;
@@ -214,15 +222,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final lastTime = _recentReports.last['time']?.toString();
     if (lastTime == null || lastTime.isEmpty) return;
 
+    final selected = _selectedCat;
     setState(() => _isLoadingMore = true);
 
     final raw = await ApiService.getReportsFeed(
       amount: _pageSize + 1,
-      category: _selectedCat,
+      category: selected,
       before: lastTime,
     );
 
     if (!mounted) return;
+    if (selected != _selectedCat) {
+      setState(() => _isLoadingMore = false);
+      return;
+    }
 
     if (raw == null) {
       setState(() => _isLoadingMore = false);
@@ -231,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final page = ApiService.trimFeedPage(raw, _pageSize);
     final merged = [..._recentReports, ...page.items];
-    await _persistFeed(merged, page.hasMore);
+    await _persistFeed(selected, merged, page.hasMore);
 
-    if (!mounted) return;
+    if (!mounted || selected != _selectedCat) return;
 
     setState(() {
       _recentReports = merged;
@@ -242,11 +255,100 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Pull-to-refresh: wipe report caches, skeleton, load active chip first,
+  /// then warm every other chip into cache in the background.
+  ///
+  /// Active-chip-first is faster *to feel ready* than loading everything then
+  /// splitting — the feed API is already per-category + paged, so "All" isn't
+  /// just the sum of the other chips' first pages.
   Future<void> _fetchReports() async {
-    await Future.wait([
-      _loadReports(forceNetwork: true),
-      _loadLocation(forceRefresh: true),
+    final gen = ++_loadGen;
+    final activeCat = _selectedCat;
+
+    await ApiService.clearHomeReportCaches();
+    if (!mounted || gen != _loadGen) return;
+
+    setState(() {
+      _isLoading = true;
+      _recentReports = [];
+      _hasMore = false;
+    });
+
+    final results = await Future.wait([
+      ApiService.getReportsFeed(
+        amount: _pageSize + 1,
+        category: activeCat,
+      ),
+      ApiService.getReportStats(),
     ]);
+
+    if (!mounted || gen != _loadGen) return;
+
+    final raw = results[0] as List<dynamic>?;
+    final stats = results[1] as Map<String, int>?;
+
+    // Only paint if user is still on the chip we refreshed for.
+    if (activeCat == _selectedCat) {
+      if (raw != null) {
+        final page = ApiService.trimFeedPage(raw, _pageSize);
+        await _persistFeed(activeCat, page.items, page.hasMore);
+        if (!mounted || gen != _loadGen) return;
+        if (activeCat == _selectedCat) {
+          setState(() {
+            _recentReports = page.items;
+            _hasMore = page.hasMore;
+            if (stats != null) {
+              _nearbyCount = stats['nearby'] ?? 0;
+              _inProgressCount = stats['in_progress'] ?? 0;
+              _resolvedCount = stats['resolved'] ?? 0;
+            }
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          if (stats != null) {
+            _nearbyCount = stats['nearby'] ?? 0;
+            _inProgressCount = stats['in_progress'] ?? 0;
+            _resolvedCount = stats['resolved'] ?? 0;
+          }
+          _isLoading = false;
+        });
+      }
+    } else if (raw != null) {
+      // User switched chips; still cache the refreshed active-at-start feed.
+      final page = ApiService.trimFeedPage(raw, _pageSize);
+      await _persistFeed(activeCat, page.items, page.hasMore);
+    }
+
+    if (!mounted || gen != _loadGen) return;
+    await _loadLocation(forceRefresh: true);
+    if (!mounted || gen != _loadGen) return;
+    unawaited(_prefetchOtherCategoryFeeds(
+      gen: gen,
+      skipCategory: activeCat,
+    ));
+  }
+
+  Future<void> _prefetchOtherCategoryFeeds({
+    required int gen,
+    required String? skipCategory,
+  }) async {
+    // null = All, then each category chip.
+    final categories = <String?>[null, ...ReportCategories.all];
+    final others =
+        categories.where((c) => c != skipCategory).toList(growable: false);
+
+    await Future.wait(others.map((category) async {
+      if (gen != _loadGen) return;
+      final raw = await ApiService.getReportsFeed(
+        amount: _pageSize + 1,
+        category: category,
+      );
+      if (gen != _loadGen || raw == null) return;
+      final page = ApiService.trimFeedPage(raw, _pageSize);
+      await _persistFeed(category, page.items, page.hasMore);
+    }));
   }
 
   String get _greeting {
