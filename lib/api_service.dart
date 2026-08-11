@@ -12,6 +12,7 @@ class ApiService {
   static const _cacheReportStats = 'cache_report_stats';
   static const _cacheHomeFeeds = 'cache_home_feeds';
   static const _cacheHomeHasMore = 'cache_home_has_more';
+  static const _cacheHomeLocation = 'cache_home_location_label';
   static const _cacheDraftReports = 'cache_draft_reports';
   static const _cacheSubmittedReports = 'cache_submitted_reports';
   static const _cacheTopUsers = 'cache_top_users';
@@ -383,6 +384,20 @@ class ApiService {
   static Future<void> cacheReportStats(Map<String, int> stats) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cacheReportStats, jsonEncode(stats));
+  }
+
+  static Future<String?> getCachedHomeLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cacheHomeLocation)?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    return raw;
+  }
+
+  static Future<void> cacheHomeLocation(String label) async {
+    final trimmed = label.trim();
+    if (trimmed.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cacheHomeLocation, trimmed);
   }
 
   static Future<List<dynamic>?> getCachedDraftReports(int userId) async {
