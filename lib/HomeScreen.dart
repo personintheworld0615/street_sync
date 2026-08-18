@@ -10,6 +10,7 @@ import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/ViewReportsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/report_list_card.dart';
 import 'package:street_sync/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -78,19 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
         color: _ink,
         height: 1.1,
         letterSpacing: -0.5,
-      );
-  static TextStyle get _tReportTitle => GoogleFonts.inter(
-        fontSize: 17,
-        fontWeight: FontWeight.w600,
-        color: _ink,
-        height: 1.2,
-        letterSpacing: -0.2,
-      );
-  static TextStyle get _tMeta => GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w400,
-        color: _muted,
-        height: 1.2,
       );
   static TextStyle get _tFilter => GoogleFonts.inter(
         fontSize: 15,
@@ -423,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  IconData _iconFromCat(String category) => ReportCategories.icon(category);
+  IconData _iconFromCat(String? category) => ReportCategories.icon(category);
 
   @override
   Widget build(BuildContext context) {
@@ -457,21 +445,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       const ReportListSkeleton(count: 4)
                     else
                       ..._recentReports.map(
-                        (r) => _buildReportCard(
-                          icon: _iconFromCat(r['category']),
-                          severity: r['severity'] as String,
-                          name:
-                              (r['title'] as String?)?.trim().isNotEmpty == true
-                              ? r['title'] as String
-                              : (r['description'] as String? ?? 'Report'),
-                          location: r['location'] as String,
-                          time: _formatTime(r['time'] as String),
-                          onTap: () {
-                            final raw = r['id'];
-                            final id = raw is int ? raw : int.tryParse('$raw');
-                            widget.onOpenOnMap?.call(reportId: id);
-                          },
-                        ),
+                        (r) {
+                          final map = Map<String, dynamic>.from(r as Map);
+                          final title =
+                              (map['title'] as String?)?.trim().isNotEmpty ==
+                                      true
+                                  ? map['title'] as String
+                                  : (map['description'] as String? ?? 'Report');
+                          return ReportListCard(
+                            icon: _iconFromCat(map['category'] as String?),
+                            pill: ReportListCard.displayPill(map),
+                            title: title,
+                            location: map['location'] as String? ?? '',
+                            time: _formatTime(map['time'] as String? ?? ''),
+                            onTap: () {
+                              final raw = map['id'];
+                              final id =
+                                  raw is int ? raw : int.tryParse('$raw');
+                              widget.onOpenOnMap?.call(reportId: id);
+                            },
+                          );
+                        },
                       ),
                     if (!_isLoading && _recentReports.isEmpty)
                       Padding(
@@ -562,132 +556,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Color _severityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFE53935);
-      case 'medium':
-        return const Color(0xFFFB8C00);
-      case 'low':
-        return const Color(0xFF43A047);
-      default:
-        return _muted;
-    }
-  }
-
-  Color _severityFill(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFFFEBEE);
-      case 'medium':
-        return const Color(0xFFFFF3E0);
-      case 'low':
-        return const Color(0xFFE8F5E9);
-      default:
-        return const Color(0xFFF3F4F6);
-    }
-  }
-
-  String _shortLocation(String location) {
-    final trimmed = location.trim();
-    if (trimmed.isEmpty) return 'Unknown';
-    final comma = trimmed.indexOf(',');
-    if (comma > 0) return trimmed.substring(0, comma).trim();
-    return trimmed;
-  }
-
-  Widget _buildReportCard({
-    required IconData icon,
-    required String severity,
-    required String location,
-    required String name,
-    required String time,
-    VoidCallback? onTap,
-  }) {
-    final severityLabel = severity.trim().isEmpty
-        ? 'Unknown'
-        : '${severity[0].toUpperCase()}${severity.substring(1).toLowerCase()}';
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: const Color(0xFFEEF0F3),
-                    child: Icon(icon, size: 20, color: _ink),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: _tReportTitle,
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                _shortLocation(location),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: _tMeta,
-                              ),
-                            ),
-                            Text(' · ', style: _tMeta),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _severityFill(severity),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                severityLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: _severityColor(severity),
-                                  height: 1.2,
-                                ),
-                              ),
-                            ),
-                            Text(' · ', style: _tMeta),
-                            Text(time, style: _tMeta),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: Colors.grey.shade400,
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
-          ],
-        ),
       ),
     );
   }
