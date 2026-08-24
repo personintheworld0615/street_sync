@@ -18,7 +18,6 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   static const _tourSeenKey = 'street_sync_ai_tour_seen_v1';
-  // Match HomeScreen: charcoal CTA, not teal.
   static const _cta = Color(0xFF111827);
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
@@ -32,6 +31,7 @@ class _MainShellState extends State<MainShell> {
   final _statsTourKey = GlobalKey();
   final _quickActionsTourKey = GlobalKey();
   final _recentReportsTourKey = GlobalKey();
+  final _voiceActionTourKey = GlobalKey();
   final _homeNavTourKey = GlobalKey();
   final _mapNavTourKey = GlobalKey();
   final _addNavTourKey = GlobalKey();
@@ -86,6 +86,23 @@ class _MainShellState extends State<MainShell> {
           content:
               'Use voice when you want to describe a street issue hands-free, or photo report when a picture explains it faster.',
           icon: Icons.add_location_alt_rounded,
+        ),
+        TourStep(
+          targetKey: _voiceActionTourKey,
+          title: 'Try it now: Voice Report',
+          content:
+              'Let’s create a test report using your voice. Tap "Try it" to jump in!',
+          icon: Icons.graphic_eq_rounded,
+          actionLabel: 'Try it',
+          onAction: () {
+            _completeTour();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const VoiceReportScreen(isTour: true),
+              ),
+            );
+          },
         ),
         TourStep(
           targetKey: _recentReportsTourKey,
@@ -231,6 +248,7 @@ class _MainShellState extends State<MainShell> {
                 statsTourKey: _statsTourKey,
                 quickActionsTourKey: _quickActionsTourKey,
                 recentReportsTourKey: _recentReportsTourKey,
+                voiceActionTourKey: _voiceActionTourKey,
               ),
               MapScreen(isActive: _index == 1, initialReportId: _focusReportId),
               const UpdatesScreen(),
@@ -362,7 +380,6 @@ class _FloatingNavDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Sit low — only a tiny inset above the home indicator, not full SafeArea.
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(18, 0, 18, bottomInset > 0 ? 16 : 18),

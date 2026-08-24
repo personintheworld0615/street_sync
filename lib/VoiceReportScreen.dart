@@ -7,22 +7,29 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
+import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
 
 class VoiceReportScreen extends StatefulWidget {
-  const VoiceReportScreen({super.key});
+  final bool isTour;
+  const VoiceReportScreen({super.key, this.isTour = false});
 
   @override
   State<VoiceReportScreen> createState() => _VoiceReportScreenState();
 }
 
 class _VoiceReportScreenState extends State<VoiceReportScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _pageBg = Color(0xFFF7F8FA);
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
   static const _cta = Color(0xFF111827);
   static const _defaultLatLng = LatLng(40.3573, -74.6672);
+
+  final _micKey = GlobalKey();
+  final _transcriptKey = GlobalKey();
+  final _submitKey = GlobalKey();
+  bool _showTour = false;
 
   final SpeechToText _speech = SpeechToText();
   bool _speechReady = false;
@@ -50,7 +57,69 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
     _initSpeech();
     _locationFuture = _captureLocation(updateUi: true);
+
+    if (widget.isTour) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showTour = true);
+      });
+    }
   }
+
+  void _startMockRecording() async {
+    setState(() {
+      _showTour = false; // Hide tour while "recording"
+      _isRecording = true;
+      _animationController.repeat();
+      _statusText = 'AI is listening…';
+      _transcript = '';
+    });
+
+    const mockText =
+        "I see a large pothole on the corner of Market street that needs immediate attention.";
+    final words = mockText.split(' ');
+
+    for (var i = 0; i < words.length; i++) {
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!mounted || !_isRecording) return;
+      setState(() {
+        _transcript = words.sublist(0, i + 1).join(' ');
+      });
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _animationController.stop();
+      _statusText = 'Recording complete. Review below.';
+      _showTour = true; // Show tour again for next step
+    });
+  }
+
+  List<TourStep> get _tourSteps => [
+    TourStep(
+      targetKey: _micKey,
+      title: 'Your Voice, Your Power',
+      content:
+          'Tap the mic to start describing an issue. StreetSync will automatically clean up your speech.',
+      icon: Icons.mic_rounded,
+      actionLabel: 'Try a test report',
+      onAction: _startMockRecording,
+    ),
+    TourStep(
+      targetKey: _transcriptKey,
+      title: 'Live AI Transcript',
+      content:
+          'Watch your words appear here in real-time. Our AI will even fix grammar and typos automatically!',
+      icon: Icons.auto_awesome,
+    ),
+    TourStep(
+      targetKey: _submitKey,
+      title: 'One-Tap Submission',
+      content:
+          'Happy with your report? Click Continue to let our AI summarize it and find the exact location.',
+      icon: Icons.send_rounded,
+    ),
+  ];
 
   Future<void> _initSpeech() async {
     final available = await _speech.initialize(
@@ -257,7 +326,10 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
 
     if (picked == null || !mounted) return;
-    final label = await _shortLabelFromCoords(picked.latitude, picked.longitude);
+    final label = await _shortLabelFromCoords(
+      picked.latitude,
+      picked.longitude,
+    );
     if (!mounted) return;
     setState(() {
       _lat = picked.latitude;
@@ -307,15 +379,19 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              e.toString().replaceFirst('Exception: ', ''),
-            ),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _returnHomeFromTour() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
     }
   }
 
@@ -328,79 +404,106 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
     return Scaffold(
       backgroundColor: _pageBg,
-      appBar: AppBar(
-        centerTitle: true,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        backgroundColor: _pageBg,
-        foregroundColor: _ink,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-        ),
-        title: const Text(
-          'Voice report',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: _ink,
-          ),
-        ),
-      ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
-              child: Column(
-                children: [
-                  _buildLocationPill(),
-                  if (!_isRecording &&
-                      _statusText !=
-                          'Tap the microphone to start recording' &&
-                      _statusText !=
-                          'Listening… describe the issue in a few sentences') ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      _statusText,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: _muted,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                  Expanded(
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              centerTitle: true,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              backgroundColor: _pageBg,
+              foregroundColor: _ink,
+              leading: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              ),
+              title: const Text(
+                'Voice report',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                ),
+              ),
+            ),
+            body: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildMicControl(_cta),
-                        const SizedBox(height: 10),
-                        Text(
-                          _isRecording ? 'Listening...' : 'Tap to record',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: _isRecording
-                                ? const Color(0xFF5B6B75)
-                                : _muted,
+                        _buildLocationPill(),
+                        if (!_isRecording &&
+                            _statusText !=
+                                'Tap the microphone to start recording' &&
+                            _statusText !=
+                                'Listening… describe the issue in a few sentences') ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            _statusText,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: _muted,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              KeyedSubtree(
+                                key: _micKey,
+                                child: _buildMicControl(_cta),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                _isRecording ? 'Listening...' : 'Tap to record',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _isRecording
+                                      ? const Color(0xFF5B6B75)
+                                      : _muted,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        SizedBox(
+                          height: transcriptH,
+                          child: KeyedSubtree(
+                            key: _transcriptKey,
+                            child: _buildTranscriptPanel(),
+                          ),
+                        ),
+                        SizedBox(height: showSubmit ? 10 : 20),
                       ],
                     ),
                   ),
-                  SizedBox(
-                    height: transcriptH,
-                    child: _buildTranscriptPanel(),
+                ),
+                if (showSubmit)
+                  KeyedSubtree(
+                    key: _submitKey,
+                    child: _buildSubmitBar(bottomInset),
                   ),
-                  SizedBox(height: showSubmit ? 10 : 20),
-                ],
-              ),
+              ],
             ),
           ),
-          if (showSubmit) _buildSubmitBar(bottomInset),
+          if (_showTour)
+            Positioned.fill(
+              child: Material(
+                type: MaterialType.transparency,
+                child: AiTour(
+                  steps: _tourSteps,
+                  onComplete: () => setState(() => _showTour = false),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -422,11 +525,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 16,
-                color: _ink,
-              ),
+              const Icon(Icons.location_on_outlined, size: 16, color: _ink),
               const SizedBox(width: 6),
               if (_locationLoading)
                 const SizedBox(
@@ -588,8 +687,9 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: const Color(0xFF8A96A3)
-              .withValues(alpha: opacity.clamp(0.0, 1.0)),
+          color: const Color(
+            0xFF8A96A3,
+          ).withValues(alpha: opacity.clamp(0.0, 1.0)),
           width: stroke,
         ),
       ),
@@ -617,11 +717,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         children: [
           Row(
             children: [
-              Icon(
-                Icons.graphic_eq_rounded,
-                size: 18,
-                color: labelColor,
-              ),
+              Icon(Icons.graphic_eq_rounded, size: 18, color: labelColor),
               const SizedBox(width: 7),
               Text(
                 'Live transcript',
@@ -663,7 +759,11 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         height: 52,
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _goToConfirmation,
+          onPressed: _isSubmitting
+              ? null
+              : widget.isTour
+              ? _returnHomeFromTour
+              : _goToConfirmation,
           style: ElevatedButton.styleFrom(
             backgroundColor: _cta,
             foregroundColor: Colors.white,
@@ -682,9 +782,9 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                     color: Colors.white,
                   ),
                 )
-              : const Text(
-                  'Continue',
-                  style: TextStyle(
+              : Text(
+                  widget.isTour ? 'Back to Home' : 'Continue',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -726,9 +826,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   void _setPosition(LatLng latLng) {
     setState(() {
       _position = latLng;
-      _markers = {
-        Marker(markerId: const MarkerId('report'), position: latLng),
-      };
+      _markers = {Marker(markerId: const MarkerId('report'), position: latLng)};
     });
     widget.onChanged(latLng);
   }
@@ -809,10 +907,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 ),
                 child: const Text(
                   'Use this location',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

@@ -1,10 +1,8 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 
 const kAuthRedirectUrl = 'com.example.streetsync://login-callback';
 
@@ -12,139 +10,104 @@ class AuthService {
   AuthService._();
 
   static SupabaseClient get client => Supabase.instance.client;
-
   static GoTrueClient get auth => client.auth;
-
   static Session? get session => auth.currentSession;
-
   static User? get user => auth.currentUser;
-
   static String? get accessToken => session?.accessToken;
-
-  static bool get isSignedIn {
-    if (!_initialized) return false;
-    return session != null;
-  }
+  static bool get isSignedIn => session != null;
 
   static bool _initialized = false;
   static bool _googleInitialized = false;
 
-  /// Ask Supabase for a new access token using the stored refresh token.
-  static Future<bool> refreshSession() async {
-    if (!isConfigured) return false;
+  /// Safely check if Supabase is initialized.
+  static bool get isConfigured {
     try {
-      final result = await auth.refreshSession();
-      return result.session != null;
-    } catch (e) {
-      debugPrint('refreshSession failed: $e');
+      return _initialized && Supabase.instance.isInitialized;
+    } catch (_) {
       return false;
     }
   }
 
-  /// Returns true if we have a usable (non-expired) session.
-  static Future<bool> ensureFreshSession() async {
-    if (!isConfigured) return false;
-    final s = session;
-    if (s == null) return false;
-    if (!s.isExpired) return true;
-    return refreshSession();
-  }
-
-  static String get supabaseUrl {
-    final fromAssets = dotenv.maybeGet('SUPABASE_URL')?.trim();
-    if (fromAssets != null && fromAssets.isNotEmpty) return fromAssets;
-    return '';
-  }
-
-  static String get supabaseAnonKey {
-    final key = dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ??
-        dotenv.maybeGet('SUPABASE_PUBLISHABLE_KEY')?.trim() ??
-        '';
-    return key;
-  }
-
-  static String get googleWebClientId =>
-      dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID')?.trim() ?? '';
-
-  static String get googleIosClientId =>
-      dotenv.maybeGet('GOOGLE_IOS_CLIENT_ID')?.trim() ?? '';
+  static String get supabaseUrl => dotenv.maybeGet('SUPABASE_URL')?.trim() ?? '';
+  static String get supabaseAnonKey => dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ?? '';
+  static String get googleWebClientId => dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID')?.trim() ?? '';
+  static String get googleIosClientId => dotenv.maybeGet('GOOGLE_IOS_CLIENT_ID')?.trim() ?? '';
 
   static Future<void> initialize() async {
+    if (kIsWeb) _initialized = false;
     if (_initialized) return;
 
     final url = supabaseUrl;
     final anon = supabaseAnonKey;
+
     if (url.isEmpty || anon.isEmpty) {
-      debugPrint(
-        'AuthService: missing SUPABASE_URL or SUPABASE_ANON_KEY in assets/.env',
-      );
-      _initialized = false;
+      debugPrint('AuthService: Credentials missing in assets/.env');
       return;
     }
-    await Supabase.initialize(
-      url: url,
-      publishableKey: anon,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
-    );
-    _initialized = true;
 
-    // Warm up native Google Sign-In (no browser).
-    unawaited(_ensureGoogleInitialized());
+    try {
+      await Supabase.initialize(
+        url: url,
+        publishableKey: anon,
+        authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
+      );
+      _initialized = true;
+      unawaited(_ensureGoogleInitialized());
+    } catch (e) {
+      if (e.toString().contains('already been initialized')) {
+        _initialized = true;
+      } else {
+        debugPrint('Supabase Init Error: $e');
+      }
+    }
   }
-
-  static bool get isConfigured => _initialized;
 
   static Future<void> _ensureGoogleInitialized() async {
     if (_googleInitialized) return;
     final webClientId = googleWebClientId;
-    if (webClientId.isEmpty) {
-      debugPrint('AuthService: GOOGLE_WEB_CLIENT_ID missing in assets/.env');
-      return;
+    if (webClientId.isEmpty) return;
+    
+    try {
+      await GoogleSignIn.instance.initialize(
+        clientId: googleIosClientId.isEmpty ? null : googleIosClientId,
+        serverClientId: webClientId,
+      );
+      _googleInitialized = true;
+    } catch (e) {
+      debugPrint('Google Sign-In Init Error: $e');
     }
-    final iosClientId = googleIosClientId;
-    await GoogleSignIn.instance.initialize(
-      // iOS/macOS client id (optional but recommended for those platforms)
-      clientId: iosClientId.isEmpty ? null : iosClientId,
-      // Web client id — required so we get an ID token for Supabase
-      serverClientId: webClientId,
-    );
-    _googleInitialized = true;
   }
 
-  static String? get firstNameFromUser {
-    final meta = user?.userMetadata ?? {};
-    final direct = meta['first_name'] as String?;
-    if (direct != null && direct.trim().isNotEmpty) return direct.trim();
-    final full = (meta['full_name'] as String?) ??
-        (meta['name'] as String?) ??
-        '';
-    if (full.trim().isEmpty) return null;
-    return full.trim().split(RegExp(r'\s+')).first;
+  static Future<String?> signUp({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+  }) async {
+    if (!isConfigured) return 'Supabase not configured.';
+    try {
+      final res = await auth.signUp(
+        email: email,
+        password: password,
+        data: {'first_name': firstName, 'last_name': lastName},
+        emailRedirectTo: kAuthRedirectUrl,
+      );
+      if (res.session == null && res.user != null) {
+        return 'Check your email to confirm your account.';
+      }
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Sign up failed: $e';
+    }
   }
 
-  static String? get lastNameFromUser {
-    final meta = user?.userMetadata ?? {};
-    final direct = meta['last_name'] as String?;
-    if (direct != null && direct.trim().isNotEmpty) return direct.trim();
-    final full = (meta['full_name'] as String?) ??
-        (meta['name'] as String?) ??
-        '';
-    final parts = full.trim().split(RegExp(r'\s+'));
-    if (parts.length < 2) return null;
-    return parts.sublist(1).join(' ');
-  }
-
-  /// Returns null on success, or an error message.
   static Future<String?> signIn({
     required String email,
     required String password,
   }) async {
-    if (!isConfigured) {
-      return 'Supabase is not configured. Add SUPABASE_URL and '
-          'SUPABASE_ANON_KEY to assets/.env';
-    }
+    if (!isConfigured) return 'Supabase not configured.';
     try {
       await auth.signInWithPassword(email: email, password: password);
       return null;
@@ -155,51 +118,18 @@ class AuthService {
     }
   }
 
-  static bool isEmailConfirmBlocker(String? error) {
-    if (error == null) return false;
-    final msg = error.toLowerCase();
-    return msg.contains('rate limit') ||
-        msg.contains('not confirmed') ||
-        msg.contains('email not confirmed');
-  }
-
-  /// Native Google Sign-In (account picker in-app). No Chrome tab.
-  /// Falls back to browser OAuth only if native auth isn't supported.
   static Future<String?> signInWithGoogle() async {
-    if (!isConfigured) {
-      return 'Supabase is not configured. Add SUPABASE_URL and '
-          'SUPABASE_ANON_KEY to assets/.env';
-    }
-    if (googleWebClientId.isEmpty) {
-      return 'Add GOOGLE_WEB_CLIENT_ID to assets/.env';
-    }
+    if (!isConfigured) return 'Supabase not configured.';
+    if (googleWebClientId.isEmpty) return 'Google Web Client ID missing.';
 
     try {
       await _ensureGoogleInitialized();
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final googleAuth = googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = null; // authenticate() currently only provides idToken in this version
 
-      if (!GoogleSignIn.instance.supportsAuthenticate()) {
-        // Web / unsupported platforms — browser OAuth fallback.
-        return signInWithOAuth(OAuthProvider.google);
-      }
-
-      final googleUser = await GoogleSignIn.instance.authenticate(
-        scopeHint: const ['email', 'profile'],
-      );
-      final idToken = googleUser.authentication.idToken;
-      if (idToken == null || idToken.isEmpty) {
-        return 'Google did not return an ID token. '
-            'Add an iOS OAuth client (bundle com.example.streetSync) '
-            'and set GOOGLE_IOS_CLIENT_ID, or check GOOGLE_WEB_CLIENT_ID.';
-      }
-
-      String? accessToken;
-      try {
-        final authz = await googleUser.authorizationClient
-            .authorizationForScopes(const ['email', 'profile']);
-        accessToken = authz?.accessToken;
-      } catch (_) {
-        // ID token alone is enough for Supabase.
-      }
+      if (idToken == null) return 'Google did not return an ID token.';
 
       await auth.signInWithIdToken(
         provider: OAuthProvider.google,
@@ -209,60 +139,30 @@ class AuthService {
       return null;
     } on AuthException catch (e) {
       return e.message;
-    } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        return 'Google sign-in was canceled';
-      }
-      return 'Google sign-in failed: ${e.description ?? e.code.name}';
     } catch (e) {
       return 'Google sign-in failed: $e';
     }
   }
 
-  /// Browser OAuth (Apple, or Google fallback). Prefer [signInWithGoogle]
-  /// for Google so the flow stays in-app.
   static Future<String?> signInWithOAuth(OAuthProvider provider) async {
-    if (!isConfigured) {
-      return 'Supabase is not configured. Add SUPABASE_URL and '
-          'SUPABASE_ANON_KEY to assets/.env';
-    }
+    if (!isConfigured) return 'Supabase not configured.';
     try {
       await auth.signInWithOAuth(
         provider,
         redirectTo: kIsWeb ? null : kAuthRedirectUrl,
-        authScreenLaunchMode: kIsWeb
-            ? LaunchMode.platformDefault
-            : LaunchMode.inAppBrowserView,
       );
       return null;
     } on AuthException catch (e) {
       return e.message;
     } catch (e) {
-      // inAppBrowserView isn't available on every desktop build — retry external.
-      try {
-        await auth.signInWithOAuth(
-          provider,
-          redirectTo: kIsWeb ? null : kAuthRedirectUrl,
-          authScreenLaunchMode: LaunchMode.externalApplication,
-        );
-        return null;
-      } catch (e2) {
-        return 'OAuth failed: $e2';
-      }
+      return 'OAuth failed: $e';
     }
   }
 
-  /// Sends a password-reset email. Returns null on success.
   static Future<String?> resetPassword(String email) async {
-    if (!isConfigured) {
-      return 'Supabase is not configured. Add SUPABASE_URL and '
-          'SUPABASE_ANON_KEY to assets/.env';
-    }
+    if (!isConfigured) return 'Supabase not configured.';
     try {
-      await auth.resetPasswordForEmail(
-        email,
-        redirectTo: kIsWeb ? null : kAuthRedirectUrl,
-      );
+      await auth.resetPasswordForEmail(email, redirectTo: kAuthRedirectUrl);
       return null;
     } on AuthException catch (e) {
       return e.message;
@@ -271,7 +171,6 @@ class AuthService {
     }
   }
 
-  /// Call after the user lands from a recovery deep link.
   static Future<String?> updatePassword(String newPassword) async {
     try {
       await auth.updateUser(UserAttributes(password: newPassword));
@@ -284,18 +183,37 @@ class AuthService {
   }
 
   static Future<void> signOut() async {
-    if (!Supabase.instance.isInitialized) return;
+    if (!isConfigured) return;
     try {
-      if (_googleInitialized) {
-        await GoogleSignIn.instance.signOut();
-      }
-    } catch (e) {
-      debugPrint('Google signOut error: $e');
-    }
-    try {
+      if (_googleInitialized) await GoogleSignIn.instance.signOut();
       await auth.signOut();
-    } catch (e) {
-      debugPrint('signOut error: $e');
+    } catch (_) {}
+  }
+
+  static Future<bool> refreshSession() async {
+    if (!isConfigured) return false;
+    try {
+      final result = await auth.refreshSession();
+      return result.session != null;
+    } catch (_) {
+      return false;
     }
   }
+
+  static Future<bool> ensureFreshSession() async {
+    if (!isConfigured) return false;
+    final s = session;
+    if (s == null) return false;
+    if (!s.isExpired) return true;
+    return refreshSession();
+  }
+
+  static bool isEmailConfirmBlocker(String? error) {
+    if (error == null) return false;
+    final msg = error.toLowerCase();
+    return msg.contains('rate limit') || msg.contains('confirm');
+  }
+
+  static String? get firstNameFromUser => user?.userMetadata?['first_name'] as String?;
+  static String? get lastNameFromUser => user?.userMetadata?['last_name'] as String?;
 }

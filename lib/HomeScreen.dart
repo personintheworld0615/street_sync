@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
     this.statsTourKey,
     this.quickActionsTourKey,
     this.recentReportsTourKey,
+    this.voiceActionTourKey,
   });
 
   /// Opens the Map tab; pass [reportId] to focus that pin.
@@ -27,6 +28,7 @@ class HomeScreen extends StatefulWidget {
   final GlobalKey? statsTourKey;
   final GlobalKey? quickActionsTourKey;
   final GlobalKey? recentReportsTourKey;
+  final GlobalKey? voiceActionTourKey;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -38,8 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _muted = Color(0xFF757575);
   static const _cta = Color(0xFF111827);
 
-  // Inter ≈ SF Pro look from the modern-v2 mockup (cross-platform).
-  // Casual, wide wordmark (mockup vibe) — pitch black.
   static TextStyle get _tBrand => GoogleFonts.nunito(
         fontSize: 50,
         fontWeight: FontWeight.w700,
@@ -104,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _nearbyCount = 0;
   int _inProgressCount = 0;
   int _resolvedCount = 0;
-  /// Bumps on each refresh so stale prefetch / loads don't overwrite newer UI.
   int _loadGen = 0;
 
   String _locationLabel = 'Locating…';
@@ -135,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         _recentReports = [];
         _hasMore = cachedHasMore ?? false;
-        // Cache miss — keep / start skeleton until network paints.
         _isLoading = true;
       }
       if (cachedStats != null) {
@@ -173,7 +171,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final stats = results[1] as Map<String, int>?;
 
     if (!mounted) return;
-    // User may have switched chips while this request was in flight.
     if (selected != _selectedCat) return;
 
     if (raw != null) {
@@ -243,8 +240,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// Pull-to-refresh: wipe report caches, skeleton, load active chip first,
-  /// then warm every other chip into cache in the background.
   Future<void> _fetchReports() async {
     final gen = ++_loadGen;
     final activeCat = _selectedCat;
@@ -271,7 +266,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final raw = results[0] as List<dynamic>?;
     final stats = results[1] as Map<String, int>?;
 
-    // Only paint if user is still on the chip we refreshed for.
     if (activeCat == _selectedCat) {
       if (raw != null) {
         final page = ApiService.trimFeedPage(raw, _pageSize);
@@ -300,7 +294,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } else if (raw != null) {
-      // User switched chips; still cache the refreshed active-at-start feed.
       final page = ApiService.trimFeedPage(raw, _pageSize);
       await _persistFeed(activeCat, page.items, page.hasMore);
     }
@@ -318,7 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
     required int gen,
     required String? skipCategory,
   }) async {
-    // null = All, then each category chip.
     final categories = <String?>[null, ...ReportCategories.all];
     final others =
         categories.where((c) => c != skipCategory).toList(growable: false);
@@ -593,6 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _reportModeChip(
+                    key: widget.voiceActionTourKey,
                     icon: Icons.graphic_eq_rounded,
                     label: 'Voice',
                     onTap: () {
@@ -631,11 +624,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _reportModeChip({
+    Key? key,
     required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
     return InkWell(
+      key: key,
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Padding(
@@ -767,7 +762,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
               child: Transform.scale(
-                // Blur softens edges; slight scale avoids transparent fringe.
                 scale: 1.05,
                 child: Opacity(
                   opacity: 1.0,
@@ -831,4 +825,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
