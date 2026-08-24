@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -9,6 +8,7 @@ import 'Confirmation.dart';
 import 'ConfirmationVoiceReport.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
 class Updatething extends StatefulWidget {
   Updatething({
@@ -31,7 +31,6 @@ class Updatething extends StatefulWidget {
   final String? severity;
   final String? otherCategory;
   final String? imagePath;
-  /// Public Storage URL from a saved draft (when no local file).
   final String? existingImageUrl;
   final int? draftId;
   final double? latitude;
@@ -78,7 +77,7 @@ class Updatething extends StatefulWidget {
 class _UpdateThingState extends State<Updatething> {
   LatLng position = const LatLng(40.3573, -74.6672);
   Set<Marker> _markers = {};
-  static const _blue = Color(0xFF2196F3);
+  static const _cta = Color(0xFF111827);
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
   static const _muted = Color(0xFF5B677A);
@@ -283,13 +282,13 @@ class _UpdateThingState extends State<Updatething> {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: _blue.withValues(alpha: 0.1),
+                        color: _cta.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
                         Icons.add_a_photo_outlined,
                         size: 40,
-                        color: _blue,
+                        color: _cta,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -340,21 +339,21 @@ class _UpdateThingState extends State<Updatething> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: _blue.withValues(alpha: 0.08),
+                    color: _cta.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _blue.withValues(alpha: 0.25)),
+                    border: Border.all(color: _cta.withValues(alpha: 0.25)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.file_upload_outlined, size: 22, color: _blue),
+                      Icon(Icons.file_upload_outlined, size: 22, color: _cta),
                       SizedBox(width: 8),
                       Text(
                         'Upload from library',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: _blue,
+                          color: _cta,
                         ),
                       ),
                     ],
@@ -634,9 +633,9 @@ class _UpdateThingState extends State<Updatething> {
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? _blue.withValues(alpha: 0.1) : Colors.grey[50],
+          color: selected ? _cta.withValues(alpha: 0.1) : Colors.grey[50],
           border: Border.all(
-            color: selected ? _blue : Colors.grey[300]!,
+            color: selected ? _cta : Colors.grey[300]!,
             width: selected ? 1.8 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -647,7 +646,7 @@ class _UpdateThingState extends State<Updatething> {
             Icon(
               icon,
               size: 20,
-              color: selected ? _blue : _muted,
+              color: selected ? _cta : _muted,
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -659,7 +658,7 @@ class _UpdateThingState extends State<Updatething> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? _blue : Colors.grey[700],
+                  color: selected ? _cta : Colors.grey[700],
                 ),
               ),
             ),
@@ -860,7 +859,7 @@ class _UpdateThingState extends State<Updatething> {
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _blue,
+                      backgroundColor: _cta,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: () async{
@@ -953,7 +952,13 @@ class _UpdateThingState extends State<Updatething> {
 
           setState(() => _submitting = true);
           try {
-            final address = await _addressFromLatLng(position);
+            final address = await translateLocation(
+              position.latitude,
+              position.longitude,
+              includeRegion: true,
+              fallback:
+                  '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+            );
             if (!mounted) return;
             setState(() => _submitting = false);
 
@@ -1014,11 +1019,11 @@ class _UpdateThingState extends State<Updatething> {
           height: 52,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _submitting ? _blue.withValues(alpha: 0.5) : _blue,
+            color: _submitting ? _cta.withValues(alpha: 0.5) : _cta,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: _blue.withValues(alpha: 0.35),
+                color: _cta.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1058,28 +1063,6 @@ Future<String> _autoSeverityCalc(String category) async {
     case 'Other':
     default:
       return 'Medium';
-  }
-}
-Future<String> _addressFromLatLng(LatLng pos) async {
-  try {
-    final places = await placemarkFromCoordinates(
-      pos.latitude,
-      pos.longitude,
-    );
-    if (places.isEmpty) {
-      return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
-    }
-    final p = places.first;
-    final parts = [
-      if (p.street?.isNotEmpty == true) p.street!,
-      if (p.locality?.isNotEmpty == true) p.locality!,
-      if (p.administrativeArea?.isNotEmpty == true) p.administrativeArea!,
-    ];
-    return parts.isEmpty
-        ? '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}'
-        : parts.join(', ');
-  } catch (_) {
-    return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
   }
 }
 
