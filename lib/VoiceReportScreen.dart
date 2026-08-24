@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/geocoding_utils.dart';
+import 'package:street_sync/voice_mic_control.dart';
 
 class VoiceReportScreen extends StatefulWidget {
   const VoiceReportScreen({super.key});
@@ -118,7 +119,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       final pos = await Geolocator.getCurrentPosition();
       _lat = pos.latitude;
       _long = pos.longitude;
-      final label = await _shortLabelFromCoords(pos.latitude, pos.longitude);
+      final label = await translateLocation(pos.latitude, pos.longitude);
       if (updateUi && mounted) {
         setState(() {
           _locationLoading = false;
@@ -135,22 +136,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           _locationLabel = 'Set location';
         });
       }
-    }
-  }
-
-  Future<String> _shortLabelFromCoords(double lat, double lng) async {
-    try {
-      final places = await placemarkFromCoordinates(lat, lng);
-      if (places.isEmpty) return 'Pinned location';
-      final p = places.first;
-      if (p.locality?.isNotEmpty == true) return p.locality!;
-      if (p.subLocality?.isNotEmpty == true) return p.subLocality!;
-      if (p.administrativeArea?.isNotEmpty == true) {
-        return p.administrativeArea!;
-      }
-      return 'Pinned location';
-    } catch (_) {
-      return 'Pinned location';
     }
   }
 
@@ -216,26 +201,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
   }
 
-  Future<String> _addressFromCoords(double lat, double lng) async {
-    try {
-      final places = await placemarkFromCoordinates(lat, lng);
-      if (places.isEmpty) {
-        return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
-      }
-      final p = places.first;
-      final parts = [
-        if (p.street?.isNotEmpty == true) p.street!,
-        if (p.locality?.isNotEmpty == true) p.locality!,
-        if (p.administrativeArea?.isNotEmpty == true) p.administrativeArea!,
-      ];
-      return parts.isEmpty
-          ? '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}'
-          : parts.join(', ');
-    } catch (_) {
-      return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
-    }
-  }
-
   Future<void> _openLocationPicker() async {
     final initial = LatLng(
       _lat ?? _defaultLatLng.latitude,
@@ -257,7 +222,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
 
     if (picked == null || !mounted) return;
-    final label = await _shortLabelFromCoords(picked.latitude, picked.longitude);
+    final label = await translateLocation(picked.latitude, picked.longitude);
     if (!mounted) return;
     setState(() {
       _lat = picked.latitude;
@@ -278,7 +243,13 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       final lat = _lat;
       final lng = _long;
       final location = (lat != null && lng != null)
-          ? await _addressFromCoords(lat, lng)
+          ? await translateLocation(
+              lat,
+              lng,
+              includeRegion: true,
+              fallback:
+                  '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+            )
           : 'Location unavailable';
 
       if (!mounted) return;
@@ -376,7 +347,12 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildMicControl(_cta),
+                        VoiceMicControl(
+                          isRecording: _isRecording,
+                          animation: _pulseAnimation,
+                          onTap: _toggleRecording,
+                          accent: _cta,
+                        ),
                         const SizedBox(height: 10),
                         Text(
                           _isRecording ? 'Listening...' : 'Tap to record',
@@ -439,7 +415,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                 )
               else
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 200),
+                  constraints: const BoxConstraints(maxWidth: 280),
                   child: Text(
                     _locationLabel,
                     overflow: TextOverflow.ellipsis,
@@ -452,145 +428,6 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                 ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMicControl(Color accent) {
-    const size = 268.0;
-    const core = 138.0;
-    const glassOuter = core + 42; // frosted band edge
-    const outline = size - 6; // outer outline edge
-
-    return GestureDetector(
-      onTap: _toggleRecording,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: AnimatedBuilder(
-          animation: _animationController,
-          builder: (context, _) {
-            final p = _isRecording ? _pulseAnimation.value : 0.0;
-            final ripples = <Widget>[];
-            if (_isRecording) {
-              for (var i = 0; i < 3; i++) {
-                final phase = (p + i / 3.0) % 1.0;
-                ripples.add(
-                  _rippleRing(
-                    diameter: glassOuter + (outline - glassOuter) * phase,
-                    opacity: (1.0 - phase) * 0.42,
-                    stroke: 1.5,
-                  ),
-                );
-              }
-            } else {
-              ripples.addAll([
-                _rippleRing(
-                  diameter: glassOuter + 28,
-                  opacity: 0.10,
-                  stroke: 1.1,
-                ),
-                _rippleRing(
-                  diameter: glassOuter + 52,
-                  opacity: 0.07,
-                  stroke: 1.1,
-                ),
-              ]);
-            }
-
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                // Fixed outer outline — pulse targets this edge
-                _rippleRing(
-                  diameter: outline,
-                  opacity: _isRecording ? 0.28 : 0.16,
-                  stroke: 1.4,
-                ),
-                ...ripples,
-                Container(
-                  width: glassOuter,
-                  height: glassOuter,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.88),
-                        const Color(0xFFE4E9F0).withValues(alpha: 0.62),
-                        const Color(0xFFC9D2DE).withValues(alpha: 0.48),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFF9AA7B5).withValues(alpha: 0.5),
-                      width: 1.3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.07),
-                        blurRadius: 22,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.4),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Container(
-                  width: core,
-                  height: core,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.24),
-                        blurRadius: 22,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.stop_rounded : Icons.mic_none_rounded,
-                    size: 54,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _rippleRing({
-    required double diameter,
-    required double opacity,
-    required double stroke,
-  }) {
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: const Color(0xFF8A96A3)
-              .withValues(alpha: opacity.clamp(0.0, 1.0)),
-          width: stroke,
         ),
       ),
     );

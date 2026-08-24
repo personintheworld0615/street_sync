@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyDraftReportsScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
+import 'package:street_sync/PrivacyPolicyScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
@@ -276,7 +277,14 @@ class _ProfileState extends State<Profile> {
               _actionRow(
                 icon: Icons.shield_outlined,
                 label: 'Privacy policy',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PrivacyPolicyScreen(),
+                    ),
+                  );
+                },
               ),
               _actionRow(
                 icon: Icons.logout_rounded,

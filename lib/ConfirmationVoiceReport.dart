@@ -38,7 +38,7 @@ class ConfirmationVoiceReport extends StatefulWidget {
 }
 
 class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
-  static const _primaryBlue = Color(0xFF2196F3);
+  static const _cta = Color(0xFF111827);
   bool _submitting = false;
   bool _savingDraft = false;
 
@@ -114,12 +114,12 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: _primaryBlue.withValues(alpha: 0.12),
+                    color: _cta.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.check_circle_rounded,
-                    color: _primaryBlue,
+                    color: _cta,
                     size: 44,
                   ),
                 ),
@@ -210,7 +210,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        backgroundColor: _primaryBlue,
+        backgroundColor: _cta,
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -249,7 +249,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      color: _primaryBlue,
+      color: _cta,
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
@@ -323,10 +323,10 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: _primaryBlue.withValues(alpha: 0.1),
+                        color: _cta.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: _primaryBlue.withValues(alpha: 0.35),
+                          color: _cta.withValues(alpha: 0.35),
                         ),
                       ),
                       child: Row(
@@ -335,7 +335,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                           Icon(
                             Icons.auto_awesome,
                             size: 14,
-                            color: _primaryBlue,
+                            color: _cta,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -343,7 +343,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: _primaryBlue,
+                              color: _cta,
                             ),
                           ),
                         ],
@@ -362,7 +362,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.category_outlined,
-              iconColor: Colors.blue,
+              iconColor: _cta,
               label: 'Category',
               value: _inferredCategory,
               isSuggested: _fromAi,
@@ -499,9 +499,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _primaryBlue.withOpacity(0.08),
+        color: _cta.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _primaryBlue.withOpacity(0.25)),
+        border: Border.all(color: _cta.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,7 +511,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: _primaryBlue,
+              color: _cta,
             ),
           ),
           const SizedBox(height: 16),
@@ -550,7 +550,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: isActive ? _primaryBlue : Colors.grey[300],
+          backgroundColor: isActive ? _cta : Colors.grey[300],
           child: isActive
               ? const Icon(Icons.check, color: Colors.white, size: 16)
               : Text(
@@ -599,9 +599,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             child: ElevatedButton(
               onPressed: _busy ? null : _showSubmittedThenGoHome,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryBlue,
+                backgroundColor: _cta,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: _primaryBlue.withValues(alpha: 0.5),
+                disabledBackgroundColor: _cta.withValues(alpha: 0.5),
                 elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

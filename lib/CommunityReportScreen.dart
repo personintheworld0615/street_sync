@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -12,8 +11,10 @@ import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_severity.dart';
+import 'package:street_sync/voice_mic_control.dart';
 class CommunityReportScreen extends StatefulWidget {
   
   CommunityReportScreen({super.key});
@@ -143,10 +144,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1600),
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _initSpeech();
     _gotouser();
@@ -209,48 +210,32 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildVoiceCard() {
-    final accent = _isRecording ? const Color(0xFFE11D48) : _cta;
-
     return Column(
       children: [
         _buildLocationPill(),
-        const SizedBox(height: 18),
-        Text(
-          _statusText,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: _ink,
-            height: 1.35,
-          ),
-        ),
-        const SizedBox(height: 24),
-        ScaleTransition(
-          scale: _pulseAnimation,
-          child: GestureDetector(
-            onTap: _toggleRecording,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: accent,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.22),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Icon(
-                _isRecording ? Icons.stop_rounded : Icons.mic_none_rounded,
-                size: 48,
-                color: Colors.white,
-              ),
+        if (!_isRecording &&
+            _statusText != 'Tap the microphone to start recording' &&
+            _statusText !=
+                'Listening… describe the issue in a few sentences') ...[
+          const SizedBox(height: 10),
+          Text(
+            _statusText,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _muted,
+              height: 1.35,
             ),
           ),
+        ],
+        const SizedBox(height: 8),
+        VoiceMicControl(
+          isRecording: _isRecording,
+          animation: _pulseAnimation,
+          onTap: _toggleRecording,
+          accent: _cta,
+          size: 220,
         ),
         const SizedBox(height: 14),
         Text(
@@ -301,7 +286,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   )
                 else
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 200),
+                    constraints: const BoxConstraints(maxWidth: 280),
                     child: Text(
                       _locationLabel,
                       overflow: TextOverflow.ellipsis,
@@ -320,24 +305,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     );
   }
 
-  Future<String> _shortLabelFromCoords(double lat, double lng) async {
-    try {
-      final places = await placemarkFromCoordinates(lat, lng);
-      if (places.isEmpty) return 'Pinned location';
-      final p = places.first;
-      if (p.locality?.isNotEmpty == true) return p.locality!;
-      if (p.subLocality?.isNotEmpty == true) return p.subLocality!;
-      if (p.administrativeArea?.isNotEmpty == true) {
-        return p.administrativeArea!;
-      }
-      return 'Pinned location';
-    } catch (_) {
-      return 'Pinned location';
-    }
-  }
-
   Future<void> _applyPickedLocation(LatLng latLng) async {
-    final label = await _shortLabelFromCoords(latLng.latitude, latLng.longitude);
+    final label = await translateLocation(latLng.latitude, latLng.longitude);
     if (!mounted) return;
     setState(() {
       position = latLng;
@@ -500,7 +469,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       _transcript = '';
       _isRecording = true;
       _statusText = 'Listening… describe the issue in a few sentences';
-      _animationController.repeat(reverse: true);
+      _animationController.repeat();
     });
 
     await _speech.listen(
@@ -758,7 +727,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     try {
       final userLocation = await Geolocator.getCurrentPosition();
       final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
-      final label = await _shortLabelFromCoords(
+      final label = await translateLocation(
         userLatLng.latitude,
         userLatLng.longitude,
       );
@@ -1366,7 +1335,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
     String location = 'Location not set';
     try {
-      location = await _addressFromLatLng(position);
+      location = await translateLocation(
+        position.latitude,
+        position.longitude,
+        includeRegion: true,
+        fallback:
+            '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+      );
     } catch (_) {}
 
     final category = _selectedCategory == 'Other'
@@ -1498,7 +1473,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
               setState(() => _submitting = true);
               try {
-                final address = await _addressFromLatLng(position);
+                final address = await translateLocation(
+                  position.latitude,
+                  position.longitude,
+                  includeRegion: true,
+                  fallback:
+                      '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+                );
                 if (!mounted) return;
                 setState(() => _submitting = false);
 
@@ -1602,29 +1583,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
         ],
       ),
     );
-  }
-}
-
-Future<String> _addressFromLatLng(LatLng pos) async {
-  try {
-    final places = await placemarkFromCoordinates(
-      pos.latitude,
-      pos.longitude,
-    );
-    if (places.isEmpty) {
-      return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
-    }
-    final p = places.first;
-    final parts = [
-      if (p.street?.isNotEmpty == true) p.street!,
-      if (p.locality?.isNotEmpty == true) p.locality!,
-      if (p.administrativeArea?.isNotEmpty == true) p.administrativeArea!,
-    ];
-    return parts.isEmpty
-        ? '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}'
-        : parts.join(', ');
-  } catch (_) {
-    return '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
   }
 }
 

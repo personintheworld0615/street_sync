@@ -19,8 +19,8 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   static const _pageBg = Color(0xFFF4F7FB);
   static const _ink = Color(0xFF152033);
   static const _muted = Color(0xFF5B677A);
-  static const _blue = Color(0xFF2196F3);
-  static const _iconBg = Color(0xFFE8F4FD);
+  static const _cta = Color(0xFF111827);
+  static const _iconBg = Color(0xFFEEF0F3);
 
   Map<String, dynamic> get report => widget.report;
 
@@ -83,7 +83,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       case 'draft':
         return _muted;
       default:
-        return _blue;
+        return _cta;
     }
   }
 
@@ -152,7 +152,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
       height: 260,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.blue
+        color: _cta
       ),
       child: Center(
         child: Icon(
@@ -179,7 +179,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
             expandedHeight: hasPhoto ? 260 : 180,
             pinned: true,
             stretch: true,
-            backgroundColor: _blue,
+            backgroundColor: _cta,
             foregroundColor: Colors.white,
             elevation: 0,
             title: const Text(
@@ -266,7 +266,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       Expanded(
                         child: _metaCard(
                           icon: Icons.schedule_rounded,
-                          iconColor: _blue,
+                          iconColor: _cta,
                           label: 'Reported',
                           value: _formatTime(report['time']?.toString() ?? ''),
                         ),
@@ -287,7 +287,7 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           ),
                           child: const Icon(
                             Icons.location_on_outlined,
-                            color: _blue,
+                            color: _cta,
                             size: 22,
                           ),
                         ),
