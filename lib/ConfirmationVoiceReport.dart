@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_severity.dart';
 import 'package:street_sync/api_service.dart';
 
@@ -24,11 +25,14 @@ class ConfirmationVoiceReport extends StatefulWidget {
   final double latitude;
   final double longitude;
   final String othercat;
+
   /// AI-provided category (preferred). Falls back to keyword inference if null.
   final String? category;
+
   /// AI-provided severity (preferred). Falls back to keyword inference if null.
   final String? severity;
   final String? aiRationale;
+
   /// Original speech transcript when description was AI-polished.
   final String? rawTranscript;
 
@@ -41,26 +45,35 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   static const _cta = Color(0xFF111827);
   bool _submitting = false;
   bool _savingDraft = false;
+  late String _title;
+  late String _description;
+  late String _category;
+  bool _severityDetailsEdited = false;
 
   bool get _busy => _submitting || _savingDraft;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = widget.title.trim();
+    _description = widget.description.trim();
+    _category = widget.category?.trim().isNotEmpty == true
+        ? widget.category!.trim()
+        : inferCategory(widget.description);
+  }
 
   bool get _fromAi =>
       widget.category != null ||
       widget.severity != null ||
       widget.aiRationale != null;
 
-  String get _inferredCategory =>
-      widget.category?.trim().isNotEmpty == true
-          ? widget.category!.trim()
-          : inferCategory(widget.description);
-
   String get _autoSeverity {
     final ai = widget.severity?.trim().toLowerCase();
-    if (ai == 'low' || ai == 'medium' || ai == 'high') return ai!;
-    return autoSeverity(
-      category: _inferredCategory,
-      description: widget.rawTranscript ?? widget.description,
-    );
+    if (!_severityDetailsEdited &&
+        (ai == 'low' || ai == 'medium' || ai == 'high')) {
+      return ai!;
+    }
+    return autoSeverity(category: _category, description: _description);
   }
 
   Color _getColorForSeverity(String sev) {
@@ -78,16 +91,15 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
 
   Color get _severityColor => _getColorForSeverity(_autoSeverity);
 
-
-
   Future<void> _showSubmittedThenGoHome() async {
     if (_busy) return;
+    if (!_validateEditableFields()) return;
     setState(() => _submitting = true);
 
     final success = await ApiService.submitReport(
-      title: widget.title,
-      description: widget.description,
-      category: _inferredCategory,
+      title: _title,
+      description: _description,
+      category: _category,
       location: widget.location,
       severity: _autoSeverity,
       isDraft: false,
@@ -127,10 +139,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                 const Text(
                   'Report submitted!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -167,12 +176,13 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
 
   Future<void> _saveAsDraft() async {
     if (_busy) return;
+    if (!_validateEditableFields()) return;
     setState(() => _savingDraft = true);
 
     final success = await ApiService.submitReport(
-      title: widget.title,
-      description: widget.description,
-      category: _inferredCategory,
+      title: _title,
+      description: _description,
+      category: _category,
       location: widget.location,
       severity: _autoSeverity,
       isDraft: true,
@@ -203,6 +213,111 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
       MaterialPageRoute(builder: (_) => const MainShell()),
       (route) => false,
     );
+  }
+
+  bool _validateEditableFields() {
+    final missing = <String>[];
+    if (_title.trim().isEmpty) missing.add('title');
+    if (_category.trim().isEmpty) missing.add('category');
+    if (_description.trim().isEmpty) missing.add('description');
+
+    if (missing.isEmpty) return true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Please enter a ${missing.first}.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return false;
+  }
+
+  Future<void> _editTextField({
+    required String label,
+    required String initialValue,
+    required int maxLines,
+    required ValueChanged<String> onSaved,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit $label'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: maxLines,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || !mounted) return;
+    if (result.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label cannot be empty.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => onSaved(result.trim()));
+  }
+
+  Future<void> _editCategory() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Category',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              ...ReportCategories.all.map(
+                (category) => ListTile(
+                  title: Text(ReportCategories.label(category)),
+                  subtitle: Text(ReportCategories.subtitle(category)),
+                  leading: Icon(ReportCategories.icon(category)),
+                  trailing: _category == category
+                      ? const Icon(Icons.check_rounded, color: _cta)
+                      : null,
+                  onTap: () => Navigator.pop(context, category),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    setState(() {
+      _category = result;
+      _severityDetailsEdited = true;
+    });
   }
 
   @override
@@ -288,15 +403,11 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   Widget _buildSummaryCard() {
     final rationale = widget.aiRationale?.trim();
     final raw = widget.rawTranscript?.trim();
-    final showRaw = raw != null &&
-        raw.isNotEmpty &&
-        raw != widget.description.trim();
+    final showRaw = raw != null && raw.isNotEmpty && raw != _description.trim();
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
@@ -325,18 +436,12 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                       decoration: BoxDecoration(
                         color: _cta.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _cta.withValues(alpha: 0.35),
-                        ),
+                        border: Border.all(color: _cta.withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            size: 14,
-                            color: _cta,
-                          ),
+                          Icon(Icons.auto_awesome, size: 14, color: _cta),
                           const SizedBox(width: 4),
                           Text(
                             'AI analyzed',
@@ -356,16 +461,23 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               icon: Icons.title_outlined,
               iconColor: Colors.indigo,
               label: 'Title',
-              value: widget.title,
+              value: _title,
               isSuggested: _fromAi,
+              onEdit: () => _editTextField(
+                label: 'Title',
+                initialValue: _title,
+                maxLines: 1,
+                onSaved: (value) => _title = value,
+              ),
             ),
             _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.category_outlined,
               iconColor: _cta,
               label: 'Category',
-              value: _inferredCategory,
+              value: _category,
               isSuggested: _fromAi,
+              onEdit: _editCategory,
             ),
             _summaryDivider(),
             _buildSummaryRow(
@@ -379,8 +491,17 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               icon: Icons.description_outlined,
               iconColor: Colors.purple,
               label: _fromAi ? 'AI description' : 'Description',
-              value: widget.description,
+              value: _description,
               isSuggested: _fromAi,
+              onEdit: () => _editTextField(
+                label: 'Description',
+                initialValue: _description,
+                maxLines: 5,
+                onSaved: (value) {
+                  _description = value;
+                  _severityDetailsEdited = true;
+                },
+              ),
             ),
             if (showRaw) ...[
               _summaryDivider(),
@@ -388,7 +509,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                 icon: Icons.mic_none_rounded,
                 iconColor: Colors.teal,
                 label: 'What you said',
-                value: raw!,
+                value: raw,
               ),
             ],
             _summaryDivider(),
@@ -431,6 +552,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     required String label,
     required String value,
     bool isSuggested = false,
+    VoidCallback? onEdit,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -460,7 +582,10 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                     if (isSuggested) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: iconColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
@@ -489,6 +614,14 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
               ],
             ),
           ),
+          if (onEdit != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Edit $label',
+              onPressed: _busy ? null : onEdit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          ],
         ],
       ),
     );
@@ -521,15 +654,9 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
             text: 'Your report is reviewed by city staff',
           ),
           const SizedBox(height: 14),
-          _buildStep(
-            stepNumber: 2,
-            text: 'Field team is dispatched to assess',
-          ),
+          _buildStep(stepNumber: 2, text: 'Field team is dispatched to assess'),
           const SizedBox(height: 14),
-          _buildStep(
-            stepNumber: 3,
-            text: 'Issue is scheduled for repair',
-          ),
+          _buildStep(stepNumber: 3, text: 'Issue is scheduled for repair'),
           const SizedBox(height: 14),
           _buildStep(
             stepNumber: 4,

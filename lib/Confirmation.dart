@@ -4,21 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/report_severity.dart';
 
 class Confirmation extends StatefulWidget {
-   const Confirmation({
+  const Confirmation({
     super.key,
     required this.category,
-     required this.location,
-     required this.title,
-     required this.description,
+    required this.location,
+    required this.title,
+    required this.description,
     required this.severity,
-     this.image,
-     this.existingImageUrl,
-     this.draftId,
-     this.latitude = 0.0,
-     this.longitude = 0.0,
-     this.othercat = ""
+    this.image,
+    this.existingImageUrl,
+    this.draftId,
+    this.latitude = 0.0,
+    this.longitude = 0.0,
+    this.othercat = "",
   });
 
   final String category;
@@ -27,8 +29,10 @@ class Confirmation extends StatefulWidget {
   final String description;
   final String severity;
   final XFile? image;
+
   /// Server photo URL when continuing a draft without a new local file.
   final String? existingImageUrl;
+
   /// When set, submit updates this draft in place instead of creating a new row.
   final int? draftId;
   final double latitude;
@@ -43,11 +47,25 @@ class _ConfirmationState extends State<Confirmation> {
   static const _cta = Color(0xFF111827);
   bool _submitting = false;
   bool _savingDraft = false;
+  late String _title;
+  late String _description;
+  late String _category;
+  bool _severityDetailsEdited = false;
 
   bool get _busy => _submitting || _savingDraft;
 
+  @override
+  void initState() {
+    super.initState();
+    _title = widget.title.trim();
+    _description = widget.description.trim();
+    _category = widget.category.trim().isEmpty
+        ? ReportCategories.other
+        : widget.category.trim();
+  }
+
   Color get _severityColor {
-    switch (widget.severity.toLowerCase()) {
+    switch (_currentSeverity.toLowerCase()) {
       case 'high':
         return Colors.red;
       case 'medium':
@@ -59,16 +77,22 @@ class _ConfirmationState extends State<Confirmation> {
     }
   }
 
+  String get _currentSeverity {
+    if (!_severityDetailsEdited) return widget.severity;
+    return autoSeverity(category: _category, description: _description);
+  }
+
   Future<void> _saveAsDraft() async {
     if (_busy) return;
+    if (!_validateEditableFields()) return;
     setState(() => _savingDraft = true);
 
     final success = await ApiService.submitReport(
-      title: widget.title,
-      description: widget.description,
-      category: widget.category,
+      title: _title,
+      description: _description,
+      category: _category,
       location: widget.location,
-      severity: widget.severity,
+      severity: _currentSeverity,
       isDraft: true,
       latitude: widget.latitude,
       longitude: widget.longitude,
@@ -104,14 +128,15 @@ class _ConfirmationState extends State<Confirmation> {
 
   Future<void> _confirmAndSubmit() async {
     if (_busy) return;
+    if (!_validateEditableFields()) return;
     setState(() => _submitting = true);
 
     final success = await ApiService.submitReport(
-      title: widget.title,
-      description: widget.description,
-      category: widget.category,
+      title: _title,
+      description: _description,
+      category: _category,
       location: widget.location,
-      severity: widget.severity,
+      severity: _currentSeverity,
       isDraft: false,
       latitude: widget.latitude,
       longitude: widget.longitude,
@@ -125,7 +150,9 @@ class _ConfirmationState extends State<Confirmation> {
     if (!success) {
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit report. Please try again.')),
+        const SnackBar(
+          content: Text('Failed to submit report. Please try again.'),
+        ),
       );
       return;
     }
@@ -134,9 +161,7 @@ class _ConfirmationState extends State<Confirmation> {
       context: context,
       barrierDismissible: false,
       builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
           child: Column(
@@ -159,10 +184,7 @@ class _ConfirmationState extends State<Confirmation> {
               const Text(
                 'Report submitted!',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Text(
@@ -188,6 +210,111 @@ class _ConfirmationState extends State<Confirmation> {
     );
   }
 
+  bool _validateEditableFields() {
+    final missing = <String>[];
+    if (_title.trim().isEmpty) missing.add('title');
+    if (_category.trim().isEmpty) missing.add('category');
+    if (_description.trim().isEmpty) missing.add('description');
+
+    if (missing.isEmpty) return true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Please enter a ${missing.first}.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return false;
+  }
+
+  Future<void> _editTextField({
+    required String label,
+    required String initialValue,
+    required int maxLines,
+    required ValueChanged<String> onSaved,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit $label'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: maxLines,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || !mounted) return;
+    if (result.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label cannot be empty.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => onSaved(result.trim()));
+  }
+
+  Future<void> _editCategory() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Edit Category',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              ...ReportCategories.all.map(
+                (category) => ListTile(
+                  title: Text(ReportCategories.label(category)),
+                  subtitle: Text(ReportCategories.subtitle(category)),
+                  leading: Icon(ReportCategories.icon(category)),
+                  trailing: _category == category
+                      ? const Icon(Icons.check_rounded, color: _cta)
+                      : null,
+                  onTap: () => Navigator.pop(context, category),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    setState(() {
+      _category = result;
+      _severityDetailsEdited = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,7 +327,13 @@ class _ConfirmationState extends State<Confirmation> {
           'Confirm Report',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        leading: IconButton(onPressed: () => Navigator.pop(context, true), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white,)),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context, true),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -214,7 +347,7 @@ class _ConfirmationState extends State<Confirmation> {
                   const SizedBox(height: 12),
                   _buildSummaryCard(),
                   const SizedBox(height: 12),
-                  _buildWhatHappensNext()
+                  _buildWhatHappensNext(),
                 ],
               ),
             ),
@@ -250,10 +383,7 @@ class _ConfirmationState extends State<Confirmation> {
       image = _photoFallback();
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: image,
-    );
+    return ClipRRect(borderRadius: BorderRadius.circular(22), child: image);
   }
 
   Widget _photoFallback() {
@@ -264,6 +394,7 @@ class _ConfirmationState extends State<Confirmation> {
       child: Icon(Icons.image_outlined, size: 56, color: Colors.grey[600]),
     );
   }
+
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -271,7 +402,15 @@ class _ConfirmationState extends State<Confirmation> {
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
-          CircleAvatar(backgroundColor: Colors.white.withValues(alpha: 0.2),radius: 26,child: const Icon(Icons.check_circle_outline,size: 36,color: Colors.white,),),
+          CircleAvatar(
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
+            radius: 26,
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 8),
           const Text(
             'Review your report',
@@ -298,9 +437,7 @@ class _ConfirmationState extends State<Confirmation> {
   Widget _buildSummaryCard() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
@@ -321,14 +458,21 @@ class _ConfirmationState extends State<Confirmation> {
               icon: Icons.title_outlined,
               iconColor: Colors.indigo,
               label: 'Title',
-              value: widget.title,
+              value: _title,
+              onEdit: () => _editTextField(
+                label: 'Title',
+                initialValue: _title,
+                maxLines: 1,
+                onSaved: (value) => _title = value,
+              ),
             ),
             _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.category_outlined,
               iconColor: _cta,
               label: 'Category',
-              value: widget.category,
+              value: _category,
+              onEdit: _editCategory,
             ),
             _summaryDivider(),
             _buildSummaryRow(
@@ -342,14 +486,23 @@ class _ConfirmationState extends State<Confirmation> {
               icon: Icons.description_outlined,
               iconColor: Colors.purple,
               label: 'Description',
-              value: widget.description,
+              value: _description,
+              onEdit: () => _editTextField(
+                label: 'Description',
+                initialValue: _description,
+                maxLines: 5,
+                onSaved: (value) {
+                  _description = value;
+                  _severityDetailsEdited = true;
+                },
+              ),
             ),
             _summaryDivider(),
             _buildSummaryRow(
               icon: Icons.warning_amber_rounded,
               iconColor: _severityColor,
               label: 'Severity',
-              value: widget.severity,
+              value: _currentSeverity,
             ),
           ],
         ),
@@ -372,7 +525,7 @@ class _ConfirmationState extends State<Confirmation> {
     required Color iconColor,
     required String label,
     required String value,
-    Widget? trailing,
+    VoidCallback? onEdit,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -408,11 +561,18 @@ class _ConfirmationState extends State<Confirmation> {
               ],
             ),
           ),
+          if (onEdit != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Edit $label',
+              onPressed: _busy ? null : onEdit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          ],
         ],
       ),
     );
   }
-
 
   Widget _buildWhatHappensNext() {
     return Container(
@@ -441,15 +601,9 @@ class _ConfirmationState extends State<Confirmation> {
             text: 'Your report is reviewed by city staff',
           ),
           const SizedBox(height: 14),
-          _buildStep(
-            stepNumber: 2,
-            text: 'Field team is dispatched to assess',
-          ),
+          _buildStep(stepNumber: 2, text: 'Field team is dispatched to assess'),
           const SizedBox(height: 14),
-          _buildStep(
-            stepNumber: 3,
-            text: 'Issue is scheduled for repair',
-          ),
+          _buildStep(stepNumber: 3, text: 'Issue is scheduled for repair'),
           const SizedBox(height: 14),
           _buildStep(
             stepNumber: 4,
@@ -497,10 +651,9 @@ class _ConfirmationState extends State<Confirmation> {
     );
   }
 
-
   Widget _buildActionButtons() {
     return Container(
-      width: double.infinity ,
+      width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -603,7 +756,11 @@ class _ConfirmationState extends State<Confirmation> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: _busy ? null : () => Navigator.pop(context, true),
-              icon: Icon(Icons.edit_outlined, size: 20, color: Colors.grey[800]),
+              icon: Icon(
+                Icons.edit_outlined,
+                size: 20,
+                color: Colors.grey[800],
+              ),
               label: Text(
                 'Go Back To Edit',
                 style: TextStyle(
