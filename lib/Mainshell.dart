@@ -10,7 +10,9 @@ import 'HomeScreen.dart';
 import 'Map.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  final bool showAiTourOnStart;
+
+  const MainShell({super.key, this.showAiTourOnStart = false});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -41,13 +43,12 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    _maybeStartFirstRunTour();
+    if (widget.showAiTourOnStart) {
+      _startInitialTour();
+    }
   }
 
-  Future<void> _maybeStartFirstRunTour() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_tourSeenKey) == true) return;
-
+  void _startInitialTour() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Future<void>.delayed(const Duration(milliseconds: 650), () {
@@ -73,73 +74,73 @@ class _MainShellState extends State<MainShell> {
   }
 
   List<TourStep> get _tourSteps => [
-        TourStep(
-          targetKey: _statsTourKey,
-          title: 'AI guide: neighborhood pulse',
-          content:
-              'These cards summarize what is happening nearby. Tap one to jump into reports filtered by that status.',
-          icon: Icons.auto_awesome,
-        ),
-        TourStep(
-          targetKey: _quickActionsTourKey,
-          title: 'Create reports quickly',
-          content:
-              'Use voice when you want to describe a street issue hands-free, or photo report when a picture explains it faster.',
-          icon: Icons.add_location_alt_rounded,
-        ),
-        TourStep(
-          targetKey: _voiceActionTourKey,
-          title: 'Try it now: Voice Report',
-          content:
-              'Let’s create a test report using your voice. Tap "Try it" to jump in!',
-          icon: Icons.graphic_eq_rounded,
-          actionLabel: 'Try it',
-          onAction: () {
-            _completeTour();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const VoiceReportScreen(isTour: true),
-              ),
-            );
-          },
-        ),
-        TourStep(
-          targetKey: _recentReportsTourKey,
-          title: 'Scan recent activity',
-          content:
-              'Filter by category, review nearby reports, and tap a report to open its pin on the map.',
-          icon: Icons.manage_search_rounded,
-        ),
-        TourStep(
-          targetKey: _mapNavTourKey,
-          title: 'Browse reports on the map',
-          content:
-              'Reports shows issues geographically so you can see clusters, locations, and the issue nearest you.',
-          icon: Icons.location_on_outlined,
-        ),
-        TourStep(
-          targetKey: _addNavTourKey,
-          title: 'Report from anywhere',
-          content:
-              'Tap + to start a voice or photo report without leaving the tab you’re on.',
-          icon: Icons.add_rounded,
-        ),
-        TourStep(
-          targetKey: _updatesNavTourKey,
-          title: 'Stay in the loop',
-          content:
-              'Updates collects status changes and neighborhood activity as reports move forward.',
-          icon: Icons.notifications_none_rounded,
-        ),
-        TourStep(
-          targetKey: _profileNavTourKey,
-          title: 'Manage your work',
-          content:
-              'Your profile keeps drafts, submitted reports, badges, and account preferences in one place.',
-          icon: Icons.person_rounded,
-        ),
-      ];
+    TourStep(
+      targetKey: _statsTourKey,
+      title: 'AI guide: neighborhood pulse',
+      content:
+          'These cards summarize what is happening nearby. Tap one to jump into reports filtered by that status.',
+      icon: Icons.auto_awesome,
+    ),
+    TourStep(
+      targetKey: _quickActionsTourKey,
+      title: 'Create reports quickly',
+      content:
+          'Use voice when you want to describe a street issue hands-free, or photo report when a picture explains it faster.',
+      icon: Icons.add_location_alt_rounded,
+    ),
+    TourStep(
+      targetKey: _voiceActionTourKey,
+      title: 'Try it now: Voice Report',
+      content:
+          'Let’s create a test report using your voice. Tap "Try it" to jump in!',
+      icon: Icons.graphic_eq_rounded,
+      actionLabel: 'Try it',
+      onAction: () {
+        _completeTour();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const VoiceReportScreen(isTour: true),
+          ),
+        );
+      },
+    ),
+    TourStep(
+      targetKey: _recentReportsTourKey,
+      title: 'Scan recent activity',
+      content:
+          'Filter by category, review nearby reports, and tap a report to open its pin on the map.',
+      icon: Icons.manage_search_rounded,
+    ),
+    TourStep(
+      targetKey: _mapNavTourKey,
+      title: 'Browse reports on the map',
+      content:
+          'Reports shows issues geographically so you can see clusters, locations, and the issue nearest you.',
+      icon: Icons.location_on_outlined,
+    ),
+    TourStep(
+      targetKey: _addNavTourKey,
+      title: 'Report from anywhere',
+      content:
+          'Tap + to start a voice or photo report without leaving the tab you’re on.',
+      icon: Icons.add_rounded,
+    ),
+    TourStep(
+      targetKey: _updatesNavTourKey,
+      title: 'Stay in the loop',
+      content:
+          'Updates collects status changes and neighborhood activity as reports move forward.',
+      icon: Icons.notifications_none_rounded,
+    ),
+    TourStep(
+      targetKey: _profileNavTourKey,
+      title: 'Manage your work',
+      content:
+          'Your profile keeps drafts, submitted reports, badges, and account preferences in one place.',
+      icon: Icons.person_rounded,
+    ),
+  ];
 
   void openMap({int? reportId}) {
     setState(() {
@@ -348,7 +349,10 @@ class _ReportSheetOption extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: _MainShellState._muted),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: _MainShellState._muted,
+              ),
             ],
           ),
         ),
@@ -387,99 +391,99 @@ class _FloatingNavDock extends StatelessWidget {
         alignment: Alignment.bottomCenter,
         heightFactor: 1,
         child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: _MainShellState._dockBg,
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SizedBox(
-              height: 64,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _DockItem(
-                        key: homeKey,
-                        icon: Icons.home_outlined,
-                        selectedIcon: Icons.home_rounded,
-                        label: 'Home',
-                        selected: currentIndex == 0,
-                        onTap: () => onSelect(0),
-                      ),
+          decoration: BoxDecoration(
+            color: _MainShellState._dockBg,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            height: 64,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _DockItem(
+                      key: homeKey,
+                      icon: Icons.home_outlined,
+                      selectedIcon: Icons.home_rounded,
+                      label: 'Home',
+                      selected: currentIndex == 0,
+                      onTap: () => onSelect(0),
                     ),
-                    Expanded(
-                      child: _DockItem(
-                        key: reportsKey,
-                        icon: Icons.location_on_outlined,
-                        selectedIcon: Icons.location_on_rounded,
-                        label: 'Reports',
-                        selected: currentIndex == 1,
-                        onTap: () => onSelect(1),
-                      ),
+                  ),
+                  Expanded(
+                    child: _DockItem(
+                      key: reportsKey,
+                      icon: Icons.location_on_outlined,
+                      selectedIcon: Icons.location_on_rounded,
+                      label: 'Reports',
+                      selected: currentIndex == 1,
+                      onTap: () => onSelect(1),
                     ),
-                    Expanded(
-                      child: Center(
-                        child: KeyedSubtree(
-                          key: addKey,
-                          child: Material(
-                            color: _MainShellState._cta,
-                            shape: const CircleBorder(),
-                            elevation: 0,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: onAdd,
-                              child: const SizedBox(
-                                width: 48,
-                                height: 48,
-                                child: Icon(
-                                  Icons.add_rounded,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: KeyedSubtree(
+                        key: addKey,
+                        child: Material(
+                          color: _MainShellState._cta,
+                          shape: const CircleBorder(),
+                          elevation: 0,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: onAdd,
+                            child: const SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: 26,
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: _DockItem(
-                        key: updatesKey,
-                        icon: Icons.notifications_none_rounded,
-                        selectedIcon: Icons.notifications_rounded,
-                        label: 'Updates',
-                        selected: currentIndex == 2,
-                        onTap: () => onSelect(2),
-                      ),
+                  ),
+                  Expanded(
+                    child: _DockItem(
+                      key: updatesKey,
+                      icon: Icons.notifications_none_rounded,
+                      selectedIcon: Icons.notifications_rounded,
+                      label: 'Updates',
+                      selected: currentIndex == 2,
+                      onTap: () => onSelect(2),
                     ),
-                    Expanded(
-                      child: _DockItem(
-                        key: profileKey,
-                        icon: Icons.person_outline_rounded,
-                        selectedIcon: Icons.person_rounded,
-                        label: 'Profile',
-                        selected: currentIndex == 3,
-                        onTap: () => onSelect(3),
-                      ),
+                  ),
+                  Expanded(
+                    child: _DockItem(
+                      key: profileKey,
+                      icon: Icons.person_outline_rounded,
+                      selectedIcon: Icons.person_rounded,
+                      label: 'Profile',
+                      selected: currentIndex == 3,
+                      onTap: () => onSelect(3),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
+      ),
     );
   }
 }

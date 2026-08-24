@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   StreamSubscription<AuthState>? _authSub;
 
-	@override
+  @override
   void initState() {
     super.initState();
     if (AuthService.isConfigured) {
@@ -72,8 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await showErrorPopup(context, 'Please fill in all fields');
       return;
     }
-    if (!_isLogin &&
-        (_nameCtrl.text.isEmpty || _lastNameCtrl.text.isEmpty)) {
+    if (!_isLogin && (_nameCtrl.text.isEmpty || _lastNameCtrl.text.isEmpty)) {
       await showErrorPopup(context, 'Please enter your first and last name');
       return;
     }
@@ -110,16 +109,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (ApiService.userId != null || AuthService.isSignedIn) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainShell()),
+        MaterialPageRoute(
+          builder: (_) => MainShell(showAiTourOnStart: !_isLogin),
+        ),
       );
     }
   }
+
   void _forgotPassword() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ForgotPasswordScreen(
-          initialEmail: _emailCtrl.text.trim(),
-        ),
+        builder: (_) =>
+            ForgotPasswordScreen(initialEmail: _emailCtrl.text.trim()),
       ),
     );
   }
@@ -148,9 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
         await showErrorPopup(context, syncError);
         return;
       }
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainShell()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));
       return;
     }
 
@@ -210,18 +211,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameCtrl,
-                  decoration: _inputDecoration(
-                    hint: 'Alex',
-                  ),
+                  decoration: _inputDecoration(hint: 'Alex'),
                 ),
                 const SizedBox(height: 18),
                 _label('Last Name'),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _lastNameCtrl,
-                  decoration: _inputDecoration(
-                    hint: 'Rivera',
-                  ),
+                  decoration: _inputDecoration(hint: 'Rivera'),
                 ),
                 const SizedBox(height: 18),
               ],
@@ -231,9 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                decoration: _inputDecoration(
-                  hint: 'you@example.com',
-                ),
+                decoration: _inputDecoration(hint: 'you@example.com'),
               ),
               const SizedBox(height: 18),
               _label('Password'),
@@ -254,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              SizedBox(height: 15,),
+              SizedBox(height: 15),
               if (_isLogin)
                 Row(
                   children: [
@@ -420,10 +415,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  InputDecoration _inputDecoration({
-    required String hint,
-    Widget? suffix,
-  }) {
+  InputDecoration _inputDecoration({required String hint, Widget? suffix}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: _muted.withValues(alpha: 0.7)),
