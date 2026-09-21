@@ -5,38 +5,89 @@ import 'package:flutter/material.dart';
 class ReportCategories {
   ReportCategories._();
 
-  static const roadDamage = 'Road Damage';
-  static const publicWorks = 'Public Works';
-  static const environmental = 'Environmental';
-  static const accessibility = 'Accessibility';
+  static const streetsAndTransportation = 'Streets & Transportation';
+  static const trashAndEnvironment = 'Trash & Environment';
+  static const natureAndWater = 'Nature & Water';
+  static const buildingsAndPublicSpaces = 'Buildings & Public Spaces';
   static const other = 'Other';
 
+  static const roadDamage = streetsAndTransportation;
+  static const publicWorks = trashAndEnvironment;
+  static const environmental = natureAndWater;
+  static const accessibility = buildingsAndPublicSpaces;
+
   static const all = [
-    roadDamage,
-    publicWorks,
-    environmental,
-    accessibility,
+    streetsAndTransportation,
+    trashAndEnvironment,
+    natureAndWater,
+    buildingsAndPublicSpaces,
     other,
   ];
 
+  static const Map<String, List<String>> specificOptions = {
+    streetsAndTransportation: [
+      'Pothole',
+      'Damaged Sidewalk/Curb',
+      'Traffic Light',
+      'Street Light',
+      'Damaged/Missing Sign',
+      'Road Debris',
+      'Parking/Traffic',
+      'Other',
+    ],
+    trashAndEnvironment: [
+      'Litter/Garbage',
+      'Missed Trash/Recycling',
+      'Illegal Dumping',
+      'Graffiti',
+      'Pollution',
+      'Hazardous Waste',
+      'Noise',
+      'Other',
+    ],
+    natureAndWater: [
+      'Fallen Tree/Branch',
+      'Overgrown Vegetation',
+      'Tree Maintenance',
+      'Flooding',
+      'Clogged Storm Drain',
+      'Standing Water',
+      'Sewer/Water Problem',
+      'Other',
+    ],
+    buildingsAndPublicSpaces: [
+      'Building Damage',
+      'Property Maintenance',
+      'Construction/Code Violation',
+      'Housing/Rental Problem',
+      'Park Maintenance',
+      'Animal Issue',
+      'Rodent/Insect Issue',
+      'Other',
+    ],
+    other: [
+      'Other',
+    ],
+  };
+
   /// Main categories only (excludes Other) — useful for map "Other" filtering.
   static const primary = [
-    roadDamage,
-    publicWorks,
-    environmental,
-    accessibility,
+    streetsAndTransportation,
+    trashAndEnvironment,
+    natureAndWater,
+    buildingsAndPublicSpaces,
   ];
 
   static String label(String? category) {
     switch (category) {
-      case roadDamage:
-        return 'Roads';
-      case publicWorks:
-        return 'Town';
-      case environmental:
-        return 'Environment';
-      case accessibility:
-        return 'Accessibility';
+      case streetsAndTransportation:
+        return 'Streets';
+      case trashAndEnvironment:
+        return 'Trash';
+      case natureAndWater:
+        return 'Nature';
+      case buildingsAndPublicSpaces:
+        return 'Buildings';
       case other:
         return 'Other';
       default:
@@ -46,14 +97,14 @@ class ReportCategories {
 
   static String shortLabel(String? category) {
     switch (category) {
-      case roadDamage:
-        return 'Road';
-      case publicWorks:
-        return 'Town';
-      case environmental:
-        return 'Environment';
-      case accessibility:
-        return 'ADA';
+      case streetsAndTransportation:
+        return 'Street';
+      case trashAndEnvironment:
+        return 'Trash';
+      case natureAndWater:
+        return 'Nature';
+      case buildingsAndPublicSpaces:
+        return 'Building';
       default:
         return 'Other';
     }
@@ -61,14 +112,14 @@ class ReportCategories {
 
   static String subtitle(String? category) {
     switch (category) {
-      case roadDamage:
-        return 'Potholes, cracks, pavement';
-      case publicWorks:
-        return 'Lights, signs, trash, hydrants';
-      case environmental:
-        return 'Trees, flooding, litter, e-waste';
-      case accessibility:
-        return 'Ramps, curb cuts, mobility';
+      case streetsAndTransportation:
+        return 'Potholes, lights, signs, traffic, sidewalks';
+      case trashAndEnvironment:
+        return 'Litter, dumping, graffiti, pollution, noise';
+      case natureAndWater:
+        return 'Trees, branches, flooding, drains, water';
+      case buildingsAndPublicSpaces:
+        return 'Building issues, code violations, parks, animals';
       default:
         return 'Anything that doesn\'t fit above';
     }
@@ -76,14 +127,14 @@ class ReportCategories {
 
   static IconData icon(String? category) {
     switch ((category ?? '').toLowerCase()) {
-      case 'road damage':
+      case 'streets & transportation':
         return Icons.add_road;
-      case 'public works':
-        return Icons.handyman_outlined;
-      case 'environmental':
-        return Icons.eco_outlined;
-      case 'accessibility':
-        return Icons.accessible_forward;
+      case 'trash & environment':
+        return Icons.delete_outline_rounded;
+      case 'nature & water':
+        return Icons.park_outlined;
+      case 'buildings & public spaces':
+        return Icons.business_outlined;
       default:
         return Icons.flag_outlined;
     }
@@ -91,13 +142,13 @@ class ReportCategories {
 
   static Color color(String? category) {
     switch (category) {
-      case roadDamage:
+      case streetsAndTransportation:
         return Colors.red;
-      case publicWorks:
+      case trashAndEnvironment:
         return Colors.orange;
-      case environmental:
+      case natureAndWater:
         return Colors.green;
-      case accessibility:
+      case buildingsAndPublicSpaces:
         return Colors.blue;
       default:
         return Colors.purple;

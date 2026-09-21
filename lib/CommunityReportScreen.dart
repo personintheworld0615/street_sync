@@ -40,6 +40,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   final _descriptionController = TextEditingController();
   String? _descirption;
   String? _selectedSeverity;
+  String? _selectedMajorCategory;
+  String? _selectedSpecificIssue;
 
   bool _showSeverity = false;
    GoogleMapController? _controller;
@@ -829,6 +831,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildCategoryCard() {
+    final majorOptions = [
+      ReportCategories.streetsAndTransportation,
+      ReportCategories.trashAndEnvironment,
+      ReportCategories.natureAndWater,
+      ReportCategories.buildingsAndPublicSpaces,
+      ReportCategories.other,
+    ];
+
+    final selectedOptions = _selectedMajorCategory == null
+        ? const <String>[]
+        : (ReportCategories.specificOptions[_selectedMajorCategory] ?? const <String>[]);
+
     return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -844,58 +858,95 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.roadDamage,
-                    label: ReportCategories.label(ReportCategories.roadDamage),
-                    subtitle: ReportCategories.subtitle(ReportCategories.roadDamage),
-                    icon: ReportCategories.icon(ReportCategories.roadDamage),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.publicWorks,
-                    label: ReportCategories.label(ReportCategories.publicWorks),
-                    subtitle: ReportCategories.subtitle(ReportCategories.publicWorks),
-                    icon: ReportCategories.icon(ReportCategories.publicWorks),
-                  ),
-                ),
-              ],
+            Text(
+              'Major category',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+                color: Colors.grey[600],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.environmental,
-                    label: ReportCategories.label(ReportCategories.environmental),
-                    subtitle: ReportCategories.subtitle(ReportCategories.environmental),
-                    icon: ReportCategories.icon(ReportCategories.environmental),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _selectedMajorCategory,
+                  hint: const Text('Select a major category'),
+                  items: majorOptions.map((option) {
+                    return DropdownMenuItem<String>(
+                      value: option,
+                      child: Text(option),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMajorCategory = value;
+                      _selectedSpecificIssue = null;
+                      _selectedCategory = value ?? ReportCategories.other;
+                      if (value == ReportCategories.other) {
+                        _otherCategoryController.clear();
+                      }
+                    });
+                  },
+                ),
+              ),
+            ),
+            if (_selectedMajorCategory != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Specific issue',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _selectedSpecificIssue,
+                    hint: const Text('Select a specific issue'),
+                    items: selectedOptions.map((option) {
+                      return DropdownMenuItem<String>(
+                        value: option,
+                        child: Text(option),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSpecificIssue = value;
+                        if (value == 'Other') {
+                          _selectedCategory = ReportCategories.other;
+                          _otherCategoryController.clear();
+                        } else {
+                          _selectedCategory = _selectedMajorCategory ?? ReportCategories.other;
+                          _otherCategoryController.text = value ?? '';
+                        }
+                      });
+                    },
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.accessibility,
-                    label: ReportCategories.label(ReportCategories.accessibility),
-                    subtitle: ReportCategories.subtitle(ReportCategories.accessibility),
-                    icon: ReportCategories.icon(ReportCategories.accessibility),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _buildCategoryChip(
-              value: ReportCategories.other,
-              label: ReportCategories.label(ReportCategories.other),
-              subtitle: ReportCategories.subtitle(ReportCategories.other),
-              icon: ReportCategories.icon(ReportCategories.other),
-            ),
-            if (_selectedCategory == ReportCategories.other) ...[
-              const SizedBox(height: 10),
+              ),
+            ],
+            if (_selectedCategory == ReportCategories.other && _selectedSpecificIssue == null) ...[
+              const SizedBox(height: 12),
               Container(
                 height: 48,
                 decoration: BoxDecoration(
@@ -906,7 +957,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 child: TextField(
                   controller: _otherCategoryController,
                   decoration: const InputDecoration(
-                    hintText: 'e.g. noise, stray animal, abandoned car',
+                    hintText: 'Tell us what the issue is',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.fromLTRB(18, 12, 16, 12),
                   ),
@@ -1344,11 +1395,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       );
     } catch (_) {}
 
-    final category = _selectedCategory == 'Other'
+    final category = _selectedCategory == ReportCategories.other
         ? (_otherCategoryController.text.trim().isEmpty
             ? 'Other'
             : _otherCategoryController.text.trim())
-        : (_selectedCategory ?? 'Other');
+        : (_selectedCategory ?? ReportCategories.other);
     final description = _descriptionController.text.trim();
     final title = _titleController.text.trim();
     final severity = _selectedSeverity ?? 'medium';
@@ -1429,23 +1480,24 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   final aiResult = await ApiService.analyzeVoiceReport(_transcript);
                   _titleController.text = aiResult['title'] ?? '';
                   _descriptionController.text = aiResult['description'] ?? _transcript;
-                  
-                  // Extract matching category string from ReportCategories
-                  final aiCat = aiResult['category'];
-                  if (aiCat != null) {
-                    final match = ReportCategories.all.firstWhere(
-                      (c) => c.toLowerCase() == aiCat.toLowerCase(),
-                      orElse: () => _selectedCategory ?? ReportCategories.other,
-                    );
-                    _selectedCategory = match;
-                  }
-                  
-                  _selectedSeverity = aiResult['severity'];
-                } catch (e) {
-                  print('AI voice analysis failed: $e');
-                } finally {
-                  setState(() => _submitting = false);
+
+                final aiCat = aiResult['category'];
+                if (aiCat != null) {
+                  final match = ReportCategories.all.firstWhere(
+                    (c) => c.toLowerCase() == aiCat.toLowerCase(),
+                    orElse: () => _selectedCategory ?? ReportCategories.other,
+                  );
+                  _selectedCategory = match;
+                  _selectedMajorCategory = match;
+                  _selectedSpecificIssue = null;
                 }
+
+                _selectedSeverity = aiResult['severity'];
+              } catch (e) {
+                print('AI voice analysis failed: $e');
+              } finally {
+                setState(() => _submitting = false);
+              }
               }
 
               final errors = <String>[];
