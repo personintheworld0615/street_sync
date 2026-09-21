@@ -69,6 +69,7 @@ class MyDraftReportsScreen extends StatelessWidget {
                 return ReportListCard(
                   icon: report['icon'] as IconData? ??
                       ReportCategories.icon(report['category'] as String?),
+                  category: report['category'] as String?,
                   title: ReportListCard.displayTitle(
                     report,
                     fallback: 'Draft report',

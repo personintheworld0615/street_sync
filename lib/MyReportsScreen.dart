@@ -47,6 +47,7 @@ class MyReportsScreen extends StatelessWidget {
                 return ReportListCard(
                   icon: report['icon'] as IconData? ??
                       ReportCategories.icon(report['category'] as String?),
+                  category: report['category'] as String?,
                   title: ReportListCard.displayTitle(report),
                   location: report['location'] as String? ?? '',
                   time: ReportListCard.formatTime(report['time']),

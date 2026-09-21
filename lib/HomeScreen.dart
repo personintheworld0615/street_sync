@@ -446,6 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   : (map['description'] as String? ?? 'Report');
                           return ReportListCard(
                             icon: _iconFromCat(map['category'] as String?),
+                            category: map['category'] as String?,
                             pill: ReportListCard.displayPill(map),
                             title: title,
                             location: map['location'] as String? ?? '',

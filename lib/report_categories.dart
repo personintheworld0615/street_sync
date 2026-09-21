@@ -92,15 +92,15 @@ class ReportCategories {
   static Color color(String? category) {
     switch (category) {
       case roadDamage:
-        return Colors.red;
+        return const Color(0xFFE53935);
       case publicWorks:
-        return Colors.orange;
+        return const Color(0xFFFB8C00);
       case environmental:
-        return Colors.green;
+        return const Color(0xFF43A047);
       case accessibility:
-        return Colors.blue;
+        return const Color(0xFF2160E1);
       default:
-        return Colors.purple;
+        return const Color(0xFF7C3AED);
     }
   }
 

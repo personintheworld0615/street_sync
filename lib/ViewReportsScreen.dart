@@ -106,6 +106,7 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
                         icon: ReportCategories.icon(
                           report['category'] as String?,
                         ),
+                        category: report['category'] as String?,
                         title: ReportListCard.displayTitle(report),
                         location: report['location'] as String? ?? '',
                         time: ReportListCard.formatTime(report['time']),

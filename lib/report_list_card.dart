@@ -11,7 +11,8 @@ class ReportListCard extends StatelessWidget {
     required this.title,
     required this.location,
     required this.time,
-    required this.pill,
+    this.pill,
+    this.category,
     this.onTap,
   });
 
@@ -19,7 +20,8 @@ class ReportListCard extends StatelessWidget {
   final String title;
   final String location;
   final String time;
-  final String pill;
+  final String? pill;
+  final String? category;
   final VoidCallback? onTap;
 
   static const _ink = Color(0xFF111827);
@@ -42,7 +44,15 @@ class ReportListCard extends StatelessWidget {
 
   static String displayPill(Map<String, dynamic> report, {String? fallback}) {
     final status = (report['status'] as String?)?.trim();
-    if (status != null && status.isNotEmpty) return status;
+    if (status != null && status.isNotEmpty) {
+      switch (status.toLowerCase()) {
+        case 'in_progress':
+        case 'inprogress':
+          return 'In Progress';
+        default:
+          return status;
+      }
+    }
     return fallback ?? 'Open';
   }
 
@@ -66,64 +76,52 @@ class ReportListCard extends StatelessWidget {
   }
 
   static Color pillColor(String pill) {
-    switch (pill.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFE53935);
-      case 'medium':
-        return const Color(0xFFFB8C00);
-      case 'low':
-        return const Color(0xFF43A047);
+    switch (pill.trim().toLowerCase()) {
       case 'draft':
         return const Color(0xFFB86B2A);
       case 'open':
-        return const Color(0xFF4B5563);
+        return const Color(0xFF2160E1);
       case 'in progress':
-        return const Color(0xFFEA580C);
+      case 'in_progress':
+        return const Color(0xFFFB8C00);
       case 'resolved':
-        return const Color(0xFF0F766E);
+        return const Color(0xFF43A047);
       default:
         return _muted;
-    }
-  }
-
-  static Color pillFill(String pill) {
-    switch (pill.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFFFEBEE);
-      case 'medium':
-        return const Color(0xFFFFF3E0);
-      case 'low':
-        return const Color(0xFFE8F5E9);
-      case 'draft':
-        return const Color(0xFFFFF1E6);
-      case 'open':
-        return const Color(0xFFF3F4F6);
-      case 'in progress':
-        return const Color(0xFFFFF1E8);
-      case 'resolved':
-        return const Color(0xFFE6F4F1);
-      default:
-        return const Color(0xFFF3F4F6);
     }
   }
 
   static String _formatPillLabel(String pill) {
     final trimmed = pill.trim();
     if (trimmed.isEmpty) return 'Unknown';
-    if (trimmed.toLowerCase() == 'in progress') return 'In progress';
-    return '${trimmed[0].toUpperCase()}${trimmed.substring(1).toLowerCase()}';
+    switch (trimmed.toLowerCase()) {
+      case 'in progress':
+      case 'in_progress':
+        return 'In Progress';
+      case 'open':
+        return 'Open';
+      case 'resolved':
+        return 'Resolved';
+      case 'draft':
+        return 'Draft';
+      default:
+        return '${trimmed[0].toUpperCase()}${trimmed.substring(1)}';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final pillLabel = _formatPillLabel(pill);
+    final showPill = pill != null && pill!.trim().isNotEmpty;
+    final pillLabel = showPill ? _formatPillLabel(pill!) : '';
+    final accent = ReportCategories.color(category);
+    final iconBg = accent.withValues(alpha: 0.12);
 
     final titleStyle = GoogleFonts.inter(
       fontSize: 17,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
       color: _ink,
       height: 1.2,
-      letterSpacing: -0.2,
+      letterSpacing: -0.25,
     );
     final metaStyle = GoogleFonts.inter(
       fontSize: 13,
@@ -142,10 +140,14 @@ class ReportListCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: const Color(0xFFEEF0F3),
-                    child: Icon(icon, size: 20, color: _ink),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 22, color: accent),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -169,26 +171,18 @@ class ReportListCard extends StatelessWidget {
                                 style: metaStyle,
                               ),
                             ),
-                            Text(' · ', style: metaStyle),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: pillFill(pill),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
+                            if (showPill) ...[
+                              Text(' · ', style: metaStyle),
+                              Text(
                                 pillLabel,
                                 style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: pillColor(pill),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: pillColor(pill!),
                                   height: 1.2,
                                 ),
                               ),
-                            ),
+                            ],
                             Text(' · ', style: metaStyle),
                             Text(time, style: metaStyle),
                           ],
