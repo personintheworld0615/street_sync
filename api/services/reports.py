@@ -1,12 +1,19 @@
 from datetime import datetime
 from typing import Optional
 
-from api.schemas.reports import Reports, ReportsFull, Users, UsersDetailed
+from api.schemas.reports import (
+    Reports,
+    ReportsFull,
+    UpdateOut,
+    UsersDetailed,
+)
 from api.schemas.voice import ModelOutput
 from fastapi import HTTPException
-from api.models.reports import User, Report
+from api.models.reports import User, Report, Update
 from api.services.storage import persist_report_image
 from api.services.voice_ai import analyze_voice_report as _analyze_voice_report
+
+_ALLOWED_STATUSES = {"Open", "In Progress", "Resolved"}
 
 
 def analyze_voice_report(description: str) -> ModelOutput:
@@ -20,18 +27,18 @@ def generate_ai_title(description: str) -> str:
 def report_to_schema(row: Report) -> ReportsFull:
     return ReportsFull(
         id=row.id,
-        title=row.title,
-        description=row.description,
-        category=row.category,
-        latitude=row.latitude,
-        longitude=row.longitude,
-        location=row.location,
+        title=row.title or "",
+        description=row.description or "",
+        category=row.category or "Other",
+        latitude=float(row.latitude or 0.0),
+        longitude=float(row.longitude or 0.0),
+        location=row.location or "",
         image=row.image,
-        time=row.time,
-        severity=row.severity,
-        status=row.status,
+        time=row.time or datetime.utcnow(),
+        severity=(row.severity or "medium"),
+        status=row.status or "Open",
         user_id=row.user_id,
-        isDraft=row.is_draft,
+        isDraft=bool(row.is_draft),
     )
 
 
@@ -214,15 +221,19 @@ def delete_account(db, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # Remove reports first so FK constraints don't block the user delete.
+    # Remove updates + reports first so FK constraints don't block the user delete.
+    db.query(Update).filter(Update.user_id == user_id).delete()
     db.query(Report).filter(Report.user_id == user_id).delete()
     db.delete(user)
     db.commit()
     return {"message": "Account deleted successfully"}
+
+
 def delete_report(db, report_id: int):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    db.query(Update).filter(Update.report_id == report_id).delete()
     db.delete(report)
     db.commit()
     return {"message": "Report deleted successfully"}
@@ -269,3 +280,102 @@ def update_report(db, report_id: int, report: Reports, current_user: User):
         bump_user_report_count(db, report.user_id)
 
     return report_to_schema(row)
+
+
+def update_to_schema(row: Update) -> UpdateOut:
+    return UpdateOut(
+        id=row.id,
+        report_id=row.report_id,
+        user_id=row.user_id,
+        report_title=row.report_title,
+        old_status=row.old_status,
+        new_status=row.new_status,
+        comment=row.comment,
+        is_read=row.is_read,
+        created_at=row.created_at,
+    )
+
+
+def _normalize_status(status: str) -> str:
+    cleaned = (status or "").strip()
+    lowered = cleaned.lower()
+    aliases = {
+        "open": "Open",
+        "in progress": "In Progress",
+        "in_progress": "In Progress",
+        "inprogress": "In Progress",
+        "resolved": "Resolved",
+        "closed": "Resolved",
+    }
+    if lowered in aliases:
+        return aliases[lowered]
+    if cleaned in _ALLOWED_STATUSES:
+        return cleaned
+    raise HTTPException(
+        status_code=422,
+        detail="status must be Open, In Progress, or Resolved",
+    )
+
+
+def update_report_status(
+    db,
+    report_id: int,
+    new_status: str,
+    comment: Optional[str] = None,
+):
+    """Dashboard status change: update report + insert an Updates feed row."""
+    row = db.query(Report).filter(Report.id == report_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.is_draft:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot change status on a draft report",
+        )
+
+    normalized = _normalize_status(new_status)
+    old_status = row.status or "Open"
+    cleaned_comment = (comment or "").strip() or None
+
+    if old_status == normalized and cleaned_comment is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Status is unchanged and no comment was provided",
+        )
+
+    row.status = normalized
+
+    update_row = Update(
+        report_id=row.id,
+        user_id=row.user_id,
+        report_title=row.title or "",
+        old_status=old_status,
+        new_status=normalized,
+        comment=cleaned_comment,
+        is_read=False,
+        created_at=datetime.utcnow(),
+    )
+    db.add(update_row)
+    db.commit()
+    db.refresh(update_row)
+    return update_to_schema(update_row)
+
+
+def get_updates_for_user(db, user_id: int, limit: int = 50):
+    rows = (
+        db.query(Update)
+        .filter(Update.user_id == user_id)
+        .order_by(Update.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [update_to_schema(r) for r in rows]
+
+
+def mark_updates_read(db, user_id: int, update_ids: Optional[list[int]] = None):
+    q = db.query(Update).filter(Update.user_id == user_id, Update.is_read == False)
+    if update_ids:
+        q = q.filter(Update.id.in_(update_ids))
+    q.update({"is_read": True}, synchronize_session=False)
+    db.commit()
+    return {"message": "ok"}

@@ -552,7 +552,6 @@ class _MapScreenState extends State<MapScreen> {
         : (report['description'] as String? ?? 'Report');
     final category = report['category']?.toString() ?? 'Other';
     final location = report['location']?.toString() ?? 'Unknown location';
-    final severity = report['severity']?.toString() ?? '';
     final imageUrl = report['image']?.toString();
     final categoryColor = ReportCategories.color(category);
 
@@ -609,32 +608,6 @@ class _MapScreenState extends State<MapScreen> {
                             color: categoryColor,
                           ),
                         ),
-                        if (severity.isNotEmpty) ...[
-                          Text(
-                            '  ·  ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: _severityColor(severity),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            severity[0].toUpperCase() + severity.substring(1),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -725,18 +698,5 @@ class _MapScreenState extends State<MapScreen> {
         size: 28,
       ),
     );
-  }
-
-  Color _severityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return Colors.red;
-      case 'medium':
-        return Colors.orange;
-      case 'low':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
   }
 }

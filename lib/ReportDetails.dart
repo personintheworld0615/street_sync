@@ -43,12 +43,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
     return '${value[0].toUpperCase()}${value.substring(1)}';
   }
 
-  String get _severity {
-    final value = (report['severity']?.toString() ?? '').trim();
-    if (value.isEmpty) return 'Unknown';
-    return '${value[0].toUpperCase()}${value.substring(1).toLowerCase()}';
-  }
-
   String get _location =>
       report['location']?.toString().trim().isNotEmpty == true
           ? report['location'].toString()
@@ -57,19 +51,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   String get _description {
     final value = report['description']?.toString().trim() ?? '';
     return value.isEmpty ? 'No description provided.' : value;
-  }
-
-  Color _severityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFE53935);
-      case 'medium':
-        return const Color(0xFFFB8C00);
-      case 'low':
-        return const Color(0xFF43A047);
-      default:
-        return _muted;
-    }
   }
 
   Color _statusColor(String status) {
@@ -168,7 +149,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   Widget build(BuildContext context) {
     final reportImage = _buildReportImage(report['image']);
     final hasPhoto = reportImage != null;
-    final severityColor = _severityColor(_severity);
     final statusColor = _statusColor(_status);
 
     return Scaffold(
@@ -252,26 +232,11 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _metaCard(
-                          icon: Icons.priority_high_rounded,
-                          iconColor: severityColor,
-                          label: 'Severity',
-                          value: _severity,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _metaCard(
-                          icon: Icons.schedule_rounded,
-                          iconColor: _cta,
-                          label: 'Reported',
-                          value: _formatTime(report['time']?.toString() ?? ''),
-                        ),
-                      ),
-                    ],
+                  _metaCard(
+                    icon: Icons.schedule_rounded,
+                    iconColor: _cta,
+                    label: 'Reported',
+                    value: _formatTime(report['time']?.toString() ?? ''),
                   ),
                   const SizedBox(height: 10),
                   _sectionCard(
@@ -355,13 +320,6 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                           label: 'Status',
                           value: _status,
                           valueColor: statusColor,
-                        ),
-                        const Divider(height: 22),
-                        _detailRow(
-                          icon: Icons.bolt_outlined,
-                          label: 'Severity',
-                          value: _severity,
-                          valueColor: severityColor,
                         ),
                       ],
                     ),

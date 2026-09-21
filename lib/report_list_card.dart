@@ -41,8 +41,6 @@ class ReportListCard extends StatelessWidget {
   }
 
   static String displayPill(Map<String, dynamic> report, {String? fallback}) {
-    final severity = (report['severity'] as String?)?.trim();
-    if (severity != null && severity.isNotEmpty) return severity;
     final status = (report['status'] as String?)?.trim();
     if (status != null && status.isNotEmpty) return status;
     return fallback ?? 'Open';

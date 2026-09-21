@@ -64,19 +64,6 @@ class _ConfirmationState extends State<Confirmation> {
         : widget.category.trim();
   }
 
-  Color get _severityColor {
-    switch (_currentSeverity.toLowerCase()) {
-      case 'high':
-        return Colors.red;
-      case 'medium':
-        return Colors.orange;
-      case 'low':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
   String get _currentSeverity {
     if (!_severityDetailsEdited) return widget.severity;
     return autoSeverity(category: _category, description: _description);
@@ -496,13 +483,6 @@ class _ConfirmationState extends State<Confirmation> {
                   _severityDetailsEdited = true;
                 },
               ),
-            ),
-            _summaryDivider(),
-            _buildSummaryRow(
-              icon: Icons.warning_amber_rounded,
-              iconColor: _severityColor,
-              label: 'Severity',
-              value: _currentSeverity,
             ),
           ],
         ),

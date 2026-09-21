@@ -37,7 +37,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         _PolicyBullet(
           label: 'Report Information',
           text:
-              'We collect information you provide when creating a report, including the type of infrastructure issue, title, description, severity, approximate or precise location (including map coordinates when available), images, and the date and time of the report. Draft reports may also be saved until you submit or delete them.',
+              'We collect information you provide when creating a report, including the type of infrastructure issue, title, description, approximate or precise location (including map coordinates when available), images, and the date and time of the report. Draft reports may also be saved until you submit or delete them.',
         ),
         _PolicyBullet(
           label: 'Public Profile Information',
@@ -59,7 +59,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         'Create, save, and process infrastructure reports.',
         'Determine the location of reported issues.',
         'Display reported issues within the application, including on maps and community feeds.',
-        'Analyze voice transcripts with AI to suggest a title, description, category, and severity, which you can review before submitting.',
+        'Analyze voice transcripts with AI to suggest a title, description, and category, which you can review before submitting.',
         'Show contributor activity on the leaderboard.',
         'Organize reports for potential review by relevant local authorities.',
         'Improve the functionality and reliability of StreetSync.',
@@ -86,7 +86,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
       title: '5. Voice Processing and AI',
       paragraphs: [
         'If voice reporting is used, StreetSync processes voice input using speech-recognition technology on your device (typically provided by Apple or Google) to convert your description into text.',
-        'That text may then be sent to StreetSync’s servers and processed by third-party AI language-model providers to suggest a title, description, category, and severity for the report. You can review and edit this information before submitting.',
+        'That text may then be sent to StreetSync’s servers and processed by third-party AI language-model providers to suggest a title, description, and category for the report. You can review and edit this information before submitting.',
         'StreetSync does not use voice recordings or transcripts for advertising or unrelated purposes.',
       ],
     ),

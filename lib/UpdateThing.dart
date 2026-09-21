@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/report_severity.dart';
 class Updatething extends StatefulWidget {
   Updatething({
     super.key,
@@ -89,9 +90,7 @@ class _UpdateThingState extends State<Updatething> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _descirption;
-  String? _selectedSeverity;
 
-  bool _showSeverity = false;
    GoogleMapController? _controller;
    bool _ready =false;
   bool _submitting = false;
@@ -159,9 +158,6 @@ class _UpdateThingState extends State<Updatething> {
                     _buildDescriptionCard(),
                     const SizedBox(height: 14),
                     _buildLocationCard(),
-                    const SizedBox(height: 14),
-                    if (_selectedSeverity != null) _buildSeverityCard(),
-                    if (_selectedSeverity == null) _buildSeverityCardNew(),
                   ],
                 ),
               ),
@@ -209,11 +205,6 @@ class _UpdateThingState extends State<Updatething> {
       _titleController.text = title;
     }
 
-    final severity = widget.severity;
-    if (severity != null && severity.isNotEmpty) {
-      _selectedSeverity = _normalizeSeverity(severity);
-    }
-
     final imagePath = widget.imagePath;
     if (imagePath != null && File(imagePath).existsSync()) {
       _image = XFile(imagePath);
@@ -237,17 +228,19 @@ class _UpdateThingState extends State<Updatething> {
     return url != null && url.isNotEmpty;
   }
 
-  String _normalizeSeverity(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'low':
-        return 'Low';
-      case 'medium':
-        return 'Medium';
-      case 'high':
-        return 'High';
-      default:
-        return severity;
+  String _resolvedCategory() {
+    if (_selectedCategory == 'Other') {
+      final other = _otherCategoryController.text.trim();
+      return other.isEmpty ? 'Other' : other;
     }
+    return _selectedCategory ?? 'Other';
+  }
+
+  String _resolvedSeverity() {
+    return autoSeverity(
+      category: _resolvedCategory(),
+      description: _descriptionController.text,
+    );
   }
 
   Future<void> _initLocation() async {
@@ -787,130 +780,6 @@ class _UpdateThingState extends State<Updatething> {
       });
     }
   }
-    Widget _buildSeverityCard() {
-      return Card(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Severity',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'Low',
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'Medium',
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'High',
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-  Widget _buildSeverityCardNew() {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Severity',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _cta,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: () async{
-                      String severity = await _autoSeverityCalc(_selectedCategory!);
-                      setState(() => _selectedSeverity = severity);
-                    },
-                    child: Text('Calculate Severity',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold,color: Colors.white),),
-                  ),
-                  )
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSeverityChip({
-    required String label,
-    required Color color,
-  }) {
-    final selected = _selectedSeverity == label;
-
-    return _Pressable(
-      onTap: () {
-        setState(() => _selectedSeverity = label);
-      },
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : Colors.grey[50],
-          border: Border.all(
-            color: selected ? color : Colors.grey[300]!,
-            width: selected ? 2.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? color : Colors.grey[700],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildSubmitBar() {
     return Container(
       width: double.infinity,
@@ -933,7 +802,6 @@ class _UpdateThingState extends State<Updatething> {
           if (_titleController.text.trim().isEmpty) errors.add('title');
           if (_imageWasProvided && !_hasPhoto) errors.add('photo');
           if (_selectedCategory == null) errors.add('category');
-          if (_selectedSeverity == null) errors.add('severity');
           if (_descriptionController.text.trim().isEmpty) {
             errors.add('description');
           }
@@ -979,6 +847,8 @@ class _UpdateThingState extends State<Updatething> {
                     latitude: position.latitude,
                     longitude: position.longitude,
                     othercat: othercat,
+                    category: _selectedCategory,
+                    severity: _resolvedSeverity(),
                   ),
                 ),
               );
@@ -995,7 +865,7 @@ class _UpdateThingState extends State<Updatething> {
                   image: _image,
                   existingImageUrl: _existingImageUrl,
                   draftId: widget.draftId,
-                  severity: _selectedSeverity!,
+                  severity: _resolvedSeverity(),
                   location: address,
                   latitude: position.latitude,
                   longitude: position.longitude,
@@ -1049,20 +919,6 @@ class _UpdateThingState extends State<Updatething> {
         ),
       ),
     );
-  }
-}
-Future<String> _autoSeverityCalc(String category) async {
-  switch (category) {
-    case 'Accessibility':
-      return 'high';
-    case 'Road Damage':
-    case 'Public Works':
-      return 'Medium';
-    case 'Environmental':
-      return 'Low';
-    case 'Other':
-    default:
-      return 'Medium';
   }
 }
 

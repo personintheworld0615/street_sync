@@ -987,4 +987,25 @@ class ApiService {
     final result = await analyzeVoiceReport(description);
     return result['title'] as String;
   }
+
+  /// Status-change feed for the logged-in user (Updates tab).
+  static Future<List<dynamic>?> getUpdates({int amount = 50}) async {
+    final url = Uri.parse('$baseUrl/updates?amount=$amount');
+    try {
+      final response = await _authorized(
+        () => http.get(url, headers: _headers),
+      );
+      if (response == null) return null;
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      // Production may not have /updates deployed yet.
+      if (response.statusCode == 404) return [];
+      print('getUpdates: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      print('getUpdates Error: $e');
+      return null;
+    }
+  }
 }

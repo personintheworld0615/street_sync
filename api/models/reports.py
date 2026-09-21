@@ -41,3 +41,26 @@ class Report(Base):
     time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     user: Mapped["User"] = relationship(back_populates="reports")
+    updates: Mapped[List["Update"]] = relationship(
+        back_populates="report",
+        cascade="all, delete-orphan",
+    )
+
+
+class Update(Base):
+    """One row per dashboard status change, shown in the app Updates tab."""
+
+    __tablename__ = "updates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("reports.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    report_title: Mapped[str] = mapped_column(String(255), default="")
+    old_status: Mapped[str] = mapped_column(String(20))
+    new_status: Mapped[str] = mapped_column(String(20))
+    comment: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+    report: Mapped["Report"] = relationship(back_populates="updates")

@@ -76,21 +76,6 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     return autoSeverity(category: _category, description: _description);
   }
 
-  Color _getColorForSeverity(String sev) {
-    switch (sev.toLowerCase()) {
-      case 'high':
-        return Colors.red;
-      case 'medium':
-        return Colors.orange;
-      case 'low':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Color get _severityColor => _getColorForSeverity(_autoSeverity);
-
   Future<void> _showSubmittedThenGoHome() async {
     if (_busy) return;
     if (!_validateEditableFields()) return;
@@ -512,14 +497,6 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
                 value: raw,
               ),
             ],
-            _summaryDivider(),
-            _buildSummaryRow(
-              icon: Icons.warning_amber_rounded,
-              iconColor: _severityColor,
-              label: _fromAi ? 'Severity' : 'Severity (Auto-detected)',
-              value: _autoSeverity,
-              isSuggested: true,
-            ),
             if (rationale != null && rationale.isNotEmpty) ...[
               _summaryDivider(),
               _buildSummaryRow(

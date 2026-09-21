@@ -39,9 +39,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _descirption;
-  String? _selectedSeverity;
 
-  bool _showSeverity = false;
    GoogleMapController? _controller;
    bool _ready =false;
   bool _submitting = false;
@@ -161,9 +159,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     _buildTitleCard(),
                     const SizedBox(height: 14),
                     _buildLocationCard(),
-                    const SizedBox(height: 14),
-                    if (_selectedSeverity != null) _buildSeverityCard(),
-                    if (_selectedSeverity == null) _buildSeverityCardNew(),
     ],);
   }
   Widget _buildComingSoonforAI() {
@@ -1196,139 +1191,123 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       });
     }
   }
-    Widget _buildSeverityCard() {
-      return _section(
-      child: Padding(
-          padding: const EdgeInsets.all(16),
+  String _resolvedSeverity() {
+    return autoSeverity(
+      category: _resolvedCategory(),
+      description: _descriptionController.text,
+    );
+  }
+
+  String _resolvedCategory() {
+    if (_selectedCategory == 'Other') {
+      final other = _otherCategoryController.text.trim();
+      return other.isEmpty ? 'Other' : other;
+    }
+    return _selectedCategory ?? 'Other';
+  }
+
+  Future<void> _showSubmittedDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Severity',
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: _cta.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: _cta,
+                  size: 44,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Report submitted!',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'Low',
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'Medium',
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildSeverityChip(
-                      label: 'High',
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
+              Text(
+                'Thanks your report is on its way.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.35,
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    Navigator.pop(context);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _submitDirectly() async {
+    if (_busy) return;
+    setState(() => _submitting = true);
+
+    String location = 'Location not set';
+    try {
+      location = await translateLocation(
+        position.latitude,
+        position.longitude,
+        includeRegion: true,
+        fallback:
+            '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
       );
+    } catch (_) {}
+
+    final success = await ApiService.submitReport(
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      category: _resolvedCategory(),
+      location: location,
+      severity: _resolvedSeverity(),
+      isDraft: false,
+      latitude: position.latitude,
+      longitude: position.longitude,
+      imagePath: _image?.path,
+    );
+
+    if (!mounted) return;
+
+    if (!success) {
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to submit report. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
     }
-  Widget _buildSeverityCardNew() {
-    return _section(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Severity',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _cta,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    onPressed: () {
-                      if (_selectedCategory == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter a category'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-                      final severity = autoSeverity(
-                        category: _selectedCategory!,
-                        description: _descriptionController.text,
-                      );
-                      setState(() => _selectedSeverity = severity);
-                    },
-                    child: Text('Calculate Severity',style: TextStyle(fontSize: 16,fontWeight: FontWeight.bold,color: Colors.white),),
-                  ),
-                  )
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+
+    await _showSubmittedDialog();
   }
 
-  Widget _buildSeverityChip({
-    required String label,
-    required Color color,
-  }) {
-    final selected = _selectedSeverity == label;
-
-    return _Pressable(
-      onTap: () {
-        setState(() => _selectedSeverity = label);
-      },
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.12) : Colors.grey[50],
-          border: Border.all(
-            color: selected ? color : Colors.grey[300]!,
-            width: selected ? 2.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? color : Colors.grey[700],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
   Future<void> _saveAsDraft() async {
     if (_busy) return;
     setState(() => _savingDraft = true);
@@ -1344,21 +1323,12 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       );
     } catch (_) {}
 
-    final category = _selectedCategory == 'Other'
-        ? (_otherCategoryController.text.trim().isEmpty
-            ? 'Other'
-            : _otherCategoryController.text.trim())
-        : (_selectedCategory ?? 'Other');
-    final description = _descriptionController.text.trim();
-    final title = _titleController.text.trim();
-    final severity = _selectedSeverity ?? 'medium';
-
     final success = await ApiService.submitReport(
-      title: title,
-      description: description,
-      category: category,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      category: _resolvedCategory(),
       location: location,
-      severity: severity,
+      severity: _resolvedSeverity(),
       isDraft: true,
       latitude: position.latitude,
       longitude: position.longitude,
@@ -1422,7 +1392,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 return;
               }
 
-              // If in voice mode, analyze the transcript first to auto-fill title/desc/cat/sev
+              // If in voice mode, analyze the transcript first to auto-fill title/desc/category
               if (_reportMode == 'voice' && _transcript.isNotEmpty) {
                 setState(() => _submitting = true);
                 try {
@@ -1440,7 +1410,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     _selectedCategory = match;
                   }
                   
-                  _selectedSeverity = aiResult['severity'];
                 } catch (e) {
                   print('AI voice analysis failed: $e');
                 } finally {
@@ -1455,9 +1424,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               if (_descriptionController.text.trim().isEmpty) {
                 errors.add('description');
               }
-              if (_selectedSeverity == null) {
-                errors.add('severity');
-              }
               if (_markers.isEmpty) errors.add('location');
 
               if (errors.isNotEmpty) {
@@ -1468,6 +1434,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     duration: const Duration(seconds: 2),
                   ),
                 );
+                return;
+              }
+
+              if (_reportMode == 'manual') {
+                await _submitDirectly();
                 return;
               }
 
@@ -1487,11 +1458,11 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   context,
                   MaterialPageRoute(
                     builder: (context) => Confirmation(
-                      category: _selectedCategory!,
+                      category: _resolvedCategory(),
                       title: _titleController.text.trim(),
                       description: _descriptionController.text.trim(),
                       image: _image!,
-                      severity: _selectedSeverity!,
+                      severity: _resolvedSeverity(),
                       location: address,
                       latitude: position.latitude,
                       longitude: position.longitude,
@@ -1526,9 +1497,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                         color: Colors.white,
                       ),
                     )
-                  : const Text(
-                      'Review',
-                      style: TextStyle(
+                  : Text(
+                      _reportMode == 'manual' ? 'Submit' : 'Review',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

@@ -16,8 +16,10 @@ from sqlalchemy.orm import Session
 from api.database import get_db
 from api.models.reports import User
 from api.schemas.reports import (
+    ReportStatusUpdate,
     Reports,
     ReportsFull,
+    UpdateOut,
     UsersDetailed,
 )
 from api.schemas.voice import ModelOutput, VoiceReportInput
@@ -221,6 +223,32 @@ def get_reports_resolved(db: Session = Depends(get_db)):
 @router.get("/reports/in_progress", response_model=List[ReportsFull])
 def get_reports_in_progress(db: Session = Depends(get_db)):
     return reports_service.get_reports_in_progress(db)
+
+
+@router.patch("/reports/{report_id}/status", response_model=UpdateOut)
+def patch_report_status(
+    report_id: int,
+    body: ReportStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dashboard: set report status and create an Updates feed item."""
+    _ = current_user  # auth required; ownership not required (staff dashboard)
+    return reports_service.update_report_status(
+        db,
+        report_id,
+        new_status=body.status,
+        comment=body.comment,
+    )
+
+
+@router.get("/updates", response_model=List[UpdateOut])
+def get_my_updates(
+    amount: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return reports_service.get_updates_for_user(db, current_user.id, limit=amount)
 
 
 @router.get("/reports/{report_id}", response_model=ReportsFull)
