@@ -70,23 +70,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   BitmapDescriptor _getMarkerIcon(String category, bool isSelected) {
-  switch (category) {
-    case ReportCategories.roadDamage:
-      return isSelected ? redLarge! : redSmall!;
+    final major = ReportCategories.majorCategoryOf(category) ?? category;
+    switch (major) {
+      case ReportCategories.streetsAndTransportation:
+        return isSelected ? redLarge! : redSmall!;
 
-    case ReportCategories.publicWorks:
-      return isSelected ? orangeLarge! : orangeSmall!;
+      case ReportCategories.trashAndEnvironment:
+        return isSelected ? orangeLarge! : orangeSmall!;
 
-    case ReportCategories.environmental:
-      return isSelected ? greenLarge! : greenSmall!;
+      case ReportCategories.natureAndWater:
+        return isSelected ? greenLarge! : greenSmall!;
 
-    case ReportCategories.accessibility:
-      return isSelected ? blueLarge! : blueSmall!;
+      case ReportCategories.buildingsAndPublicSpaces:
+        return isSelected ? blueLarge! : blueSmall!;
 
-    default:
-      return isSelected ? purpleLarge! : purpleSmall!;
+      default:
+        return isSelected ? purpleLarge! : purpleSmall!;
+    }
   }
-}
 
   BitmapDescriptor? redSmall, redLarge;
   BitmapDescriptor? orangeSmall, orangeLarge;
@@ -214,11 +215,13 @@ class _MapScreenState extends State<MapScreen> {
     final reports = _selectedCategory == null
         ? _recentReports
         : _recentReports.where((report) {
+            final category = report["category"] as String?;
+            final major = ReportCategories.majorCategoryOf(category);
             if (_selectedCategory == ReportCategories.other) {
-              return !ReportCategories.isPrimary(report["category"] as String?);
+              return !ReportCategories.isPrimary(category);
             }
 
-            return report["category"] == _selectedCategory;
+            return major == _selectedCategory;
           });
 
     setState(() {
@@ -245,17 +248,18 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   double _getMarkerColor(String category) {
-    switch (category) {
-      case ReportCategories.roadDamage:
+    final major = ReportCategories.majorCategoryOf(category) ?? category;
+    switch (major) {
+      case ReportCategories.streetsAndTransportation:
         return BitmapDescriptor.hueRed;
 
-      case ReportCategories.publicWorks:
+      case ReportCategories.trashAndEnvironment:
         return BitmapDescriptor.hueOrange;
 
-      case ReportCategories.environmental:
+      case ReportCategories.natureAndWater:
         return BitmapDescriptor.hueGreen;
 
-      case ReportCategories.accessibility:
+      case ReportCategories.buildingsAndPublicSpaces:
         return BitmapDescriptor.hueAzure;
 
       default:

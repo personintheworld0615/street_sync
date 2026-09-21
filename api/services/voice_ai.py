@@ -15,7 +15,7 @@ We will give you a short description of a civic issue, return JSON only with:
   "title": "3 word brief title",
   "description": "Professional ~20 word report description",
   "severity": "low | medium | high",
-  "category": "Road Damage | Public Works | Environmental | Accessibility | Other",
+  "category": "Streets & Transportation | Trash & Environment | Nature & Water | Buildings & Public Spaces | Other",
 }
 
 Severity:

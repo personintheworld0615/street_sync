@@ -527,6 +527,10 @@ class _UpdateThingState extends State<Updatething> {
   }
 
   Widget _buildCategoryCard() {
+    final selectedMajor = ReportCategories.majorCategoryOf(_selectedCategory);
+    final showSpecificOptions = selectedMajor != null && selectedMajor != ReportCategories.other;
+    final options = showSpecificOptions ? ReportCategories.optionsFor(selectedMajor) : const <String>[];
+
     return Card(
       color: Colors.white,
       elevation: 2,
@@ -545,46 +549,61 @@ class _UpdateThingState extends State<Updatething> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.roadDamage,
-                    icon: ReportCategories.icon(ReportCategories.roadDamage),
+            for (var i = 0; i < ReportCategories.primary.length; i += 2) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildCategoryChip(
+                      value: ReportCategories.primary[i],
+                      icon: ReportCategories.icon(ReportCategories.primary[i]),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.publicWorks,
-                    icon: ReportCategories.icon(ReportCategories.publicWorks),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.environmental,
-                    icon: ReportCategories.icon(ReportCategories.environmental),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.accessibility,
-                    icon: ReportCategories.icon(ReportCategories.accessibility),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+                  if (i + 1 < ReportCategories.primary.length) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildCategoryChip(
+                        value: ReportCategories.primary[i + 1],
+                        icon: ReportCategories.icon(ReportCategories.primary[i + 1]),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
             _buildCategoryChip(
               value: ReportCategories.other,
               icon: ReportCategories.icon(ReportCategories.other),
             ),
+            if (showSpecificOptions) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: options.map((option) {
+                  final selected = _selectedCategory == option;
+                  final accent = ReportCategories.color(selectedMajor);
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: selected,
+                    selectedColor: accent.withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: selected ? accent : _ink,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (_) => setState(() => _selectedCategory = option),
+                    backgroundColor: Colors.white,
+                    side: BorderSide(
+                      color: selected ? accent : Colors.grey[300]!,
+                      width: selected ? 1.4 : 1,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             if (_selectedCategory == ReportCategories.other) ...[
               const SizedBox(height: 10),
               Container(
@@ -614,7 +633,9 @@ class _UpdateThingState extends State<Updatething> {
     required String value,
     required IconData icon,
   }) {
-    final selected = _selectedCategory == value;
+    final selectedMajor = ReportCategories.majorCategoryOf(_selectedCategory);
+    final selected = _selectedCategory == value || selectedMajor == value;
+    final accent = ReportCategories.color(value);
 
     return _Pressable(
       onTap: () {
@@ -626,9 +647,9 @@ class _UpdateThingState extends State<Updatething> {
         height: 52,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? _cta.withValues(alpha: 0.1) : Colors.grey[50],
+          color: selected ? accent.withValues(alpha: 0.1) : Colors.grey[50],
           border: Border.all(
-            color: selected ? _cta : Colors.grey[300]!,
+            color: selected ? accent : Colors.grey[300]!,
             width: selected ? 1.8 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -639,7 +660,7 @@ class _UpdateThingState extends State<Updatething> {
             Icon(
               icon,
               size: 20,
-              color: selected ? _cta : _muted,
+              color: selected ? accent : _muted,
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -651,7 +672,7 @@ class _UpdateThingState extends State<Updatething> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? _cta : Colors.grey[700],
+                  color: selected ? accent : Colors.grey[700],
                 ),
               ),
             ),

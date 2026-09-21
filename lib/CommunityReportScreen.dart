@@ -824,6 +824,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildCategoryCard() {
+    final selectedMajor = ReportCategories.majorCategoryOf(_selectedCategory);
+    final showSpecificOptions = selectedMajor != null && selectedMajor != ReportCategories.other;
+    final options = showSpecificOptions ? ReportCategories.optionsFor(selectedMajor) : const <String>[];
+
     return _section(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -839,56 +843,68 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.roadDamage,
-                    label: ReportCategories.label(ReportCategories.roadDamage),
-                    subtitle: ReportCategories.subtitle(ReportCategories.roadDamage),
-                    icon: ReportCategories.icon(ReportCategories.roadDamage),
+            for (var i = 0; i < ReportCategories.primary.length; i += 2) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildCategoryChip(
+                      value: ReportCategories.primary[i],
+                      label: ReportCategories.label(ReportCategories.primary[i]),
+                      subtitle: ReportCategories.subtitle(ReportCategories.primary[i]),
+                      icon: ReportCategories.icon(ReportCategories.primary[i]),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.publicWorks,
-                    label: ReportCategories.label(ReportCategories.publicWorks),
-                    subtitle: ReportCategories.subtitle(ReportCategories.publicWorks),
-                    icon: ReportCategories.icon(ReportCategories.publicWorks),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.environmental,
-                    label: ReportCategories.label(ReportCategories.environmental),
-                    subtitle: ReportCategories.subtitle(ReportCategories.environmental),
-                    icon: ReportCategories.icon(ReportCategories.environmental),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildCategoryChip(
-                    value: ReportCategories.accessibility,
-                    label: ReportCategories.label(ReportCategories.accessibility),
-                    subtitle: ReportCategories.subtitle(ReportCategories.accessibility),
-                    icon: ReportCategories.icon(ReportCategories.accessibility),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+                  if (i + 1 < ReportCategories.primary.length) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildCategoryChip(
+                        value: ReportCategories.primary[i + 1],
+                        label: ReportCategories.label(ReportCategories.primary[i + 1]),
+                        subtitle: ReportCategories.subtitle(ReportCategories.primary[i + 1]),
+                        icon: ReportCategories.icon(ReportCategories.primary[i + 1]),
+                      ),
+                    ),
+                  ] else
+                    const SizedBox(width: 0),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
             _buildCategoryChip(
               value: ReportCategories.other,
               label: ReportCategories.label(ReportCategories.other),
               subtitle: ReportCategories.subtitle(ReportCategories.other),
               icon: ReportCategories.icon(ReportCategories.other),
             ),
+            if (showSpecificOptions) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: options.map((option) {
+                  final selected = _selectedCategory == option;
+                  final accent = ReportCategories.color(selectedMajor);
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: selected,
+                    selectedColor: accent.withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: selected ? accent : _ink,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (_) => setState(() => _selectedCategory = option),
+                    backgroundColor: Colors.white,
+                    side: BorderSide(
+                      color: selected ? accent : _fieldBorder,
+                      width: selected ? 1.4 : 1,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             if (_selectedCategory == ReportCategories.other) ...[
               const SizedBox(height: 10),
               Container(
@@ -920,16 +936,18 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     required String subtitle,
     required IconData icon,
   }) {
-    final selected = _selectedCategory == value;
+    final selectedMajor = ReportCategories.majorCategoryOf(_selectedCategory);
+    final selected = _selectedCategory == value || selectedMajor == value;
+    final accent = ReportCategories.color(value);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       height: 88,
       decoration: BoxDecoration(
-        color: selected ? _cta.withValues(alpha: 0.08) : Colors.white,
+        color: selected ? accent.withValues(alpha: 0.08) : Colors.white,
         border: Border.all(
-          color: selected ? _cta : _fieldBorder,
+          color: selected ? accent : _fieldBorder,
           width: selected ? 1.6 : 1,
         ),
         borderRadius: BorderRadius.circular(16),
@@ -949,7 +967,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     Icon(
                       icon,
                       size: 26,
-                      color: selected ? _cta : _muted,
+                      color: selected ? accent : _muted,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -960,7 +978,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                         fontSize: 14,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600,
-                        color: selected ? _cta : _ink,
+                        color: selected ? accent : _ink,
                       ),
                     ),
                   ],
@@ -978,7 +996,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               child: Icon(
                 Icons.info_outline,
                 size: 16,
-                color: selected ? _cta : Colors.grey[500],
+                color: selected ? accent : Colors.grey[500],
               ),
             ),
           ),

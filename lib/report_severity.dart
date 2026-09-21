@@ -1,54 +1,61 @@
 /// Shared category inference + severity scoring for voice and community reports.
 
 const categoryPriority = [
-  'Accessibility',
-  'Road Damage',
-  'Public Works',
-  'Environmental',
+  'Streets & Transportation',
+  'Trash & Environment',
+  'Nature & Water',
+  'Buildings & Public Spaces',
   'Other',
 ];
 
 const categoryKeywords = {
-  'Accessibility': [
-    'wheelchair',
-    'ramp',
-    'curb cut',
-    'accessible',
-    'ada',
-    'crosswalk signal',
-    'blind',
-    'cane',
-  ],
-  'Road Damage': [
+  'Streets & Transportation': [
     'pothole',
     'crack',
     'pavement',
     'asphalt',
     'road',
-    'sidewalk broken',
-    'sinkhole',
-  ],
-  'Public Works': [
-    'streetlight',
-    'lamp',
+    'sidewalk',
+    'curb',
     'traffic light',
+    'street light',
     'sign',
-    'hydrant',
-    'manhole',
-    'trash',
-    'dumpster',
-    'graffiti',
+    'road debris',
+    'parking',
+    'traffic',
   ],
-  'Environmental': [
+  'Trash & Environment': [
+    'litter',
+    'garbage',
+    'recycling',
+    'dumping',
+    'graffiti',
+    'pollution',
+    'hazardous',
+    'noise',
+    'trash',
+  ],
+  'Nature & Water': [
     'flood',
     'flooding',
     'tree',
     'branch',
-    'litter',
-    'spill',
-    'pollution',
-    'drainage',
+    'vegetation',
     'storm drain',
+    'standing water',
+    'sewer',
+    'water',
+  ],
+  'Buildings & Public Spaces': [
+    'building damage',
+    'property maintenance',
+    'construction',
+    'code violation',
+    'housing',
+    'park',
+    'animal',
+    'rodent',
+    'insect',
   ],
 };
 
@@ -112,10 +119,10 @@ String autoSeverity({
   final desc = description.toLowerCase();
 
   var score = switch (category) {
-    'Accessibility' => 3,
-    'Road Damage' => 2,
-    'Public Works' => 2,
-    'Environmental' => 1,
+    'Streets & Transportation' => 2,
+    'Trash & Environment' => 2,
+    'Nature & Water' => 1,
+    'Buildings & Public Spaces' => 2,
     _ => 2,
   };
 

@@ -16,9 +16,9 @@ class ModelOutput(BaseModel):
     )
     severity: Literal["low", "medium", "high"]
     category: Literal[
-        "Road Damage",
-        "Public Works",
-        "Environmental",
-        "Accessibility",
+        "Streets & Transportation",
+        "Trash & Environment",
+        "Nature & Water",
+        "Buildings & Public Spaces",
         "Other",
     ]

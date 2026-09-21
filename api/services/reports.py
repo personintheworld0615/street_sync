@@ -15,6 +15,61 @@ from api.services.voice_ai import analyze_voice_report as _analyze_voice_report
 
 _ALLOWED_STATUSES = {"Open", "In Progress", "Resolved"}
 
+_CATEGORY_GROUPS = {
+    "Streets & Transportation": [
+        "Pothole",
+        "Damaged Sidewalk/Curb",
+        "Traffic Light",
+        "Street Light",
+        "Damaged/Missing Sign",
+        "Road Debris",
+        "Parking/Traffic",
+    ],
+    "Trash & Environment": [
+        "Litter/Garbage",
+        "Missed Trash/Recycling",
+        "Illegal Dumping",
+        "Graffiti",
+        "Pollution",
+        "Hazardous Waste",
+        "Noise",
+    ],
+    "Nature & Water": [
+        "Fallen Tree/Branch",
+        "Overgrown Vegetation",
+        "Tree Maintenance",
+        "Flooding",
+        "Clogged Storm Drain",
+        "Standing Water",
+        "Sewer/Water Problem",
+    ],
+    "Buildings & Public Spaces": [
+        "Building Damage",
+        "Property Maintenance",
+        "Construction/Code Violation",
+        "Housing/Rental Problem",
+        "Park Maintenance",
+        "Animal Issue",
+        "Rodent/Insect Issue",
+    ],
+}
+
+_ALL_CATEGORY_VALUES = [
+    value for values in _CATEGORY_GROUPS.values() for value in values
+]
+
+
+def normalize_category(category: Optional[str]) -> str:
+    if category is None:
+        return "Other"
+    value = category.strip()
+    if not value:
+        return "Other"
+    for major, options in _CATEGORY_GROUPS.items():
+        if value == major or value in options:
+            return major
+    return value
+
 
 def analyze_voice_report(description: str) -> ModelOutput:
     return _analyze_voice_report(description)
@@ -120,14 +175,24 @@ def get_all_reports(db):
 
 def get_most_recent_reports(db, amount: int):
     rows = []
-    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Road Damage").order_by(Report.time.desc()).limit(amount).all())
-    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Public Works").order_by(Report.time.desc()).limit(amount).all())
-    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Environmental").order_by(Report.time.desc()).limit(amount).all())
-    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category == "Accessibility").order_by(Report.time.desc()).limit(amount).all())
-    rows.extend(db.query(Report).filter(Report.is_draft == False, Report.category != "Road Damage", Report.category != "Public Works", Report.category != "Environmental", Report.category != "Accessibility").order_by(Report.time.desc()).limit(amount).all())
+    for major_category, options in _CATEGORY_GROUPS.items():
+        rows.extend(
+            db.query(Report)
+            .filter(Report.is_draft == False, Report.category.in_(options + [major_category]))
+            .order_by(Report.time.desc())
+            .limit(amount)
+            .all()
+        )
+
+    rows.extend(
+        db.query(Report)
+        .filter(Report.is_draft == False, ~Report.category.in_(_ALL_CATEGORY_VALUES + list(_CATEGORY_GROUPS.keys())))
+        .order_by(Report.time.desc())
+        .limit(amount)
+        .all()
+    )
 
     rows.sort(key=lambda x: x.time, reverse=True)
-    # rows = db.query(Report).filter(Report.is_draft == False).order_by(Report.time.desc()).limit(amount).all()
     return [report_to_schema(report) for report in rows]
 
 
@@ -141,19 +206,11 @@ def get_reports_feed(
     q = db.query(Report).filter(Report.is_draft == False)
 
     if category:
-        if category == "Other":
-            q = q.filter(
-                ~Report.category.in_(
-                    [
-                        "Road Damage",
-                        "Public Works",
-                        "Environmental",
-                        "Accessibility",
-                    ]
-                )
-            )
+        normalized = normalize_category(category)
+        if normalized == "Other":
+            q = q.filter(~Report.category.in_(_ALL_CATEGORY_VALUES + list(_CATEGORY_GROUPS.keys())))
         else:
-            q = q.filter(Report.category == category)
+            q = q.filter(Report.category.in_(_CATEGORY_GROUPS.get(normalized, [normalized]) + [normalized]))
 
     if before is not None:
         if isinstance(before, str):
