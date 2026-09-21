@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
@@ -11,8 +12,13 @@ import 'Map.dart';
 
 class MainShell extends StatefulWidget {
   final bool showAiTourOnStart;
+  final bool showWelcomeConfetti;
 
-  const MainShell({super.key, this.showAiTourOnStart = false});
+  const MainShell({
+    super.key,
+    this.showAiTourOnStart = false,
+    this.showWelcomeConfetti = false,
+  });
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -29,6 +35,7 @@ class _MainShellState extends State<MainShell> {
   int _index = 0;
   int? _focusReportId;
   bool _showTour = false;
+  bool _showWelcome = false;
 
   final _statsTourKey = GlobalKey();
   final _quickActionsTourKey = GlobalKey();
@@ -43,7 +50,9 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    if (widget.showAiTourOnStart) {
+    if (widget.showWelcomeConfetti) {
+      _showWelcome = true;
+    } else if (widget.showAiTourOnStart) {
       _startInitialTour();
     }
   }
@@ -284,6 +293,17 @@ class _MainShellState extends State<MainShell> {
             child: Material(
               type: MaterialType.transparency,
               child: AiTour(steps: _tourSteps, onComplete: _completeTour),
+            ),
+          ),
+        if (_showWelcome)
+          Positioned.fill(
+            child: WelcomeConfettiOverlay(
+              onDismiss: () {
+                setState(() => _showWelcome = false);
+                if (widget.showAiTourOnStart) {
+                  _startInitialTour();
+                }
+              },
             ),
           ),
       ],
@@ -548,6 +568,294 @@ class _DockItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class WelcomeConfettiOverlay extends StatefulWidget {
+  final VoidCallback onDismiss;
+
+  const WelcomeConfettiOverlay({super.key, required this.onDismiss});
+
+  @override
+  State<WelcomeConfettiOverlay> createState() => _WelcomeConfettiOverlayState();
+}
+
+class _WelcomeConfettiOverlayState extends State<WelcomeConfettiOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  final List<_ConfettiParticle> _particles = [];
+  final math.Random _random = math.Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat();
+
+    // Generate random particles
+    final List<Color> colors = [
+      Colors.redAccent,
+      Colors.blueAccent,
+      Colors.greenAccent,
+      Colors.amber,
+      Colors.pinkAccent,
+      Colors.purpleAccent,
+      Colors.orangeAccent,
+      Colors.cyanAccent,
+    ];
+
+    for (int i = 0; i < 90; i++) {
+      _particles.add(
+        _ConfettiParticle(
+          initialX: _random.nextDouble(),
+          initialY: _random.nextDouble() * -1.0, // start above or top half
+          speedMultiplier: 1.0 + _random.nextDouble() * 1.5,
+          wobblePhase: _random.nextDouble() * math.pi * 2,
+          wobbleSpeed: 2.0 + _random.nextDouble() * 3.0,
+          size: 6.0 + _random.nextDouble() * 8.0,
+          color: colors[_random.nextInt(colors.length)],
+          isCircle: _random.nextBool(),
+          rotationSpeed: (_random.nextDouble() - 0.5) * 4.0,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Darkened overlay background
+        Container(color: Colors.black.withValues(alpha: 0.6)),
+        
+        // Confetti Painter
+        Positioned.fill(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: _ConfettiPainter(
+                  particles: _particles,
+                  progress: _controller.value,
+                ),
+              );
+            },
+          ),
+        ),
+
+        // Welcome Sign Card
+        Center(
+          child: FadeInUp(
+            duration: const Duration(milliseconds: 600),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Card(
+                elevation: 12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(28.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.celebration_rounded,
+                          size: 54,
+                          color: Color(0xFF2196F3),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Welcome to Street Sync!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Your account has been successfully created. Let\'s work together to sync, track, and improve our neighborhood!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 26),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: widget.onDismiss,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF152033),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Let\'s Get Started',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConfettiParticle {
+  final double initialX;
+  final double initialY;
+  final double speedMultiplier;
+  final double wobblePhase;
+  final double wobbleSpeed;
+  final double size;
+  final Color color;
+  final bool isCircle;
+  final double rotationSpeed;
+
+  _ConfettiParticle({
+    required this.initialX,
+    required this.initialY,
+    required this.speedMultiplier,
+    required this.wobblePhase,
+    required this.wobbleSpeed,
+    required this.size,
+    required this.color,
+    required this.isCircle,
+    required this.rotationSpeed,
+  });
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final List<_ConfettiParticle> particles;
+  final double progress;
+
+  _ConfettiPainter({required this.particles, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (final p in particles) {
+      // Calculate vertical fall
+      double yFraction = p.initialY + (progress * p.speedMultiplier);
+      if (yFraction > 1.0) {
+        yFraction = yFraction % 1.0;
+      } else if (yFraction < 0.0) {
+        yFraction = (yFraction % 1.0) + 1.0;
+      }
+
+      // Calculate horizontal wobble
+      double wobble = math.sin(progress * p.wobbleSpeed * math.pi * 2 + p.wobblePhase) * 0.05;
+      double xFraction = (p.initialX + wobble) % 1.0;
+
+      final double px = xFraction * size.width;
+      final double py = yFraction * size.height;
+
+      paint.color = p.color;
+
+      canvas.save();
+      canvas.translate(px, py);
+      canvas.rotate(progress * p.rotationSpeed * math.pi * 2);
+
+      if (p.isCircle) {
+        canvas.drawCircle(Offset.zero, p.size / 2, paint);
+      } else {
+        canvas.drawRect(
+          Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
+          paint,
+        );
+      }
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) => true;
+}
+
+// Simple FadeInUp animation helper widget to avoid package dependency issues
+class FadeInUp extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+
+  const FadeInUp({super.key, required this.child, required this.duration});
+
+  @override
+  State<FadeInUp> createState() => _FadeInUpState();
+}
+
+class _FadeInUpState extends State<FadeInUp> with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _opacityAnim;
+  late Animation<double> _offsetAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(vsync: this, duration: widget.duration);
+    _opacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+    _offsetAnim = Tween<double>(begin: 40.0, end: 0.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+    _animController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnim.value,
+          child: Transform.translate(
+            offset: Offset(0, _offsetAnim.value),
+            child: widget.child,
+          ),
+        );
+      },
     );
   }
 }

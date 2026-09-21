@@ -110,7 +110,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ApiService.userId != null || AuthService.isSignedIn) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => MainShell(showAiTourOnStart: !_isLogin),
+          builder: (_) => MainShell(
+            showAiTourOnStart: !_isLogin,
+            showWelcomeConfetti: !_isLogin,
+          ),
         ),
       );
     }

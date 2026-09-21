@@ -222,7 +222,7 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.2),
+                                  color: Colors.blue.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Text(
@@ -241,7 +241,7 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -308,7 +308,7 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
                         FilledButton(
                           onPressed: _next,
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.1),
+                            backgroundColor: Colors.white.withValues(alpha: 0.1),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -345,7 +345,11 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
               child: const CircleAvatar(
                 radius: 32,
                 backgroundColor: Color(0xFF152033),
-                backgroundImage: NetworkImage('https://framerusercontent.com/images/YnshfS6D7v7C7f0Vq8z7N8vF6Y.png'), // Modern AI/Bot avatar
+                child: Icon(
+                  Icons.auto_awesome,
+                  color: Colors.blue,
+                  size: 28,
+                ),
               ),
             ),
           ),

@@ -783,7 +783,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                   ),
                 )
               : Text(
-                  widget.isTour ? 'Back to Home' : 'Continue',
+                  widget.isTour ? 'Submit Report' : 'Continue',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
