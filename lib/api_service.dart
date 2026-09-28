@@ -22,6 +22,9 @@ class ApiService {
   static const _cacheFilterReports = 'cache_filter_reports';
   static const filterCacheTtl = Duration(minutes: 3);
 
+  /// Set when [submitReport] returns false. Cleared at the start of each submit.
+  static String? lastSubmitError;
+
   static String homeFeedKey(String? category) {
     final c = category?.trim();
     if (c == null || c.isEmpty) return 'All';
@@ -697,8 +700,10 @@ class ApiService {
     String? existingImageUrl,
   }) async {
     final effectiveUserId = userId ?? ApiService.userId;
+    lastSubmitError = null;
     if (effectiveUserId == null) {
       print('submitReport: no logged-in user');
+      lastSubmitError = 'Sign in before submitting a report.';
       return false;
     }
 
@@ -746,16 +751,22 @@ class ApiService {
             );
         return http.Response.fromStream(streamed);
       });
-      if (response == null) return false;
+      if (response == null) {
+        lastSubmitError = 'Could not reach the server. Try again.';
+        return false;
+      }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         print('submitReport failed: ${response.statusCode} ${response.body}');
+        lastSubmitError = _errorDetail(response.body) ??
+            'Could not submit the report. Try again.';
         return false;
       }
       await clearUserReportCaches();
       return true;
     } catch (e) {
       print('Connection Error: $e');
+      lastSubmitError = 'Could not submit the report. Try again.';
       return false;
     }
   }
@@ -1029,6 +1040,8 @@ class ApiService {
           ? data['category'] as String
           : 'Other',
       'rationale': (data['rationale'] as String?)?.trim() ?? '',
+      'emergency': data['emergency'] == true,
+      'needsDetail': data['needs_detail'] == true,
     };
   }
 

@@ -59,7 +59,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         'Create, save, and process infrastructure reports.',
         'Determine the location of reported issues.',
         'Display reported issues within the application, including on maps and community feeds.',
-        'Analyze voice transcripts with AI to suggest a title, description, and category, which you can review before submitting.',
+        'Check a report description to choose a category and to see if it is a 911 emergency or too vague to act on. The description itself is not rewritten.',
         'Show contributor activity on the leaderboard.',
         'Organize reports for potential review by relevant local authorities.',
         'Improve the functionality and reliability of StreetSync.',
@@ -85,8 +85,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
     _PolicySection(
       title: '5. Voice Processing and AI',
       paragraphs: [
-        'If voice reporting is used, StreetSync processes voice input using speech-recognition technology on your device (typically provided by Apple or Google) to convert your description into text.',
-        'That text may then be sent to StreetSync’s servers and processed by third-party AI language-model providers to suggest a title, description, and category for the report. You can review and edit this information before submitting.',
+        'If voice reporting is used, StreetSync processes voice input using speech-recognition technology on your device (typically provided by Apple or Google) to convert your description into text. The recording stays on your phone.',
+        'That text, not the recording, is sent to StreetSync’s servers and then to OpenRouter, which sends it to TypeSafe’s Jev. Jev chooses a category from a fixed list and checks whether the report sounds like a 911 emergency or is too vague to act on. It does not rewrite your words. You can review and edit the report before submitting.',
         'StreetSync does not use voice recordings or transcripts for advertising or unrelated purposes.',
       ],
     ),
@@ -107,7 +107,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         'Supabase, for authentication, databases, and image storage.',
         'Google, for Maps, location geocoding, and optional Google Sign-In.',
         'Apple or Google speech recognition, when voice input is used.',
-        'Third-party AI language-model providers, when voice reports are analyzed to suggest report details.',
+        'OpenRouter and TypeSafe (Jev), when report text is checked for a category, a 911 emergency, or a vague description.',
         'StreetSync’s own hosting and API infrastructure, which stores accounts and reports.',
       ],
     ),
@@ -196,7 +196,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Last updated: August 17, 2026',
+            'Last updated: September 28, 2026',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: _muted,

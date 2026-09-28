@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/TermsScreen.dart';
+import 'package:street_sync/error_popup.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ReportDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> report;
@@ -381,6 +384,20 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                     )
                   else
                     ..._updates.map(_updateCard),
+                  if (report['image'] != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _reportPhoto,
+                        style: TextButton.styleFrom(
+                          foregroundColor: _muted,
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Text('Report this photo'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -388,6 +405,22 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _reportPhoto() async {
+    final id = _reportId ?? '';
+    final uri = Uri.parse(
+      'mailto:${TermsScreen.contactEmail}'
+      '?subject=${Uri.encodeComponent('Take down a Street Sync photo')}'
+      '&body=${Uri.encodeComponent('Please remove the photo on report $id.')}',
+    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showAppDialog(
+        context,
+        'Email ${TermsScreen.contactEmail} to request a takedown.',
+      );
+    }
   }
 
   Widget _updateCard(Map<String, dynamic> item) {

@@ -10,7 +10,7 @@ from api.schemas.reports import (
 from api.schemas.voice import ModelOutput
 from fastapi import HTTPException
 from api.models.reports import User, Report, Update
-from api.services.storage import persist_report_image
+from api.services.storage import delete_storage_url, persist_report_image
 from api.services.voice_ai import analyze_voice_report as _analyze_voice_report
 
 _ALLOWED_STATUSES = {"Open", "In Progress", "Resolved"}
@@ -293,11 +293,20 @@ def delete_account(db, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    image_urls = [
+        row.image
+        for row in db.query(Report).filter(Report.user_id == user_id).all()
+        if row.image
+    ]
+    if user.picture:
+        image_urls.append(user.picture)
     # Remove updates + reports first so FK constraints don't block the user delete.
     db.query(Update).filter(Update.user_id == user_id).delete()
     db.query(Report).filter(Report.user_id == user_id).delete()
     db.delete(user)
     db.commit()
+    for url in image_urls:
+        delete_storage_url(url)
     return {"message": "Account deleted successfully"}
 
 
@@ -305,9 +314,11 @@ def delete_report(db, report_id: int):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    image_url = report.image
     db.query(Update).filter(Update.report_id == report_id).delete()
     db.delete(report)
     db.commit()
+    delete_storage_url(image_url)
     return {"message": "Report deleted successfully"}
 
 

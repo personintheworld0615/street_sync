@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:street_sync/ForgotPasswordScreen.dart';
 import 'package:street_sync/Mainshell.dart';
+import 'package:street_sync/PrivacyPolicyScreen.dart';
+import 'package:street_sync/TermsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
@@ -30,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _isLogin = true;
   bool _loading = false;
+  bool _acceptedTerms = false;
   String _passwordText = '';
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -103,6 +106,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
+    if (!_isLogin && !_acceptedTerms) {
+      await showErrorPopup(
+        context,
+        'Agree to the Terms and Privacy Policy to create an account',
+      );
+      return;
+    }
 
     setState(() => _loading = true);
 
@@ -131,12 +141,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (error == 'confirm-email') {
       setState(() => _isLogin = true);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'We sent a confirmation link to ${_emailCtrl.text.trim()}. Open it, then sign in.',
-          ),
-        ),
+      await showAppDialog(
+        context,
+        'We sent a confirmation link to ${_emailCtrl.text.trim()}. Open it, then sign in.',
       );
       return;
     }
@@ -168,6 +175,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _oauth(OAuthProvider provider) async {
+    if (!_acceptedTerms) {
+      await showErrorPopup(
+        context,
+        'Agree to the Terms and Privacy Policy to continue',
+      );
+      return;
+    }
     setState(() => _loading = true);
 
     final error = provider == OAuthProvider.google
@@ -329,6 +343,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               const SizedBox(height: 18),
+              _termsCheckbox(),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -485,6 +501,79 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _termsCheckbox() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _acceptedTerms,
+            activeColor: _ink,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: _loading
+                ? null
+                : (value) => setState(() => _acceptedTerms = value ?? false),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'I am 13 or older and agree to the ',
+                  style: TextStyle(fontSize: 13, color: _muted, height: 1.35),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const TermsScreen()),
+                    );
+                  },
+                  child: const Text(
+                    'Terms',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _ink,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const Text(
+                  ' and ',
+                  style: TextStyle(fontSize: 13, color: _muted, height: 1.35),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacyPolicyScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Privacy Policy',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _ink,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

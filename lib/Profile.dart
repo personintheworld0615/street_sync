@@ -7,6 +7,7 @@ import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/MyDraftReportsScreen.dart';
 import 'package:street_sync/MyReportsScreen.dart';
 import 'package:street_sync/PrivacyPolicyScreen.dart';
+import 'package:street_sync/TermsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
@@ -273,6 +274,18 @@ class _ProfileState extends State<Profile> {
                   value: pushNotifications,
                   onChanged: (v) => setState(() => pushNotifications = v),
                 ),
+              ),
+              _actionRow(
+                icon: Icons.article_outlined,
+                label: 'Terms',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TermsScreen(),
+                    ),
+                  );
+                },
               ),
               _actionRow(
                 icon: Icons.shield_outlined,

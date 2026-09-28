@@ -22,7 +22,7 @@ enum IssueCategory {
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.isActive = true, this.initialReportId});
 
-  final bool isActive;
+  final bool? isActive;
   final int? initialReportId;
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -291,7 +291,7 @@ class _MapScreenState extends State<MapScreen> {
             _updateMarkers();
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Text(
               label,
               style: TextStyle(
@@ -370,7 +370,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void didUpdateWidget(MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) {
+    if (widget.isActive == true && oldWidget.isActive != true) {
       _loadRecentReports();
     }
     if (widget.initialReportId != oldWidget.initialReportId) {
@@ -418,23 +418,42 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Future<void> _recenterOnUser() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+    final currentLocation = await Geolocator.getCurrentPosition();
+    if (!mounted) return;
+    await _controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(currentLocation.latitude, currentLocation.longitude),
+        15,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    // Nav dock sits over the map. Lift Google's location button and the chips above it.
-    final aboveDock = bottomInset + 108.0;
+    // Nav dock sits over the map. Chips and the location button share one row above it.
+    final aboveDock = bottomInset + 8.0;
     return Scaffold(        
       body: Stack(
         children: [
           GoogleMap(
             mapId: googleMapsMapId,
-            padding: EdgeInsets.only(top: 130, bottom: aboveDock + 52, right: 8),
+            padding: EdgeInsets.only(top: 130, bottom: aboveDock + 48),
             initialCameraPosition: CameraPosition(
               target: _center,
               zoom: 14,
             ),
             myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationButtonEnabled: false,
             markers: _markers,
             onTap: (_) => _clearSelection(),
             onMapCreated: (c) {
@@ -522,23 +541,50 @@ class _MapScreenState extends State<MapScreen> {
             Positioned(
               bottom: aboveDock,
               left: 12,
-              right: 68,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final category in [null, ...ReportCategories.all])
-                      _categoryChip(
-                        category == null
-                            ? 'All'
-                            : ReportCategories.shortLabel(category),
-                        category,
-                        category == null
-                            ? const Color(0xFF6B7280)
-                            : ReportCategories.color(category),
+              right: 12,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final category in [null, ...ReportCategories.all])
+                            _categoryChip(
+                              category == null
+                                  ? 'All'
+                                  : ReportCategories.shortLabel(category),
+                              category,
+                              category == null
+                                  ? const Color(0xFF6B7280)
+                                  : ReportCategories.color(category),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: Colors.white,
+                    elevation: 2,
+                    shadowColor: Colors.black26,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _recenterOnUser,
+                      child: const SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Icon(
+                          Icons.my_location,
+                          size: 26,
+                          color: Color(0xFF3C4043),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

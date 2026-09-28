@@ -10,6 +10,7 @@ import 'config.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/geocoding_utils.dart';
+import 'package:street_sync/error_popup.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_severity.dart';
 class Updatething extends StatefulWidget {
@@ -1053,13 +1054,7 @@ class _UpdateThingState extends State<Updatething> {
           if (_markers.isEmpty) errors.add('location');
 
           if (errors.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Please add: ${errors.join(', ')}'),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            showAppDialog(context, 'Please add: ${errors.join(', ')}');
             return;
           }
 
@@ -1121,12 +1116,7 @@ class _UpdateThingState extends State<Updatething> {
           } catch (_) {
             if (mounted) setState(() => _submitting = false);
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Could not get address. Try again.'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              showAppDialog(context, 'Could not get address. Try again.');
             }
           }
         },

@@ -10,6 +10,8 @@ import 'config.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/report_judgment.dart';
+import 'package:street_sync/error_popup.dart';
 
 class VoiceReportScreen extends StatefulWidget {
   final bool isTour;
@@ -249,12 +251,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       await _initSpeech();
       if (!_speechReady) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Speech recognition is not available.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showAppDialog(context, 'Speech recognition is not available.');
         return;
       }
     }
@@ -346,7 +343,8 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     try {
       await _locationFuture;
 
-      final analysis = await ApiService.analyzeVoiceReport(_transcript);
+      final judgment = await reviewReportText(context, _transcript);
+      if (!mounted || judgment == null) return;
 
       final lat = _lat;
       final lng = _long;
@@ -356,21 +354,16 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
       if (!mounted) return;
 
-      final polished = (analysis['description'] as String?)?.trim();
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationVoiceReport(
-            title: analysis['title'] as String,
-            description: (polished != null && polished.isNotEmpty)
-                ? polished
-                : _transcript,
+            title: judgment.title.isNotEmpty ? judgment.title : _transcript,
+            description: _transcript,
             location: location,
             latitude: lat ?? 0.0,
             longitude: lng ?? 0.0,
-            category: analysis['category'] as String?,
-            severity: analysis['severity'] as String?,
-            aiRationale: analysis['rationale'] as String?,
+            category: judgment.category,
             rawTranscript: _transcript,
           ),
         ),
@@ -378,11 +371,9 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     } catch (e) {
       debugPrint('Error in voice report flow: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            behavior: SnackBarBehavior.floating,
-          ),
+        showAppDialog(
+          context,
+          e.toString().replaceFirst('Exception: ', ''),
         );
       }
     } finally {

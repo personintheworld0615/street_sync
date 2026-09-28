@@ -158,7 +158,7 @@ class ReportCategories {
       case natureAndWater:
         return 'Nature';
       case buildingsAndPublicSpaces:
-        return 'Buildings';
+        return 'Build';
       case other:
         return 'Other';
       default:

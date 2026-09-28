@@ -32,6 +32,7 @@ from api.services.storage import (
     assert_storage_image_url,
     upload_report_image,
 )
+from api.services.text_filter import assert_clean
 
 router = APIRouter(tags=["reports"])
 
@@ -71,6 +72,7 @@ async def create_report(
     description = _bounded(description, "description", _DESCRIPTION_MAX)
     category = _bounded(category, "category", _CATEGORY_MAX)
     location = _bounded(location, "location", _LOCATION_MAX)
+    assert_clean(title, description, category)
     # Upload photo to Supabase Storage; DB only stores the public URL
     image_url: Optional[str] = None
     if image is not None and image.filename:
@@ -139,6 +141,7 @@ async def update_report(
     description = _bounded(description, "description", _DESCRIPTION_MAX)
     category = _bounded(category, "category", _CATEGORY_MAX)
     location = _bounded(location, "location", _LOCATION_MAX)
+    assert_clean(title, description, category)
     image_url: Optional[str] = None
     if image is not None and image.filename:
         data = await image.read(MAX_IMAGE_BYTES + 1)
@@ -342,7 +345,7 @@ def analyze_voice_report(
     request: Request,
     current_user: User = Depends(get_current_user),
 ):
-    """Turn a voice-report description into title, severity, and category."""
+    """Pick a category for this description and flag 911 or a vague report."""
     _limit_ai(request, current_user)
     return reports_service.analyze_voice_report(body.description)
 

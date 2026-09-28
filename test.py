@@ -1,4 +1,4 @@
-"""Quick smoke test for OpenRouter voice-report analysis.
+"""Quick smoke test for Jev report checks.
 
 Run from repo root:
   python test.py
@@ -30,7 +30,7 @@ SAMPLE = (
 
 def main() -> None:
     print(f"Transcript:\n  {SAMPLE}\n")
-    print("Calling OpenRouter…")
+    print("Calling Jev…")
     result = analyze_voice_report(SAMPLE)
     print("\nResult:")
     print(json.dumps(result.model_dump(), indent=2))

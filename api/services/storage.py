@@ -100,13 +100,113 @@ def _sniff_image(data: bytes) -> str:
     )
 
 
+def _strip_jpeg_exif(data: bytes) -> bytes:
+    """Drop the JPEG APP1 segment, which is where GPS and camera data live."""
+    if not data.startswith(b"\xff\xd8"):
+        return data
+    out = bytearray(b"\xff\xd8")
+    i = 2
+    n = len(data)
+    while i < n:
+        if data[i] != 0xFF:
+            out.extend(data[i:])
+            break
+        while i < n and data[i] == 0xFF:
+            i += 1
+        if i >= n:
+            break
+        marker = data[i]
+        i += 1
+        if marker in (0xD8, 0xD9) or marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            out.extend((0xFF, marker))
+            if marker == 0xD9:
+                break
+            continue
+        if i + 1 >= n:
+            break
+        length = int.from_bytes(data[i : i + 2], "big")
+        if length < 2 or i + length > n:
+            out.extend(data[i - 2 :])
+            break
+        if marker == 0xDA:
+            out.extend((0xFF, marker))
+            out.extend(data[i:])
+            break
+        if marker != 0xE1:
+            out.extend((0xFF, marker))
+            out.extend(data[i : i + length])
+        i += length
+    return bytes(out)
+
+
+def _strip_png_metadata(data: bytes) -> bytes:
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not data.startswith(signature):
+        return data
+    drop = {b"eXIf", b"tEXt", b"zTXt", b"iTXt"}
+    out = bytearray(signature)
+    i = 8
+    while i + 8 <= len(data):
+        length = int.from_bytes(data[i : i + 4], "big")
+        chunk_type = data[i + 4 : i + 8]
+        end = i + 12 + length
+        if end > len(data):
+            out.extend(data[i:])
+            break
+        if chunk_type not in drop:
+            out.extend(data[i:end])
+        i = end
+        if chunk_type == b"IEND":
+            break
+    return bytes(out)
+
+
+def strip_location_metadata(data: bytes, content_type: str) -> bytes:
+    if content_type == "image/jpeg":
+        return _strip_jpeg_exif(data)
+    if content_type == "image/png":
+        return _strip_png_metadata(data)
+    return data
+
+
 def _checked_image(data: bytes) -> Tuple[bytes, str, str]:
     if not data:
         raise HTTPException(status_code=400, detail="Empty image upload")
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image must be 8 MB or smaller")
     content_type = _sniff_image(data)
+    data = strip_location_metadata(data, content_type)
     return data, content_type, _MIME_TO_EXT[content_type]
+
+
+def delete_storage_url(url: str | None) -> None:
+    """Remove one public Storage object. Missing files are ignored."""
+    if not url:
+        return
+    value = url.split("?", 1)[0].strip()
+    try:
+        supabase_url, service_key = _credentials()
+    except HTTPException:
+        return
+    prefix = f"{supabase_url}/storage/v1/object/public/"
+    if not value.startswith(prefix):
+        return
+    object_ref = value[len(prefix) :]
+    if not object_ref or "/" not in object_ref:
+        return
+    req = Request(
+        f"{supabase_url}/storage/v1/object/{object_ref}",
+        method="DELETE",
+    )
+    req.add_header("Authorization", f"Bearer {service_key}")
+    req.add_header("apikey", service_key)
+    try:
+        with urlopen(req, timeout=20) as resp:
+            resp.read()
+    except HTTPError:
+        return
+    except URLError:
+        return
 
 
 def assert_storage_image_url(url: str) -> str:

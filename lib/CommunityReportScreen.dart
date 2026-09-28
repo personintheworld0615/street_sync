@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -11,9 +10,11 @@ import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/error_popup.dart';
 import 'config.dart';
 import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/report_severity.dart';
 import 'package:street_sync/voice_mic_control.dart';
 class CommunityReportScreen extends StatefulWidget {
@@ -46,7 +47,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
    bool _ready =false;
   bool _submitting = false;
   bool _savingDraft = false;
-  bool _generatingTitle = false;
   String _reportMode = 'manual'; // 'manual', 'auto', 'voice'
 
   final SpeechToText _speech = SpeechToText();
@@ -59,11 +59,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
   bool get _busy => _submitting || _savingDraft;
-  Timer? _debounce;
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _otherCategoryController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
@@ -108,6 +106,15 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildPhotoCard(),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Do not include faces, children, license plates, or the inside of a home.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: _muted,
+                      ),
+                    ),
                     const SizedBox(height: 18),
                     _buildModeSelector(),
                     const SizedBox(height: 18),
@@ -457,12 +464,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       await _initSpeech();
       if (!_speechReady) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Speech recognition is not available.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showAppDialog(context, 'Speech recognition is not available.');
         return;
       }
     }
@@ -1023,54 +1025,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Title',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () => _showTitleInfo(context),
-                      child: Icon(
-                        Icons.info_outline_rounded,
-                        size: 16,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  ],
-                ),
-                if (_generatingTitle)
-                  const SizedBox(
-                    height: 14,
-                    width: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _cta,
-                    ),
-                  )
-                else
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _cta.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'AI AUTO-FILL',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _cta,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                Text(
+                  'Title',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
                   ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -1093,34 +1055,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showTitleInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.auto_awesome_rounded, color: _cta),
-            SizedBox(width: 10),
-            Text('AI Title Assist'),
-          ],
-        ),
-        content: const Text(
-          'Our AI automatically generates a professional title based on your description. '
-          'This helps city workers quickly identify and prioritize issues.\n\n'
-          'You can always edit the title manually if you prefer!',
-          style: TextStyle(fontSize: 15, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -1156,7 +1090,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 controller: _descriptionController,
                 onChanged: (value) {
                   _descirption = value;
-                  _onDescriptionChanged(value);
                 },
                 onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
@@ -1172,24 +1105,6 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     );
   }
 
-  void _onDescriptionChanged(String value) {
-    if (_debounce?.isActive ?? false) _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 1500), () async {
-      if (value.trim().length > 10 && _titleController.text.trim().isEmpty) {
-        setState(() => _generatingTitle = true);
-        try {
-          final aiTitle = await ApiService.generateAITitle(value);
-          if (mounted && _titleController.text.trim().isEmpty) {
-            setState(() {
-              _titleController.text = aiTitle;
-            });
-          }
-        } finally {
-          if (mounted) setState(() => _generatingTitle = false);
-        }
-      }
-    });
-  }
   Future<void> _captureImage() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.camera,
@@ -1521,11 +1436,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
     if (!success) {
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to submit report. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showAppDialog(
+        context,
+        ApiService.lastSubmitError ??
+            'Failed to submit report. Please try again.',
       );
       return;
     }
@@ -1564,21 +1478,15 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     setState(() => _savingDraft = false);
 
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save draft. Is the API running?'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showAppDialog(
+        context,
+        ApiService.lastSubmitError ?? 'Could not save draft. Is the API running?',
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved as draft'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    await showAppDialog(context, 'Saved as draft');
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MainShell()),
       (route) => false,
@@ -1607,62 +1515,63 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               if (_busy) return;
 
               if (_reportMode == 'voice' && _isRecording) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please stop recording before submitting.'),
-                    behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 2),
-                  ),
+                showAppDialog(
+                  context,
+                  'Please stop recording before submitting.',
                 );
                 return;
               }
 
-              // If in voice mode, analyze the transcript first to auto-fill title/desc/category
-              if (_reportMode == 'voice' && _transcript.isNotEmpty) {
-                setState(() => _submitting = true);
-                try {
-                  final aiResult = await ApiService.analyzeVoiceReport(_transcript);
-                  _titleController.text = aiResult['title'] ?? '';
-                  _descriptionController.text = aiResult['description'] ?? _transcript;
-                  
-                  // Extract matching category string from ReportCategories
-                  final aiCat = aiResult['category'];
-                  if (aiCat != null) {
-                    final match = ReportCategories.all.firstWhere(
-                      (c) => c.toLowerCase() == aiCat.toLowerCase(),
-                      orElse: () => _selectedCategory ?? ReportCategories.other,
-                    );
-                    _selectedCategory = match;
-                  }
-                  
-                } catch (e) {
-                  print('AI voice analysis failed: $e');
-                } finally {
-                  setState(() => _submitting = false);
-                }
-              }
+              final described = _reportMode == 'voice' && _transcript.trim().isNotEmpty
+                  ? _transcript.trim()
+                  : _descriptionController.text.trim();
 
               final errors = <String>[];
-              if (_titleController.text.trim().isEmpty) errors.add('title');
+              if (_reportMode != 'voice' &&
+                  _titleController.text.trim().isEmpty) {
+                errors.add('title');
+              }
               if (_image == null) errors.add('photo');
-              if (_selectedCategory == null) errors.add('category');
               if (_selectedCategory == ReportCategories.streetLight &&
                   _poleNumberController.text.trim().isEmpty) {
                 errors.add('pole number');
               }
-              if (_descriptionController.text.trim().isEmpty) {
-                errors.add('description');
-              }
+              if (described.isEmpty) errors.add('description');
               if (_markers.isEmpty) errors.add('location');
 
               if (errors.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Please add: ${errors.join(', ')}'),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                showAppDialog(context, 'Please add: ${errors.join(', ')}');
+                return;
+              }
+
+              setState(() => _submitting = true);
+              final judgment = await reviewReportText(context, described);
+              if (mounted) setState(() => _submitting = false);
+              if (!mounted || judgment == null) return;
+
+              if (_reportMode == 'voice') {
+                if (_titleController.text.trim().isEmpty &&
+                    judgment.title.isNotEmpty) {
+                  _titleController.text = judgment.title;
+                }
+                if (_descriptionController.text.trim().isEmpty) {
+                  _descriptionController.text = _transcript.trim();
+                }
+              }
+              if (_selectedCategory == null && judgment.category != null) {
+                setState(() => _selectedCategory = judgment.category);
+              }
+              if (_selectedCategory == ReportCategories.streetLight &&
+                  _poleNumberController.text.trim().isEmpty) {
+                showAppDialog(context, 'Please add: pole number');
+                return;
+              }
+              if (_selectedCategory == null) {
+                showAppDialog(context, 'Please add: category');
+                return;
+              }
+              if (_titleController.text.trim().isEmpty) {
+                showAppDialog(context, 'Please add: title');
                 return;
               }
 
@@ -1701,12 +1610,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               } catch (_) {
                 if (mounted) setState(() => _submitting = false);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not get address. Try again.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  showAppDialog(context, 'Could not get address. Try again.');
                 }
               }
             },

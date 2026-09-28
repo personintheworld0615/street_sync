@@ -14,15 +14,9 @@ class VoiceReportInput(BaseModel):
 
 class ModelOutput(BaseModel):
 
-    title: str = Field(description="Punchy work-order style title, ~3 words")
-    description: str = Field(
-        description="Polished report description, about 20 words"
-    )
-    severity: Literal["low", "medium", "high"]
-    category: Literal[
-        "Streets & Transportation",
-        "Trash & Environment",
-        "Nature & Water",
-        "Buildings & Public Spaces",
-        "Other",
-    ]
+    title: str = Field(description="Opening words of the report, not a model rewrite")
+    description: str = Field(description="The person's own description")
+    severity: Literal["low", "medium", "high"] = "medium"
+    category: str
+    emergency: bool = False
+    needs_detail: bool = False

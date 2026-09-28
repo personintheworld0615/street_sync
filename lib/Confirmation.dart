@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/error_popup.dart';
 import 'package:street_sync/report_categories.dart';
+import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/report_severity.dart';
 
 class Confirmation extends StatefulWidget {
@@ -92,21 +94,15 @@ class _ConfirmationState extends State<Confirmation> {
 
     if (!success) {
       setState(() => _savingDraft = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save draft. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showAppDialog(
+        context,
+        ApiService.lastSubmitError ?? 'Could not save draft. Please try again.',
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved as draft'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    await showAppDialog(context, 'Saved as draft');
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MainShell()),
       (route) => false,
@@ -117,6 +113,12 @@ class _ConfirmationState extends State<Confirmation> {
     if (_busy) return;
     if (!_validateEditableFields()) return;
     setState(() => _submitting = true);
+    final judgment = await reviewReportText(context, _description);
+    if (!mounted) return;
+    if (judgment == null) {
+      setState(() => _submitting = false);
+      return;
+    }
 
     final success = await ApiService.submitReport(
       title: _title,
@@ -136,10 +138,10 @@ class _ConfirmationState extends State<Confirmation> {
 
     if (!success) {
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to submit report. Please try again.'),
-        ),
+      showAppDialog(
+        context,
+        ApiService.lastSubmitError ??
+            'Failed to submit report. Please try again.',
       );
       return;
     }
@@ -209,12 +211,7 @@ class _ConfirmationState extends State<Confirmation> {
 
     if (missing.isEmpty) return true;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Please enter a ${missing.first}.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    showAppDialog(context, 'Please enter a ${missing.first}.');
     return false;
   }
 
@@ -255,12 +252,7 @@ class _ConfirmationState extends State<Confirmation> {
 
     if (result == null || !mounted) return;
     if (result.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$label cannot be empty.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showAppDialog(context, '$label cannot be empty.');
       return;
     }
     setState(() => onSaved(result.trim()));

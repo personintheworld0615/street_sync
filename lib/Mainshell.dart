@@ -6,6 +6,7 @@ import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/Profile.dart';
 import 'package:street_sync/UpdatesScreen.dart';
+import 'package:street_sync/error_popup.dart';
 import 'package:street_sync/update_alerts.dart';
 
 import 'HomeScreen.dart';
@@ -70,25 +71,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _onUpdateNotice() {
-    if (!mounted || UpdateAlerts.unseen.value == 0) return;
-    if (_index == 2) {
-      UpdateAlerts.markSeen();
-      return;
-    }
+    if (!mounted || UpdateAlerts.unseen.value == 0 || _index == 2) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger == null) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('You got an update. Check the updates tab.'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          ),
-        );
+      if (!mounted || _index == 2) return;
+      showAppDialog(
+        context,
+        'You got an update. Check the updates tab.',
+      );
     });
   }
 
@@ -206,9 +195,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         _focusReportId = null;
       }
       _index = stackIndex;
-      if (stackIndex == 2) {
-        UpdateAlerts.markSeen();
-      }
     });
   }
 
@@ -306,11 +292,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 voiceActionTourKey: _voiceActionTourKey,
               ),
               MapScreen(isActive: _index == 1, initialReportId: _focusReportId),
-              const UpdatesScreen(),
+              UpdatesScreen(isActive: _index == 2),
               const Profile(),
             ],
           ),
-          floatingActionButton: _showTour
+          floatingActionButton: _showTour || _index == 1
               ? null
               : Padding(
                   padding: const EdgeInsets.only(bottom: 72),
