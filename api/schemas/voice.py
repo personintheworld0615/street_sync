@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 
 class VoiceReportInput(BaseModel):
 
-    description: str = Field(min_length=1, description="Spoken report transcript")
+    description: str = Field(
+        min_length=1,
+        max_length=2000,
+        description="Spoken report transcript",
+    )
 
 
 class ModelOutput(BaseModel):

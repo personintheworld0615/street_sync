@@ -82,18 +82,44 @@ def _upload_bytes(
     return f"{supabase_url}/storage/v1/object/public/{bucket}/{object_path}"
 
 
-def _resolve_ext_and_type(
-    content_type: str,
-    filename: Optional[str],
-) -> Tuple[str, str]:
-    content_type = (content_type or "image/jpeg").split(";")[0].strip().lower()
-    ext = _MIME_TO_EXT.get(content_type)
-    if not ext and filename and "." in filename:
-        ext = filename.rsplit(".", 1)[-1].lower()
-    if not ext:
-        ext = "jpg"
-        content_type = "image/jpeg"
-    return ext, content_type
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+
+def _sniff_image(data: bytes) -> str:
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    raise HTTPException(
+        status_code=400,
+        detail="Upload must be a JPEG, PNG, GIF, or WebP image",
+    )
+
+
+def _checked_image(data: bytes) -> Tuple[bytes, str, str]:
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image must be 8 MB or smaller")
+    content_type = _sniff_image(data)
+    return data, content_type, _MIME_TO_EXT[content_type]
+
+
+def assert_storage_image_url(url: str) -> str:
+    """Only keep image links that already live in this project's Storage."""
+    supabase_url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    prefix = f"{supabase_url}/storage/v1/object/public/"
+    value = url.strip()
+    if not supabase_url or not value.startswith(prefix):
+        raise HTTPException(
+            status_code=400,
+            detail="Image URL must be a Street Sync storage link",
+        )
+    return value
 
 
 def upload_report_image(
@@ -101,10 +127,8 @@ def upload_report_image(
     content_type: str = "image/jpeg",
     filename: Optional[str] = None,
 ) -> str:
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty image upload")
-
-    ext, content_type = _resolve_ext_and_type(content_type, filename)
+    _ = (content_type, filename)
+    data, content_type, ext = _checked_image(data)
     object_path = f"reports/{uuid.uuid4().hex}.{ext}"
     return _upload_bytes(
         bucket=_report_bucket(),
@@ -122,18 +146,14 @@ def upload_user_picture(
     filename: Optional[str] = None,
 ) -> str:
     """Upload (or replace) a profile avatar in the dedicated avatars bucket."""
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty image upload")
-
-    # Always JPEG path so re-uploads upsert the same object.
-    # content_type/filename kept for API compatibility with multipart uploads.
-    _ = (content_type, filename)
-    object_path = f"{user_id}.jpg"
+    data, content_type, ext = _checked_image(data)
+    _ = filename
+    object_path = f"{user_id}.{ext}"
     url = _upload_bytes(
         bucket=_avatar_bucket(),
         object_path=object_path,
         data=data,
-        content_type="image/jpeg",
+        content_type=content_type,
     )
     # Bust CDN / client caches when the same object path is overwritten.
     return f"{url}?v={int(time.time())}"

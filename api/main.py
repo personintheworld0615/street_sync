@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -17,13 +18,36 @@ from api.database import Base, engine
 from api.models import reports as models_reports 
 from api.routes.reports import router as reports_router
 
-app = FastAPI(title="StreetSync API")
+def _docs_enabled() -> bool:
+    flag = os.getenv("ENABLE_API_DOCS")
+    if flag is not None and flag.strip() != "":
+        return flag.strip().lower() in ("1", "true", "yes")
+    # Render sets RENDER=true. Interactive docs stay off there unless opted in.
+    return os.getenv("RENDER", "").lower() not in ("1", "true", "yes")
+
+
+def _cors_origins() -> list[str]:
+    raw = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:5000,http://localhost:8000,http://127.0.0.1:3000",
+    )
+    origins = [item.strip() for item in raw.split(",") if item.strip() and item.strip() != "*"]
+    return origins or ["http://localhost:3000"]
+
+
+_docs = "/docs" if _docs_enabled() else None
+app = FastAPI(
+    title="StreetSync API",
+    docs_url=_docs,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(reports_router)
 app.include_router(auth_router)

@@ -57,7 +57,7 @@ class AuthService {
       if (e.toString().contains('already been initialized')) {
         _initialized = true;
       } else {
-        debugPrint('Supabase Init Error: $e');
+        debugPrint('Sorry there was an error on our end. Please try again later.');
       }
     }
   }
@@ -74,7 +74,7 @@ class AuthService {
       );
       _googleInitialized = true;
     } catch (e) {
-      debugPrint('Google Sign-In Init Error: $e');
+      debugPrint('Sorry there was an error signing you in with Google. Please try again later.');
     }
   }
 
@@ -211,7 +211,7 @@ class AuthService {
   static bool isEmailConfirmBlocker(String? error) {
     if (error == null) return false;
     final msg = error.toLowerCase();
-    return msg.contains('rate limit') || msg.contains('confirm');
+    return msg.contains('not confirmed') || msg.contains('email_not_confirmed');
   }
 
   static String? get firstNameFromUser => user?.userMetadata?['first_name'] as String?;

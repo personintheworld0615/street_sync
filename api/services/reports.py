@@ -167,9 +167,18 @@ def get_all_reports_by_user_draft(db, user_id: int):
     return [report_to_schema(report) for report in rows]
 
 
+_PUBLIC_LIST_CAP = 500
+
+
 def get_all_reports(db):
     # Public list: submitted reports only (never drafts)
-    rows = db.query(Report).filter(Report.is_draft == False).all()
+    rows = (
+        db.query(Report)
+        .filter(Report.is_draft == False)
+        .order_by(Report.time.desc())
+        .limit(_PUBLIC_LIST_CAP)
+        .all()
+    )
     return [report_to_schema(report) for report in rows]
 
 
@@ -255,6 +264,8 @@ def get_reports_open(db):
     rows = (
         db.query(Report)
         .filter(Report.status == "Open", Report.is_draft == False)
+        .order_by(Report.time.desc())
+        .limit(_PUBLIC_LIST_CAP)
         .all()
     )
     return [report_to_schema(report) for report in rows]
@@ -263,6 +274,8 @@ def get_reports_resolved(db):
     rows = (
         db.query(Report)
         .filter(Report.status == "Resolved", Report.is_draft == False)
+        .order_by(Report.time.desc())
+        .limit(_PUBLIC_LIST_CAP)
         .all()
     )
     return [report_to_schema(report) for report in rows]
@@ -271,6 +284,8 @@ def get_reports_in_progress(db):
     rows = (
         db.query(Report)
         .filter(Report.status == "In Progress", Report.is_draft == False)
+        .order_by(Report.time.desc())
+        .limit(_PUBLIC_LIST_CAP)
         .all()
     )
     return [report_to_schema(report) for report in rows]

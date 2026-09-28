@@ -33,7 +33,7 @@ except KeyError as exc:
     ) from exc
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 90
+ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_SERVICE_KEY = (
@@ -232,17 +232,16 @@ def admin_create_confirmed_user(
             or payload.get("error_description")
             or ""
         )
-    # Already registered — confirm so next login works without email OTP.
     if status_code in (400, 422) and "already" in msg.lower():
-        admin_confirm_user_email(email)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
 
+    print(f"admin_create_confirmed_user failed ({status_code})")
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=msg or "Could not create auth user",
+        detail="Could not create auth user",
     )
 
 
@@ -259,43 +258,77 @@ def admin_confirm_user_email(email: str) -> bool:
     return status_code < 400
 
 
-def ensure_email_confirmed_for_login(email: str, password: str) -> None:
+def _local_password_matches(user: User, password: str) -> bool:
+    if not user.password:
+        return False
+    try:
+        return verify_password(password, user.password)
+    except Exception:
+        return False
+
+
+def assert_staff(user: User) -> None:
+    """Status changes are limited to emails listed in STAFF_EMAILS."""
+    raw = os.getenv("STAFF_EMAILS") or ""
+    allowed = {part.strip().lower() for part in raw.split(",") if part.strip()}
+    email = (user.email or "").strip().lower()
+    if not email or email not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Staff access required",
+        )
+
+
+def ensure_email_confirmed_for_login(email: str, password: str, db: Session) -> None:
     """
-    If login is blocked by unconfirmed email / confirm-email rate limits,
-    confirm the account (after verifying the password) so the client can sign in.
+    Confirm a Supabase email only after the local password hash matches.
+    A Supabase rate-limit response must not confirm the account.
     """
-    grant = supabase_password_grant(email, password)
+    normalized = email.strip().lower()
+    grant = supabase_password_grant(normalized, password)
     if grant.get("access_token"):
         return
 
     err = str(grant.get("error") or grant.get("error_code") or "").lower()
-    desc = str(grant.get("msg") or grant.get("error_description") or grant.get("message") or "").lower()
-    blocked = (
-        "email_not_confirmed" in err
-        or "email not confirmed" in desc
-        or "rate limit" in desc
-        or "rate_limit" in err
-    )
-    if not blocked:
-        detail = grant.get("error_description") or grant.get("msg") or grant.get("message") or "Invalid credentials"
+    desc = str(
+        grant.get("msg")
+        or grant.get("error_description")
+        or grant.get("message")
+        or ""
+    ).lower()
+    if "rate limit" in desc or "rate_limit" in err or "too many" in desc:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(detail),
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Try again in a little while.",
         )
 
-    if not admin_confirm_user_email(email):
+    unconfirmed = (
+        "email_not_confirmed" in err or "email not confirmed" in desc
+    )
+    if not unconfirmed:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
 
-    # Verify password after confirming; wrong password must still fail.
-    grant2 = supabase_password_grant(email, password)
-    if not grant2.get("access_token"):
-        detail = grant2.get("error_description") or grant2.get("msg") or "Invalid credentials"
+    user = db.query(User).filter(User.email == normalized).first()
+    if user is None or not _local_password_matches(user, password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(detail),
+            detail="Invalid credentials",
+        )
+
+    if not admin_confirm_user_email(normalized):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    grant2 = supabase_password_grant(normalized, password)
+    if not grant2.get("access_token"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
         )
 
 

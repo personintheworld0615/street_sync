@@ -38,8 +38,8 @@ class ReportsFull(BaseModel):
 class ReportStatusUpdate(BaseModel):
     """Dashboard payload: change report status (+ optional staff comment)."""
 
-    status: str
-    comment: Optional[str] = None
+    status: str = Field(max_length=40)
+    comment: Optional[str] = Field(default=None, max_length=500)
 
 
 class UpdateOut(BaseModel):

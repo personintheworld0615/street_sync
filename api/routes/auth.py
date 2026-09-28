@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -25,8 +25,9 @@ from api.services.auth import (
     upsert_user_from_supabase,
     verify_password,
 )
+from api.services.rate_limit import client_ip, hit
 from api.services.reports import delete_account
-from api.services.storage import upload_user_picture
+from api.services.storage import MAX_IMAGE_BYTES, upload_user_picture
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -44,8 +45,9 @@ def _token_for(user: User, access_token: str | None = None) -> TokenResponse:
 
 
 @router.post("/signup", response_model=TokenResponse)
-def signup(body: SignupRequest, db: Session = Depends(get_db)):
+def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db)):
     """Create a confirmed Supabase user (no email OTP / confirm) and local profile."""
+    hit("auth-signup", client_ip(request), limit=5, window_seconds=3600)
     email = str(body.email).strip().lower()
     existing = db.query(User).filter(User.email == email).first()
     if existing:
@@ -83,9 +85,13 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """Legacy email/password login (kept for older clients)."""
-    user = db.query(User).filter(User.email == body.email).first()
+    ip = client_ip(request)
+    email = str(body.email).strip().lower()
+    hit("auth-login-ip", ip, limit=10, window_seconds=900)
+    hit("auth-login-email", email, limit=8, window_seconds=900)
+    user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -95,13 +101,21 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/ensure-confirmed")
-def ensure_confirmed(body: LoginRequest):
+def ensure_confirmed(
+    body: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """
-    Confirm the user's email in Supabase (no 2FA / no confirm email) when
-    login is blocked by email confirmation or email rate limits.
-    Verifies the password first.
+    Confirm the user's email in Supabase when login is blocked because the
+    address is unconfirmed. Requires the local password hash to match.
+    Rate-limit errors do not confirm the account.
     """
-    ensure_email_confirmed_for_login(str(body.email), body.password)
+    ip = client_ip(request)
+    email = str(body.email).strip().lower()
+    hit("auth-confirm-ip", ip, limit=5, window_seconds=900)
+    hit("auth-confirm-email", email, limit=5, window_seconds=900)
+    ensure_email_confirmed_for_login(email, body.password, db)
     return {"ok": True}
 
 
@@ -133,12 +147,14 @@ def me(
 
 @router.post("/picture", response_model=PictureResponse)
 async def upload_picture(
+    request: Request,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Upload a profile photo to Supabase Storage; store public URL on the user."""
-    data = await image.read()
+    hit("auth-picture", str(current_user.id), limit=20, window_seconds=3600)
+    data = await image.read(MAX_IMAGE_BYTES + 1)
     if not data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

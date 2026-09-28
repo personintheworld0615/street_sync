@@ -61,10 +61,8 @@ def analyze_voice_report(description: str) -> ModelOutput:
     )
 
     if response.status_code != 200:
-        raise HTTPException(
-            502,
-            f"OpenRouter error: {response.text}"
-        )
+        print(f"OpenRouter error {response.status_code}")
+        raise HTTPException(502, "AI analysis failed")
 
     result = response.json()
 

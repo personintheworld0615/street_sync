@@ -8,6 +8,7 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Request,
     UploadFile,
     status,
 )
@@ -24,10 +25,30 @@ from api.schemas.reports import (
 )
 from api.schemas.voice import ModelOutput, VoiceReportInput
 from api.services import reports as reports_service
-from api.services.auth import get_current_user, get_optional_user
-from api.services.storage import upload_report_image
+from api.services.auth import assert_staff, get_current_user, get_optional_user
+from api.services.rate_limit import client_ip, hit
+from api.services.storage import (
+    MAX_IMAGE_BYTES,
+    assert_storage_image_url,
+    upload_report_image,
+)
 
 router = APIRouter(tags=["reports"])
+
+_TITLE_MAX = 120
+_DESCRIPTION_MAX = 2000
+_LOCATION_MAX = 200
+_CATEGORY_MAX = 50
+
+
+def _bounded(value: str, field: str, max_len: int) -> str:
+    text = value.strip()
+    if len(text) > max_len:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field} must be at most {max_len} characters",
+        )
+    return text
 
 
 @router.post("/reports", response_model=ReportsFull)
@@ -45,10 +66,15 @@ async def create_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    hit("reports-write", str(current_user.id), limit=40, window_seconds=3600)
+    title = _bounded(title, "title", _TITLE_MAX)
+    description = _bounded(description, "description", _DESCRIPTION_MAX)
+    category = _bounded(category, "category", _CATEGORY_MAX)
+    location = _bounded(location, "location", _LOCATION_MAX)
     # Upload photo to Supabase Storage; DB only stores the public URL
     image_url: Optional[str] = None
     if image is not None and image.filename:
-        data = await image.read()
+        data = await image.read(MAX_IMAGE_BYTES + 1)
         if data:
             image_url = upload_report_image(
                 data,
@@ -108,9 +134,14 @@ async def update_report(
     current_user: User = Depends(get_current_user),
 ):
     """Update a report in place (publish draft or re-save draft)."""
+    hit("reports-write", str(current_user.id), limit=40, window_seconds=3600)
+    title = _bounded(title, "title", _TITLE_MAX)
+    description = _bounded(description, "description", _DESCRIPTION_MAX)
+    category = _bounded(category, "category", _CATEGORY_MAX)
+    location = _bounded(location, "location", _LOCATION_MAX)
     image_url: Optional[str] = None
     if image is not None and image.filename:
-        data = await image.read()
+        data = await image.read(MAX_IMAGE_BYTES + 1)
         if data:
             image_url = upload_report_image(
                 data,
@@ -118,7 +149,7 @@ async def update_report(
                 filename=image.filename,
             )
     elif existing_image_url and existing_image_url.strip():
-        image_url = existing_image_url.strip()
+        image_url = assert_storage_image_url(existing_image_url.strip())
 
     severity_norm = severity.strip().lower()
     if severity_norm not in ("low", "medium", "high"):
@@ -154,26 +185,35 @@ async def update_report(
     return reports_service.update_report(db, report_id, report, current_user)
 
 
+def _limit_public_read(request: Request) -> None:
+    hit("reports-read", client_ip(request), limit=120, window_seconds=60)
+
+
 @router.get("/reports", response_model=List[ReportsFull])
-def get_all_reports(db: Session = Depends(get_db)):
+def get_all_reports(request: Request, db: Session = Depends(get_db)):
+    _limit_public_read(request)
     return reports_service.get_all_reports(db)
 
 
 @router.get("/reports/recent", response_model=List[ReportsFull])
 def get_most_recent_reports(
+    request: Request,
     amount: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    _limit_public_read(request)
     return reports_service.get_most_recent_reports(db, amount)
 
 
 @router.get("/reports/feed", response_model=List[ReportsFull])
 def get_reports_feed(
+    request: Request,
     amount: int = Query(default=10, ge=1, le=100),
     category: Optional[str] = Query(default=None),
     before: Optional[datetime] = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    _limit_public_read(request)
     return reports_service.get_reports_feed(
         db,
         amount=amount,
@@ -211,17 +251,20 @@ def get_user_submitted_reports(
 
 
 @router.get("/reports/nearme", response_model=List[ReportsFull])
-def get_reports_nearme(db: Session = Depends(get_db)):
+def get_reports_nearme(request: Request, db: Session = Depends(get_db)):
+    _limit_public_read(request)
     return reports_service.get_reports_open(db)
 
 
 @router.get("/reports/resolved", response_model=List[ReportsFull])
-def get_reports_resolved(db: Session = Depends(get_db)):
+def get_reports_resolved(request: Request, db: Session = Depends(get_db)):
+    _limit_public_read(request)
     return reports_service.get_reports_resolved(db)
 
 
 @router.get("/reports/in_progress", response_model=List[ReportsFull])
-def get_reports_in_progress(db: Session = Depends(get_db)):
+def get_reports_in_progress(request: Request, db: Session = Depends(get_db)):
+    _limit_public_read(request)
     return reports_service.get_reports_in_progress(db)
 
 
@@ -233,7 +276,8 @@ def patch_report_status(
     current_user: User = Depends(get_current_user),
 ):
     """Dashboard: set report status and create an Updates feed item."""
-    _ = current_user  # auth required; ownership not required (staff dashboard)
+    assert_staff(current_user)
+    hit("reports-status", str(current_user.id), limit=60, window_seconds=3600)
     return reports_service.update_report_status(
         db,
         report_id,
@@ -270,13 +314,28 @@ def get_top_users(
     return reports_service.get_top10_users(db, current_user.id)
 
 
+def _limit_ai(request: Request, current_user: User) -> None:
+    hit("ai-user", str(current_user.id), limit=15, window_seconds=3600)
+    hit("ai-ip", client_ip(request), limit=30, window_seconds=3600)
+
+
 @router.post("/reports/analyze-voice", response_model=ModelOutput)
-def analyze_voice_report(body: VoiceReportInput):
+def analyze_voice_report(
+    body: VoiceReportInput,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
     """Turn a voice-report description into title, severity, and category."""
+    _limit_ai(request, current_user)
     return reports_service.analyze_voice_report(body.description)
 
 
 @router.post("/reports/generate-title")
-def generate_report_title(body: VoiceReportInput):
+def generate_report_title(
+    body: VoiceReportInput,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
     """Legacy title-only helper — same AI path, returns just the title."""
+    _limit_ai(request, current_user)
     return {"title": reports_service.generate_ai_title(body.description)}

@@ -29,6 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   shared_preferences: ^2.3.0
+  flutter_secure_storage: ^11.2.0
   shimmer: ^3.0.0
   flutter:
     sdk: flutter

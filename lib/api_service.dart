@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/auth_service.dart';
 import 'dart:io' show File, Platform;
 
 class ApiService {
   static const _sessionKey = 'current_user';
+  static const _secure = FlutterSecureStorage();
   static const _cacheRecentReports = 'cache_recent_reports';
   static const _cacheReportStats = 'cache_report_stats';
   static const _cacheHomeFeeds = 'cache_home_feeds';
@@ -107,23 +109,21 @@ class ApiService {
         if (userId != null) return;
       }
 
-      // Supabase is on — don't resurrect a legacy SharedPreferences JWT.
+      // Supabase is on — don't resurrect a legacy session token.
       currentUser = null;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_sessionKey);
+      await _saveSession();
       return;
     }
 
-    // Legacy SharedPreferences session (pre-Supabase installs).
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_sessionKey);
+    // Legacy session (pre-Supabase installs), now read from encrypted storage.
+    final raw = await _readSessionRaw();
     if (raw == null || raw.isEmpty) return;
     try {
       currentUser = jsonDecode(raw) as Map<String, dynamic>;
     } catch (e) {
       print('loadSession Error: $e');
       currentUser = null;
-      await prefs.remove(_sessionKey);
+      await _saveSession();
     }
   }
 
@@ -159,12 +159,41 @@ class ApiService {
     return response;
   }
 
+  static Future<String?> _readSessionRaw() async {
+    try {
+      final secure = await _secure.read(key: _sessionKey);
+      if (secure != null && secure.isNotEmpty) return secure;
+    } catch (e) {
+      print('secure session read: $e');
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final legacy = prefs.getString(_sessionKey);
+    if (legacy == null || legacy.isEmpty) return null;
+    try {
+      await _secure.write(key: _sessionKey, value: legacy);
+    } catch (e) {
+      print('secure session migrate: $e');
+      return legacy;
+    }
+    await prefs.remove(_sessionKey);
+    return legacy;
+  }
+
   static Future<void> _saveSession() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionKey);
     if (currentUser == null) {
-      await prefs.remove(_sessionKey);
-    } else {
-      await prefs.setString(_sessionKey, jsonEncode(currentUser));
+      try {
+        await _secure.delete(key: _sessionKey);
+      } catch (e) {
+        print('secure session delete: $e');
+      }
+      return;
+    }
+    try {
+      await _secure.write(key: _sessionKey, value: jsonEncode(currentUser));
+    } catch (e) {
+      print('secure session write: $e');
     }
   }
 
