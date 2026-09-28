@@ -6,6 +6,7 @@ import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/Profile.dart';
 import 'package:street_sync/UpdatesScreen.dart';
+import 'package:street_sync/update_alerts.dart';
 
 import 'HomeScreen.dart';
 import 'Map.dart';
@@ -24,7 +25,7 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   static const _tourSeenKey = 'street_sync_ai_tour_seen_v1';
   static const _cta = Color(0xFF111827);
   static const _ink = Color(0xFF111827);
@@ -54,6 +55,47 @@ class _MainShellState extends State<MainShell> {
       _showWelcome = true;
     } else if (widget.showAiTourOnStart) {
       _startInitialTour();
+    }
+    WidgetsBinding.instance.addObserver(this);
+    UpdateAlerts.notice.addListener(_onUpdateNotice);
+    UpdateAlerts.start();
+  }
+
+  @override
+  void dispose() {
+    UpdateAlerts.notice.removeListener(_onUpdateNotice);
+    WidgetsBinding.instance.removeObserver(this);
+    UpdateAlerts.stop();
+    super.dispose();
+  }
+
+  void _onUpdateNotice() {
+    if (!mounted || UpdateAlerts.unseen.value == 0) return;
+    if (_index == 2) {
+      UpdateAlerts.markSeen();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('You got an update. Check the updates tab.'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          ),
+        );
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      UpdateAlerts.poll();
     }
   }
 
@@ -164,6 +206,9 @@ class _MainShellState extends State<MainShell> {
         _focusReportId = null;
       }
       _index = stackIndex;
+      if (stackIndex == 2) {
+        UpdateAlerts.markSeen();
+      }
     });
   }
 
@@ -479,13 +524,19 @@ class _FloatingNavDock extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: _DockItem(
-                      key: updatesKey,
-                      icon: Icons.notifications_none_rounded,
-                      selectedIcon: Icons.notifications_rounded,
-                      label: 'Updates',
-                      selected: currentIndex == 2,
-                      onTap: () => onSelect(2),
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: UpdateAlerts.unseen,
+                      builder: (context, count, _) {
+                        return _DockItem(
+                          key: updatesKey,
+                          icon: Icons.notifications_none_rounded,
+                          selectedIcon: Icons.notifications_rounded,
+                          label: 'Updates',
+                          selected: currentIndex == 2,
+                          badgeCount: count,
+                          onTap: () => onSelect(2),
+                        );
+                      },
                     ),
                   ),
                   Expanded(
@@ -516,6 +567,7 @@ class _DockItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -523,6 +575,7 @@ class _DockItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -547,10 +600,28 @@ class _DockItem extends StatelessWidget {
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Icon(
-                selected ? selectedIcon : icon,
-                size: 22,
-                color: color,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    selected ? selectedIcon : icon,
+                    size: 22,
+                    color: color,
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE53935),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 2),

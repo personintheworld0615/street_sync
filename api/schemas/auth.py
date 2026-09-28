@@ -25,6 +25,7 @@ class TokenResponse(BaseModel):
     last_name: str
     email: EmailStr
     picture: Optional[str] = None
+    email_confirmation_required: bool = False
 
 
 class PictureResponse(BaseModel):

@@ -524,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, i) {
           final value = options[i];
           final label =
-              value == 'All' ? 'All' : ReportCategories.label(value);
+              value == 'All' ? 'All' : ReportCategories.shortLabel(value);
           final selected = (_selectedCat ?? 'All') == value;
 
           return GestureDetector(

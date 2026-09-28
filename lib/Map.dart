@@ -272,30 +272,36 @@ class _MapScreenState extends State<MapScreen> {
     String? category,
     Color color,
   ) {
+    final selected = _selectedCategory == category;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        showCheckmark: false,
-        label: Text(
-          label,
-          style: TextStyle(
-            color: _selectedCategory == category
-                ? Colors.white
-                : Colors.black,
+      child: Material(
+        color: selected ? color : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        elevation: 2,
+        shadowColor: Colors.black26,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () {
+            setState(() {
+              _selectedCategory = category;
+              _selectedMarkerId = null;
+              _selectedReport = null;
+            });
+            _updateMarkers();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : const Color(0xFF111827),
+              ),
+            ),
           ),
         ),
-        selected: _selectedCategory == category,
-        selectedColor: color,
-        backgroundColor: Colors.white,
-        checkmarkColor: Colors.white,
-        onSelected: (_) {
-          setState(() {
-            _selectedCategory = category;
-            _selectedMarkerId = null;
-            _selectedReport = null;
-          });
-          _updateMarkers();
-        },
       ),
     );
   }
@@ -414,16 +420,21 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Nav dock sits over the map. Lift Google's location button and the chips above it.
+    final aboveDock = bottomInset + 108.0;
     return Scaffold(        
       body: Stack(
         children: [
           GoogleMap(
             mapId: googleMapsMapId,
+            padding: EdgeInsets.only(top: 130, bottom: aboveDock + 52, right: 8),
             initialCameraPosition: CameraPosition(
               target: _center,
               zoom: 14,
             ),
             myLocationEnabled: true,
+            myLocationButtonEnabled: true,
             markers: _markers,
             onTap: (_) => _clearSelection(),
             onMapCreated: (c) {
@@ -503,45 +514,29 @@ class _MapScreenState extends State<MapScreen> {
             ),
             if (_selectedReport != null)
               Positioned(
-                bottom: 118,
+                bottom: aboveDock + 58,
                 left: 16,
                 right: 16,
                 child: _buildSelectedReportCard(_selectedReport!),
               ),
             Positioned(
-              bottom: 108,
-              left: 10,
-              right: 78,
+              bottom: aboveDock,
+              left: 12,
+              right: 68,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _categoryChip("All", null, Colors.grey),
-                    _categoryChip(
-                      ReportCategories.shortLabel(ReportCategories.roadDamage),
-                      ReportCategories.roadDamage,
-                      ReportCategories.color(ReportCategories.roadDamage),
-                    ),
-                    _categoryChip(
-                      ReportCategories.shortLabel(ReportCategories.publicWorks),
-                      ReportCategories.publicWorks,
-                      ReportCategories.color(ReportCategories.publicWorks),
-                    ),
-                    _categoryChip(
-                      ReportCategories.shortLabel(ReportCategories.environmental),
-                      ReportCategories.environmental,
-                      ReportCategories.color(ReportCategories.environmental),
-                    ),
-                    _categoryChip(
-                      ReportCategories.shortLabel(ReportCategories.accessibility),
-                      ReportCategories.accessibility,
-                      ReportCategories.color(ReportCategories.accessibility),
-                    ),
-                    _categoryChip(
-                      ReportCategories.shortLabel(ReportCategories.other),
-                      ReportCategories.other,
-                      ReportCategories.color(ReportCategories.other),
-                    ),
+                    for (final category in [null, ...ReportCategories.all])
+                      _categoryChip(
+                        category == null
+                            ? 'All'
+                            : ReportCategories.shortLabel(category),
+                        category,
+                        category == null
+                            ? const Color(0xFF6B7280)
+                            : ReportCategories.color(category),
+                      ),
                   ],
                 ),
               ),

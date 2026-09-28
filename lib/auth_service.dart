@@ -138,9 +138,17 @@ class AuthService {
       );
       return null;
     } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('cancel') || msg.contains('canceled')) return null;
       return e.message;
     } catch (e) {
-      return 'Google sign-in failed: $e';
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('cancel') ||
+          msg.contains('canceled') ||
+          msg.contains('interrupted')) {
+        return null;
+      }
+      return 'Google sign-in did not finish. Try again.';
     }
   }
 

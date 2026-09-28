@@ -30,6 +30,22 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _isLogin = true;
   bool _loading = false;
+  String _passwordText = '';
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  bool get _emailLooksValid =>
+      _emailPattern.hasMatch(_emailCtrl.text.trim());
+
+  bool get _passwordLongEnough => _passwordText.length >= 8;
+  bool get _passwordHasUpper => _passwordText.contains(RegExp(r'[A-Z]'));
+  bool get _passwordHasLower => _passwordText.contains(RegExp(r'[a-z]'));
+  bool get _passwordHasNumber => _passwordText.contains(RegExp(r'[0-9]'));
+  bool get _passwordMeetsRules =>
+      _passwordLongEnough &&
+      _passwordHasUpper &&
+      _passwordHasLower &&
+      _passwordHasNumber;
   StreamSubscription<AuthState>? _authSub;
 
   @override
@@ -72,35 +88,58 @@ class _LoginScreenState extends State<LoginScreen> {
       await showErrorPopup(context, 'Please fill in all fields');
       return;
     }
+    if (!_emailLooksValid) {
+      await showErrorPopup(context, 'Enter a valid email address');
+      return;
+    }
     if (!_isLogin && (_nameCtrl.text.isEmpty || _lastNameCtrl.text.isEmpty)) {
       await showErrorPopup(context, 'Please enter your first and last name');
+      return;
+    }
+    if (!_isLogin && !_passwordMeetsRules) {
+      await showErrorPopup(
+        context,
+        'Password needs 8+ characters, upper and lower case, and a number',
+      );
       return;
     }
 
     setState(() => _loading = true);
 
     String? error;
-    if (_isLogin) {
-      error = await ApiService.login(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-      );
-    } else {
-      if (_passwordCtrl.text.length < 8) {
-        setState(() => _loading = false);
-        await showErrorPopup(context, 'Password must be at least 8 characters');
-        return;
+    try {
+      if (_isLogin) {
+        error = await ApiService.login(
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+        );
+      } else {
+        error = await ApiService.signup(
+          firstname: _nameCtrl.text.trim(),
+          lastname: _lastNameCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+        );
       }
-      error = await ApiService.signup(
-        firstname: _nameCtrl.text.trim(),
-        lastname: _lastNameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
-      );
+    } catch (e) {
+      error = 'Something went wrong. Try again.';
     }
 
     if (!mounted) return;
     setState(() => _loading = false);
+
+    if (error == 'confirm-email') {
+      setState(() => _isLogin = true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'We sent a confirmation link to ${_emailCtrl.text.trim()}. Open it, then sign in.',
+          ),
+        ),
+      );
+      return;
+    }
 
     if (error != null) {
       await showErrorPopup(context, error);
@@ -140,6 +179,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (error != null) {
       setState(() => _loading = false);
       await showErrorPopup(context, error);
+      return;
+    }
+
+    if (provider == OAuthProvider.google && !AuthService.isSignedIn) {
+      setState(() => _loading = false);
       return;
     }
 
@@ -239,6 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _passwordCtrl,
                 obscureText: _obscure,
+                onChanged: (value) => setState(() => _passwordText = value),
                 decoration: _inputDecoration(
                   hint: '••••••••',
                   suffix: IconButton(
@@ -252,6 +297,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              if (!_isLogin) ...[
+                const SizedBox(height: 10),
+                _passwordRule('At least 8 characters', _passwordLongEnough),
+                _passwordRule('One uppercase letter', _passwordHasUpper),
+                _passwordRule('One lowercase letter', _passwordHasLower),
+                _passwordRule('One number', _passwordHasNumber),
+              ],
               SizedBox(height: 15),
               if (_isLogin)
                 Row(
@@ -366,6 +418,35 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _passwordRule(String label, bool met) {
+    final color = _passwordText.isEmpty
+        ? _muted
+        : (met ? const Color(0xFF43A047) : const Color(0xFFE53935));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            met && _passwordText.isNotEmpty
+                ? Icons.check_circle
+                : Icons.circle_outlined,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

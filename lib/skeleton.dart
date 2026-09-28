@@ -84,6 +84,59 @@ class ReportListSkeleton extends StatelessWidget {
   }
 }
 
+class UpdateCardSkeleton extends StatelessWidget {
+  const UpdateCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 16, width: 180)),
+              SizedBox(width: 12),
+              SkeletonBox(height: 12, width: 48),
+            ],
+          ),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              SkeletonBox(height: 26, width: 72, radius: 999),
+              SizedBox(width: 10),
+              SkeletonBox(height: 26, width: 88, radius: 999),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class UpdateListSkeleton extends StatelessWidget {
+  final int count;
+
+  const UpdateListSkeleton({super.key, this.count = 4});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        children: List.generate(count, (_) => const UpdateCardSkeleton()),
+      ),
+    );
+  }
+}
+
 class ProfileSkeleton extends StatelessWidget {
   const ProfileSkeleton({super.key});
 

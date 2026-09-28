@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
 
 class ReportDetailsScreen extends StatefulWidget {
@@ -22,7 +23,40 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
   static const _cta = Color(0xFF111827);
   static const _iconBg = Color(0xFFEEF0F3);
 
-  Map<String, dynamic> get report => widget.report;
+  late Map<String, dynamic> report;
+  List<Map<String, dynamic>> _updates = [];
+
+  @override
+  void initState() {
+    super.initState();
+    report = Map<String, dynamic>.from(widget.report);
+    _loadUpdates();
+  }
+
+  int? get _reportId {
+    final raw = report['id'];
+    if (raw is int) return raw;
+    return int.tryParse('$raw');
+  }
+
+  Future<void> _loadUpdates() async {
+    final id = _reportId;
+    if (id == null || !mounted) return;
+    final results = await Future.wait([
+      ApiService.getReport(id),
+      ApiService.getReportUpdates(id),
+    ]);
+    if (!mounted) return;
+    final full = results[0] as Map<String, dynamic>?;
+    final rawUpdates = results[1] as List<dynamic>?;
+    setState(() {
+      if (full != null) report = full;
+      _updates = (rawUpdates ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    });
+  }
 
   String get _title {
     final title = report['title']?.toString().trim();
@@ -324,11 +358,81 @@ class _ReportDetailsScreenState extends State<ReportDetailsScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Updates',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _ink,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_updates.isEmpty)
+                    _sectionCard(
+                      child: Text(
+                        'No status updates yet.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: _muted,
+                        ),
+                      ),
+                    )
+                  else
+                    ..._updates.map(_updateCard),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _updateCard(Map<String, dynamic> item) {
+    final oldStatus = (item['old_status'] as String?)?.trim() ?? 'Open';
+    final newStatus = (item['new_status'] as String?)?.trim() ?? 'Open';
+    final comment = (item['comment'] as String?)?.trim() ?? '';
+    final time = _formatTime(item['created_at']?.toString() ?? '');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _sectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '$oldStatus  →  $newStatus',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _statusColor(newStatus),
+                  ),
+                ),
+                const Spacer(),
+                if (time.isNotEmpty && time != 'Recently')
+                  Text(
+                    time,
+                    style: const TextStyle(fontSize: 12, color: _muted),
+                  ),
+              ],
+            ),
+            if (comment.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                comment,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.45,
+                  color: _ink,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

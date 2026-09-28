@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:street_sync/ReportDetails.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/skeleton.dart';
+import 'package:street_sync/update_alerts.dart';
 
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
@@ -24,11 +26,22 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   @override
   void initState() {
     super.initState();
+    UpdateAlerts.refreshTick.addListener(_onUpdatesRefresh);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    UpdateAlerts.refreshTick.removeListener(_onUpdatesRefresh);
+    super.dispose();
+  }
+
+  void _onUpdatesRefresh() {
+    _load(quiet: true);
+  }
+
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet) setState(() => _loading = true);
     final raw = await ApiService.getUpdates();
     if (!mounted) return;
     setState(() {
@@ -79,18 +92,23 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 
   Future<void> _openReport(Map<String, dynamic> item) async {
-    final reportId = item['report_id'];
-    if (reportId == null) return;
-    // Minimal map so ReportDetails has something to show if fetch fails.
-    final seed = <String, dynamic>{
-      'id': reportId,
-      'title': item['report_title'] ?? 'Report',
-      'status': item['new_status'] ?? 'Open',
-    };
+    final rawId = item['report_id'];
+    final id = rawId is int ? rawId : int.tryParse('$rawId');
+    if (id == null) return;
+    final report = await ApiService.getReport(id);
     if (!mounted) return;
+    if (report == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open that report.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReportDetailsScreen(report: seed),
+        builder: (_) => ReportDetailsScreen(report: report),
       ),
     );
   }
@@ -130,12 +148,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               ),
               const SizedBox(height: 24),
               if (_loading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 48),
-                  child: Center(
-                    child: CircularProgressIndicator(color: _ink),
-                  ),
-                )
+                const UpdateListSkeleton()
               else if (_updates.isEmpty)
                 _emptyState()
               else

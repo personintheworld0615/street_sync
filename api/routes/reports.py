@@ -295,6 +295,23 @@ def get_my_updates(
     return reports_service.get_updates_for_user(db, current_user.id, limit=amount)
 
 
+@router.get("/reports/{report_id}/updates", response_model=List[UpdateOut])
+def get_report_updates(
+    report_id: int,
+    request: Request,
+    amount: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    _limit_public_read(request)
+    return reports_service.get_updates_for_report(
+        db,
+        report_id,
+        current_user,
+        limit=amount,
+    )
+
+
 @router.get("/reports/{report_id}", response_model=ReportsFull)
 def get_report(
     report_id: int,

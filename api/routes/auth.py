@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -12,12 +14,14 @@ from api.schemas.auth import (
     TokenResponse,
 )
 from api.services.auth import (
+    admin_confirm_user_email,
     admin_create_confirmed_user,
     admin_find_user_id_by_email,
     create_access_token,
     delete_supabase_user,
     ensure_email_confirmed_for_login,
     fetch_supabase_user,
+    send_signup_confirmation_email,
     get_current_user,
     hash_password,
     security,
@@ -32,7 +36,12 @@ from api.services.storage import MAX_IMAGE_BYTES, upload_user_picture
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _token_for(user: User, access_token: str | None = None) -> TokenResponse:
+def _token_for(
+    user: User,
+    access_token: str | None = None,
+    *,
+    email_confirmation_required: bool = False,
+) -> TokenResponse:
     return TokenResponse(
         access_token=access_token or create_access_token(user.id),
         token_type="bearer",
@@ -41,14 +50,25 @@ def _token_for(user: User, access_token: str | None = None) -> TokenResponse:
         last_name=user.last_name,
         email=user.email,
         picture=user.picture,
+        email_confirmation_required=email_confirmation_required,
     )
 
 
 @router.post("/signup", response_model=TokenResponse)
 def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db)):
-    """Create a confirmed Supabase user (no email OTP / confirm) and local profile."""
+    """Create a Supabase user and email a confirmation link when mail can be sent."""
     hit("auth-signup", client_ip(request), limit=5, window_seconds=3600)
     email = str(body.email).strip().lower()
+    password = body.password
+    if not (
+        re.search(r"[A-Z]", password)
+        and re.search(r"[a-z]", password)
+        and re.search(r"[0-9]", password)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password needs an uppercase letter, a lowercase letter, and a number",
+        )
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
@@ -62,6 +82,7 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
             password=body.password,
             first_name=body.first_name,
             last_name=body.last_name,
+            email_confirm=False,
         )
     except HTTPException:
         raise
@@ -80,8 +101,11 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
     db.add(user)
     db.commit()
     db.refresh(user)
-    # Client signs into Supabase next; legacy JWT is a fallback for older builds.
-    return _token_for(user)
+    sent = send_signup_confirmation_email(email)
+    if not sent:
+        # Mail is not configured. Confirm the account so signup is not a dead end.
+        admin_confirm_user_email(email)
+    return _token_for(user, email_confirmation_required=sent)
 
 
 @router.post("/login", response_model=TokenResponse)

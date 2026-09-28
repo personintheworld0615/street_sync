@@ -19,6 +19,8 @@ class ApiService {
   static const _cacheSubmittedReports = 'cache_submitted_reports';
   static const _cacheTopUsers = 'cache_top_users';
   static const _cacheUserScopedId = 'cache_user_scoped_id';
+  static const _cacheFilterReports = 'cache_filter_reports';
+  static const filterCacheTtl = Duration(minutes: 3);
 
   static String homeFeedKey(String? category) {
     final c = category?.trim();
@@ -295,6 +297,7 @@ class ApiService {
     await prefs.remove(_cacheSubmittedReports);
     await prefs.remove(_cacheTopUsers);
     await prefs.remove(_cacheUserScopedId);
+    await prefs.remove(_cacheFilterReports);
   }
 
   static Future<List<dynamic>?> _readListCache(String key) async {
@@ -504,9 +507,15 @@ class ApiService {
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        final detail = _errorDetail(response.body) ??
-            'Sign up failed (${response.statusCode})';
+        final detail = _friendlyAuthMessage(
+          _errorDetail(response.body) ??
+              'Sign up failed (${response.statusCode})',
+        );
         return detail;
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map && decoded['email_confirmation_required'] == true) {
+        return 'confirm-email';
       }
     } catch (e) {
       return 'Sign up failed: $e';
@@ -527,49 +536,28 @@ class ApiService {
   }
 
   /// Email/password login via Supabase Auth, then profile sync with the API.
-  /// If Supabase blocks on email confirmation / rate limit, the API confirms
-  /// the account (no 2FA email) and we retry once.
+  /// Unconfirmed accounts stay blocked until the user opens the email link.
   static Future<String?> login({
     required String email,
     required String password,
   }) async {
     var error = await AuthService.signIn(email: email, password: password);
     if (AuthService.isEmailConfirmBlocker(error)) {
-      final confirmError = await _ensureEmailConfirmed(
-        email: email,
-        password: password,
-      );
-      if (confirmError != null) return confirmError;
-      error = await AuthService.signIn(email: email, password: password);
+      return 'Confirm your email first. Open the link we sent to ${email.trim()}, then sign in.';
     }
-    if (error != null) return error;
+    if (error != null) return _friendlyAuthMessage(error);
     final syncError = await syncFromSupabase();
     if (syncError != null && userId == null) return syncError;
     return null;
   }
 
-  static Future<String?> _ensureEmailConfirmed({
-    required String email,
-    required String password,
-  }) async {
-    final url = Uri.parse('$baseUrl/auth/ensure-confirmed');
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'email': email.trim(),
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) return null;
-      return _errorDetail(response.body) ??
-          'Could not confirm account (${response.statusCode})';
-    } catch (e) {
-      return 'Could not confirm account: $e';
+  static String _friendlyAuthMessage(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('invalid') &&
+        (lower.contains('credential') || lower.contains('login'))) {
+      return 'Email or password is incorrect.';
     }
+    return message;
   }
 
   static String? _errorDetail(String body) {
@@ -781,6 +769,7 @@ class ApiService {
     await prefs.remove(_cacheHomeHasMore);
     await prefs.remove(_cacheRecentReports);
     await prefs.remove(_cacheReportStats);
+    await prefs.remove(_cacheFilterReports);
   }
 
   /// Home pull-to-refresh: drop feed + stats caches so the next load is fresh.
@@ -863,6 +852,35 @@ class ApiService {
     return null;
   }
 
+  /// Nearby / in-progress / resolved lists. Entries older than 3 minutes are dropped.
+  static Future<List<dynamic>?> getCachedReportsByFilter(String filter) async {
+    final map = await _readJsonMap(_cacheFilterReports);
+    final entry = map[filter];
+    if (entry is! Map) return null;
+    final savedAt = entry['saved_at'];
+    final items = entry['items'];
+    if (savedAt is! num || items is! List) return null;
+    final age = DateTime.now().millisecondsSinceEpoch - savedAt.toInt();
+    if (age >= filterCacheTtl.inMilliseconds) {
+      map.remove(filter);
+      await _writeJsonMap(_cacheFilterReports, map);
+      return null;
+    }
+    return List<dynamic>.from(items);
+  }
+
+  static Future<void> cacheReportsByFilter(
+    String filter,
+    List<dynamic> items,
+  ) async {
+    final map = await _readJsonMap(_cacheFilterReports);
+    map[filter] = {
+      'saved_at': DateTime.now().millisecondsSinceEpoch,
+      'items': items,
+    };
+    await _writeJsonMap(_cacheFilterReports, map);
+  }
+
   /// Home stat lists: [filter] is `nearby`, `in_progress`, or `resolved`.
   static Future<List<dynamic>?> getReportsByFilter(String filter) async {
     final path = switch (filter) {
@@ -880,7 +898,9 @@ class ApiService {
       );
       if (response == null) return null;
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheReportsByFilter(filter, list);
+        return list;
       }
       print('getReportsByFilter ($path): ${response.statusCode}');
     } catch (e) {
@@ -1015,6 +1035,42 @@ class ApiService {
   static Future<String> generateAITitle(String description) async {
     final result = await analyzeVoiceReport(description);
     return result['title'] as String;
+  }
+
+  static Future<Map<String, dynamic>?> getReport(int id) async {
+    final url = Uri.parse('$baseUrl/reports/$id');
+    try {
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 8)),
+      );
+      if (response == null) return null;
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      }
+      print('getReport: ${response.statusCode}');
+    } catch (e) {
+      print('getReport Error: $e');
+    }
+    return null;
+  }
+
+  static Future<List<dynamic>?> getReportUpdates(int reportId) async {
+    final url = Uri.parse('$baseUrl/reports/$reportId/updates?amount=50');
+    try {
+      final response = await _authorized(
+        () => http.get(url, headers: _headers).timeout(const Duration(seconds: 8)),
+      );
+      if (response == null) return null;
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+      if (response.statusCode == 404) return [];
+      print('getReportUpdates: ${response.statusCode}');
+    } catch (e) {
+      print('getReportUpdates Error: $e');
+    }
+    return null;
   }
 
   /// Status-change feed for the logged-in user (Updates tab).

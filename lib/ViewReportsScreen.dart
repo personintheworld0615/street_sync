@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:street_sync/ReportDetails.dart';
@@ -29,22 +31,52 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
 
   List<Map<String, dynamic>> _reports = [];
   bool _loading = true;
+  Timer? _cacheTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _cacheTimer = Timer.periodic(ApiService.filterCacheTtl, (_) {
+      _load(force: true);
+    });
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _cacheTimer?.cancel();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> _asReports(List<dynamic> raw) {
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<void> _load({bool force = false}) async {
+    if (!force) {
+      final cached = await ApiService.getCachedReportsByFilter(widget.filter);
+      if (!mounted) return;
+      if (cached != null) {
+        setState(() {
+          _reports = _asReports(cached);
+          _loading = false;
+        });
+      } else if (_reports.isEmpty) {
+        setState(() => _loading = true);
+      }
+    }
+
     final raw = await ApiService.getReportsByFilter(widget.filter);
     if (!mounted) return;
+    if (raw == null) {
+      setState(() => _loading = false);
+      return;
+    }
     setState(() {
-      _reports = (raw ?? [])
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+      _reports = _asReports(raw);
       _loading = false;
     });
   }
@@ -70,7 +102,7 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
       ),
       body: RefreshIndicator(
         color: _ink,
-        onRefresh: _load,
+        onRefresh: () => _load(force: true),
         child: _loading
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),

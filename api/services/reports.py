@@ -433,6 +433,22 @@ def update_report_status(
     return update_to_schema(update_row)
 
 
+def get_updates_for_report(db, report_id: int, current_user: User | None = None, limit: int = 50):
+    row = db.query(Report).filter(Report.id == report_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.is_draft and (current_user is None or row.user_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Report not found")
+    rows = (
+        db.query(Update)
+        .filter(Update.report_id == report_id)
+        .order_by(Update.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [update_to_schema(r) for r in rows]
+
+
 def get_updates_for_user(db, user_id: int, limit: int = 50):
     rows = (
         db.query(Update)
