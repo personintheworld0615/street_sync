@@ -33,6 +33,20 @@ migrate_working_dir/
 /build/
 /coverage/
 lib/config.dart
+/android/local.properties
+
+# Secret/config files
+.env
+.env.*
+!.env.example
+.env.local
+android/local.properties
+ios/*.xcconfig
+ios/**/*.xcconfig
+ios/Runner/*.xcconfig
+**/*.p8
+**/*.pem
+**/*.key
 
 # Symbolication related
 app.*.symbols
@@ -51,7 +65,6 @@ api/venv/
 api/__pycache__/
 api/**/*.pyc
 api/**/*.db
-.env
 app.db
 
 # YOLO / ML training

@@ -418,6 +418,7 @@ class _MapScreenState extends State<MapScreen> {
       body: Stack(
         children: [
           GoogleMap(
+            mapId: googleMapsMapId,
             initialCameraPosition: CameraPosition(
               target: _center,
               zoom: 14,

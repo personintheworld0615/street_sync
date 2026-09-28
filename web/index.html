@@ -29,7 +29,29 @@
 
   <title>street_sync</title>
   <link rel="manifest" href="manifest.json">
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDBHx86l3MKiRfHuXApCS0oEZuhZM03iYs"></script>
+  <script>
+    // Maps API loader — replace placeholders during build with env vars.
+    (function() {
+      var key = "%MAPS_API_KEY%";
+      var mapId = "%MAP_ID%";
+      window.__MAPS_API_KEY__ = key;
+      window.__MAP_ID__ = mapId;
+
+      function loadMaps() {
+        var s = document.createElement('script');
+        s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(window.__MAPS_API_KEY__) + "&libraries=places";
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+      }
+
+      if (key && key !== "%MAPS_API_KEY%") {
+        loadMaps();
+      } else {
+        console.warn("Maps API key placeholder present; inject MAPS_API_KEY during build or set window.__MAPS_API_KEY__ before page loads.");
+      }
+    })();
+  </script>
   <style id="splash-screen-style">
     html {
       height: 100%

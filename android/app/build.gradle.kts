@@ -13,7 +13,8 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(FileInputStream(localPropertiesFile))
 }
-val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")?.trim() ?: ""
+val mapsMapId: String = localProperties.getProperty("MAP_ID")?.trim() ?: ""
 
 android {
     namespace = "com.example.street_sync"
@@ -39,6 +40,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        manifestPlaceholders["MAP_ID"] = mapsMapId
     }
 
     buildTypes {

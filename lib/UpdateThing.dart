@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'Confirmation.dart';
 import 'ConfirmationVoiceReport.dart';
+import 'config.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/geocoding_utils.dart';
@@ -459,6 +460,7 @@ class _UpdateThingState extends State<Updatething> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: GoogleMap(
+                mapId: googleMapsMapId,
                 gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
                   Factory<OneSequenceGestureRecognizer>(
                     () => EagerGestureRecognizer(),

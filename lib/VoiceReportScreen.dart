@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'config.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
@@ -872,6 +873,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: GoogleMap(
+                  mapId: googleMapsMapId,
                   gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
                     Factory<OneSequenceGestureRecognizer>(
                       () => EagerGestureRecognizer(),

@@ -11,6 +11,7 @@ import 'Mainshell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/api_service.dart';
+import 'config.dart';
 import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_severity.dart';
@@ -763,6 +764,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: GoogleMap(
+                mapId: googleMapsMapId,
                 gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
                   Factory<OneSequenceGestureRecognizer>(
                     () => EagerGestureRecognizer(),
