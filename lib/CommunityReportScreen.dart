@@ -39,6 +39,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   final _otherCategoryController = TextEditingController();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _poleNumberController = TextEditingController();
   String? _descirption;
 
    GoogleMapController? _controller;
@@ -66,6 +67,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     _otherCategoryController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _poleNumberController.dispose();
     _animationController.dispose();
     _speech.stop();
     super.dispose();
@@ -156,6 +158,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     _buildDescriptionCard(),
                     const SizedBox(height: 14),
                     _buildCategoryCard(),
+                    if (_selectedCategory == ReportCategories.streetLight) ...[
+                      const SizedBox(height: 14),
+                      _buildPoleNumberCard(),
+                    ],
                     const SizedBox(height: 14),
                     _buildTitleCard(),
                     const SizedBox(height: 14),
@@ -1211,10 +1217,209 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       });
     }
   }
+  Widget _buildPoleNumberCard() {
+    return _section(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Pole Number',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const Text(
+                      ' *',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => _showPoleNumberInfo(context),
+                      child: const Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'REQUIRED',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: TextField(
+                controller: _poleNumberController,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., A1234, 56789, or pole tag code',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.fromLTRB(18, 14, 16, 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_rounded,
+                    size: 20,
+                    color: Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Where to find the Pole Number:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E40AF),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'The pole number is usually printed on a metal tag, sticker, or painted stencil on the side of the pole that faces the street, about 5 to 10 feet above the ground (at about head or eye level).',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E3A8A),
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Finding a Missing or Unreadable Number:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E40AF),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Look for a small yellow, orange, or metal tag containing a sequence of numbers and/or letters (often 3 to 6 digits). If the number is missing or worn off, check the closest neighboring pole to the left or right and use that number when reporting an outage.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E3A8A),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPoleNumberInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB)),
+            SizedBox(width: 10),
+            Text('Finding the Pole Number'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'The pole number is usually printed on a metal tag, sticker, or painted stencil on the side of the pole that faces the street, about 5 to 10 feet above the ground (at about head or eye level).',
+                style: TextStyle(fontSize: 14, height: 1.4, color: Colors.black87),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Finding a Missing or Unreadable Number:',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Look for a small yellow, orange, or metal tag containing a sequence of numbers and/or letters (often 3 to 6 digits). If the number is missing or worn off, check the closest neighboring pole to the left or right and use that number when reporting an outage.',
+                style: TextStyle(fontSize: 14, height: 1.4, color: Colors.black87),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _resolvedDescription() {
+    final baseDesc = _descriptionController.text.trim();
+    final poleNum = _poleNumberController.text.trim();
+    if (_selectedCategory == ReportCategories.streetLight && poleNum.isNotEmpty) {
+      if (baseDesc.startsWith('Pole Number:')) {
+        return baseDesc;
+      }
+      return 'Pole Number: $poleNum\n\n$baseDesc';
+    }
+    return baseDesc;
+  }
+
   String _resolvedSeverity() {
     return autoSeverity(
       category: _resolvedCategory(),
-      description: _descriptionController.text,
+      description: _resolvedDescription(),
     );
   }
 
@@ -1302,7 +1507,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
     final success = await ApiService.submitReport(
       title: _titleController.text.trim(),
-      description: _descriptionController.text.trim(),
+      description: _resolvedDescription(),
       category: _resolvedCategory(),
       location: location,
       severity: _resolvedSeverity(),
@@ -1345,7 +1550,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
     final success = await ApiService.submitReport(
       title: _titleController.text.trim(),
-      description: _descriptionController.text.trim(),
+      description: _resolvedDescription(),
       category: _resolvedCategory(),
       location: location,
       severity: _resolvedSeverity(),
@@ -1441,6 +1646,10 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               if (_titleController.text.trim().isEmpty) errors.add('title');
               if (_image == null) errors.add('photo');
               if (_selectedCategory == null) errors.add('category');
+              if (_selectedCategory == ReportCategories.streetLight &&
+                  _poleNumberController.text.trim().isEmpty) {
+                errors.add('pole number');
+              }
               if (_descriptionController.text.trim().isEmpty) {
                 errors.add('description');
               }
@@ -1480,7 +1689,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                     builder: (context) => Confirmation(
                       category: _resolvedCategory(),
                       title: _titleController.text.trim(),
-                      description: _descriptionController.text.trim(),
+                      description: _resolvedDescription(),
                       image: _image!,
                       severity: _resolvedSeverity(),
                       location: address,

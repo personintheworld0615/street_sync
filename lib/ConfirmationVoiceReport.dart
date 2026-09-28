@@ -205,6 +205,10 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
     if (_title.trim().isEmpty) missing.add('title');
     if (_category.trim().isEmpty) missing.add('category');
     if (_description.trim().isEmpty) missing.add('description');
+    if (_category == ReportCategories.streetLight &&
+        !_description.toLowerCase().contains('pole number')) {
+      missing.add('pole number for the street light in description');
+    }
 
     if (missing.isEmpty) return true;
 
