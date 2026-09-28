@@ -77,7 +77,7 @@ class Updatething extends StatefulWidget {
 }
 
 class _UpdateThingState extends State<Updatething> {
-  LatLng position = const LatLng(40.3573, -74.6672);
+  LatLng position = const LatLng(40.3334, -74.6004); // Plainsboro, NJ
   Set<Marker> _markers = {};
   static const _cta = Color(0xFF111827);
   static const _pageBg = Color(0xFFF4F7FB);

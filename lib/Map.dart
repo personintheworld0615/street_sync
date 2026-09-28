@@ -30,7 +30,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _controller;
-  LatLng _center = const LatLng(40.3573, -74.6672);
+  LatLng _center = const LatLng(40.3334, -74.6004); // Plainsboro, NJ
   bool _ready = false;
   Set<Marker> _markers = {};
   final TextEditingController _searchController = TextEditingController();

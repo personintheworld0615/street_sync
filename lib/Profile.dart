@@ -217,7 +217,7 @@ class _ProfileState extends State<Profile> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'West Windsor, NJ',
+                    'Plainsboro, NJ',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 14,

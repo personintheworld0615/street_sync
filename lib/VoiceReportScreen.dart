@@ -25,7 +25,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
   static const _cta = Color(0xFF111827);
-  static const _defaultLatLng = LatLng(40.3573, -74.6672);
+  static const _defaultLatLng = LatLng(40.3334, -74.6004); // Plainsboro, NJ
 
   final _micKey = GlobalKey();
   final _transcriptKey = GlobalKey();

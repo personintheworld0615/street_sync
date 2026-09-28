@@ -26,7 +26,7 @@ class CommunityReportScreen extends StatefulWidget {
 
 class _CommunityReportScreenState extends State<CommunityReportScreen>
     with TickerProviderStateMixin {
-  LatLng position = const LatLng(40.3573, -74.6672); // same default as Map.dart
+  LatLng position = const LatLng(40.3334, -74.6004); // Plainsboro, NJ
   Set<Marker> _markers = {};
   static const _pageBg = Color(0xFFF7F8FA);
   static const _ink = Color(0xFF111827);
