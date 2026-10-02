@@ -101,25 +101,22 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   List<TourStep> get _tourSteps => [
     TourStep(
       targetKey: _micKey,
-      title: 'Your Voice, Your Power',
-      content:
-          'Tap the mic to start describing an issue. StreetSync will automatically clean up your speech.',
+      title: 'Microphone',
+      content: 'Tap the mic and say what’s wrong. You don’t have to type it.',
       icon: Icons.mic_rounded,
-      actionLabel: 'Try a test report',
+      actionLabel: 'Try it',
       onAction: _startMockRecording,
     ),
     TourStep(
       targetKey: _transcriptKey,
-      title: 'Live AI Transcript',
-      content:
-          'Watch your words appear here in real-time. Our AI will even fix grammar and typos automatically!',
-      icon: Icons.auto_awesome,
+      title: 'Transcript',
+      content: 'Your words show up here. Change anything before you send it.',
+      icon: Icons.notes_rounded,
     ),
     TourStep(
       targetKey: _submitKey,
-      title: 'One-Tap Submission',
-      content:
-          'Happy with your report? Click Continue to let our AI summarize it and find the exact location.',
+      title: 'Send',
+      content: 'When it looks right, continue. We’ll drop it on the map.',
       icon: Icons.send_rounded,
     ),
   ];
@@ -371,10 +368,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     } catch (e) {
       debugPrint('Error in voice report flow: $e');
       if (mounted) {
-        showAppDialog(
-          context,
-          e.toString().replaceFirst('Exception: ', ''),
-        );
+        showAppDialog(context, e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

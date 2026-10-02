@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:street_sync/AccessSetupScreen.dart';
 import 'package:street_sync/ForgotPasswordScreen.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/PrivacyPolicyScreen.dart';
@@ -9,10 +10,14 @@ import 'package:street_sync/TermsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
 import 'package:street_sync/error_popup.dart';
+import 'package:street_sync/first_run.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.startAsCreateAccount = false});
+
+  /// First open lands on account creation. Sign-out still opens sign-in.
+  final bool startAsCreateAccount;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -30,8 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   bool _obscure = true;
-  bool _isLogin = true;
+  late bool _isLogin;
   bool _loading = false;
+  bool _didRoute = false;
   bool _acceptedTerms = false;
   String _passwordText = '';
 
@@ -54,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _isLogin = !widget.startAsCreateAccount;
     if (AuthService.isConfigured) {
       _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
         if (data.event != AuthChangeEvent.signedIn ||
@@ -66,9 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         setState(() => _loading = false);
         if (ApiService.userId != null || error == null) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainShell()),
-          );
+          await _finishAuth(firstRun: !_isLogin);
         } else {
           await showErrorPopup(context, error);
         }
@@ -154,15 +159,34 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (ApiService.userId != null || AuthService.isSignedIn) {
+      await _finishAuth(firstRun: !_isLogin);
+    }
+  }
+
+  Future<void> _finishAuth({required bool firstRun}) async {
+    if (_didRoute || !mounted) return;
+    if (ApiService.userId == null && !AuthService.isSignedIn) return;
+    _didRoute = true;
+    await FirstRun.markSignedInBefore();
+    if (!mounted) return;
+
+    if (firstRun) {
+      await FirstRun.markTourPending();
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => MainShell(
-            showAiTourOnStart: !_isLogin,
-            showWelcomeConfetti: !_isLogin,
-          ),
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const AccessSetupScreen(),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+          transitionDuration: const Duration(milliseconds: 280),
         ),
       );
+      return;
     }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
   }
 
   void _forgotPassword() {
@@ -210,9 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await showErrorPopup(context, syncError);
         return;
       }
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));
+      await _finishAuth(firstRun: !_isLogin);
       return;
     }
 
@@ -369,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         )
                       : Text(
-                          _isLogin ? 'Sign in' : 'Sign up',
+                          _isLogin ? 'Sign in' : 'Create account',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,

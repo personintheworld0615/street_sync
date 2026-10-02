@@ -97,6 +97,7 @@ flutter:
     - assets/images/markers/Big_Purple.png
     - assets/images/home_hero.png
     - assets/images/splash_logo.png
+    - assets/images/tour_guide.jpg
     - assets/images/google_g.svg
     - assets/.env
 

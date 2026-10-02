@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/ai_tour.dart';
+import 'package:street_sync/first_run.dart';
 import 'package:street_sync/Profile.dart';
 import 'package:street_sync/UpdatesScreen.dart';
 import 'package:street_sync/error_popup.dart';
@@ -27,7 +27,6 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  static const _tourSeenKey = 'street_sync_ai_tour_seen_v1';
   static const _cta = Color(0xFF111827);
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
@@ -74,10 +73,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (!mounted || UpdateAlerts.unseen.value == 0 || _index == 2) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _index == 2) return;
-      showAppDialog(
-        context,
-        'You got an update. Check the updates tab.',
-      );
+      showAppDialog(context, 'You got an update. Check the updates tab.');
     });
   }
 
@@ -99,8 +95,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   Future<void> _completeTour() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_tourSeenKey, true);
+    await FirstRun.markTourSeen();
     if (!mounted) return;
     setState(() => _showTour = false);
   }
@@ -116,69 +111,37 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   List<TourStep> get _tourSteps => [
     TourStep(
       targetKey: _statsTourKey,
-      title: 'AI guide: neighborhood pulse',
+      title: 'Neighborhood',
       content:
-          'These cards summarize what is happening nearby. Tap one to jump into reports filtered by that status.',
-      icon: Icons.auto_awesome,
+          'These are the reports around you. Nearby, still open, and already fixed.',
+      icon: Icons.bar_chart_rounded,
     ),
     TourStep(
       targetKey: _quickActionsTourKey,
-      title: 'Create reports quickly',
+      title: 'Report',
       content:
-          'Use voice when you want to describe a street issue hands-free, or photo report when a picture explains it faster.',
-      icon: Icons.add_location_alt_rounded,
-    ),
-    TourStep(
-      targetKey: _voiceActionTourKey,
-      title: 'Try it now: Voice Report',
-      content:
-          'Let’s create a test report using your voice. Tap "Try it" to jump in!',
+          'See something wrong? Say it, or take a photo. Either one starts a report.',
       icon: Icons.graphic_eq_rounded,
-      actionLabel: 'Try it',
-      onAction: () {
-        _completeTour();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const VoiceReportScreen(isTour: true),
-          ),
-        );
-      },
-    ),
-    TourStep(
-      targetKey: _recentReportsTourKey,
-      title: 'Scan recent activity',
-      content:
-          'Filter by category, review nearby reports, and tap a report to open its pin on the map.',
-      icon: Icons.manage_search_rounded,
     ),
     TourStep(
       targetKey: _mapNavTourKey,
-      title: 'Browse reports on the map',
+      title: 'Map',
       content:
-          'Reports shows issues geographically so you can see clusters, locations, and the issue nearest you.',
+          'Every report is a pin. Open the map when you want the street, not the list.',
       icon: Icons.location_on_outlined,
     ),
     TourStep(
       targetKey: _addNavTourKey,
-      title: 'Report from anywhere',
+      title: 'Add',
       content:
-          'Tap + to start a voice or photo report without leaving the tab you’re on.',
+          'This works from any tab. Voice or a photo, without going back home.',
       icon: Icons.add_rounded,
     ),
     TourStep(
-      targetKey: _updatesNavTourKey,
-      title: 'Stay in the loop',
-      content:
-          'Updates collects status changes and neighborhood activity as reports move forward.',
-      icon: Icons.notifications_none_rounded,
-    ),
-    TourStep(
       targetKey: _profileNavTourKey,
-      title: 'Manage your work',
-      content:
-          'Your profile keeps drafts, submitted reports, badges, and account preferences in one place.',
-      icon: Icons.person_rounded,
+      title: 'Profile',
+      content: 'Your drafts and the reports you’ve sent live here.',
+      icon: Icons.person_outline_rounded,
     ),
   ];
 
@@ -589,11 +552,7 @@ class _DockItem extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Icon(
-                    selected ? selectedIcon : icon,
-                    size: 22,
-                    color: color,
-                  ),
+                  Icon(selected ? selectedIcon : icon, size: 22, color: color),
                   if (badgeCount > 0)
                     Positioned(
                       right: -6,
@@ -693,7 +652,7 @@ class _WelcomeConfettiOverlayState extends State<WelcomeConfettiOverlay>
       children: [
         // Darkened overlay background
         Container(color: Colors.black.withValues(alpha: 0.6)),
-        
+
         // Confetti Painter
         Positioned.fill(
           child: AnimatedBuilder(
@@ -837,7 +796,9 @@ class _ConfettiPainter extends CustomPainter {
       }
 
       // Calculate horizontal wobble
-      double wobble = math.sin(progress * p.wobbleSpeed * math.pi * 2 + p.wobblePhase) * 0.05;
+      double wobble =
+          math.sin(progress * p.wobbleSpeed * math.pi * 2 + p.wobblePhase) *
+          0.05;
       double xFraction = (p.initialX + wobble) % 1.0;
 
       final double px = xFraction * size.width;
@@ -853,7 +814,11 @@ class _ConfettiPainter extends CustomPainter {
         canvas.drawCircle(Offset.zero, p.size / 2, paint);
       } else {
         canvas.drawRect(
-          Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: p.size,
+            height: p.size * 0.6,
+          ),
           paint,
         );
       }
@@ -876,7 +841,8 @@ class FadeInUp extends StatefulWidget {
   State<FadeInUp> createState() => _FadeInUpState();
 }
 
-class _FadeInUpState extends State<FadeInUp> with SingleTickerProviderStateMixin {
+class _FadeInUpState extends State<FadeInUp>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _opacityAnim;
   late Animation<double> _offsetAnim;
@@ -884,13 +850,18 @@ class _FadeInUpState extends State<FadeInUp> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: widget.duration);
-    _opacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    _animController = AnimationController(
+      vsync: this,
+      duration: widget.duration,
     );
-    _offsetAnim = Tween<double>(begin: 40.0, end: 0.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _opacityAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    _offsetAnim = Tween<double>(
+      begin: 40.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
   }
 

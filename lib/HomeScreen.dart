@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:street_sync/first_run.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/ViewReportsScreen.dart';
@@ -345,7 +346,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        final alreadyAsked = await FirstRun.permissionsWereAsked();
+        if (!alreadyAsked) {
+          permission = await Geolocator.requestPermission();
+        }
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {

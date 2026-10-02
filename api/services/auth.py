@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import secrets
 import urllib.error
 import urllib.parse
@@ -140,23 +141,34 @@ def _supabase_admin_request(
         return exc.code, parsed
 
 
+_SUPABASE_USER_ID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def is_supabase_user_id(value: str | None) -> bool:
+    return bool(value and _SUPABASE_USER_ID.match(value))
+
+
 def delete_supabase_user(supabase_user_id: str) -> bool:
-    """Delete the Auth user. Returns True on success."""
-    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY or not supabase_user_id:
+    """Hard-delete the Auth user. A missing user counts as already deleted."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY or not is_supabase_user_id(supabase_user_id):
         print(
             "delete_supabase_user skipped: missing SUPABASE_URL, "
-            "SUPABASE_SERVICE_KEY, or user id"
+            "SUPABASE_SERVICE_KEY, or a Supabase user id"
         )
         return False
     try:
         status_code, payload = _supabase_admin_request(
-            "DELETE", f"/admin/users/{supabase_user_id}"
+            "DELETE",
+            f"/admin/users/{supabase_user_id}",
+            body={"should_soft_delete": False},
         )
-        if status_code in (200, 204):
+        # 404: already gone, so a retry can still remove the app profile.
+        if status_code in (200, 204, 404):
             return True
-        print(
-            f"delete_supabase_user failed ({status_code}): {payload}"
-        )
+        print(f"delete_supabase_user failed ({status_code}): {payload}")
         return False
     except Exception as exc:
         print(f"delete_supabase_user error: {exc}")
@@ -188,7 +200,13 @@ def admin_find_user_id_by_email(email: str) -> str | None:
         query=f"page=1&per_page=200&email={urllib.parse.quote(target)}",
     )
     if status_code >= 400 or not isinstance(payload, dict):
-        return None
+        detail = "Could not look up the sign-in account"
+        if isinstance(payload, dict):
+            detail = str(payload.get("msg") or payload.get("message") or detail)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=detail,
+        )
     users = payload.get("users") or []
     for user in users:
         if not isinstance(user, dict):

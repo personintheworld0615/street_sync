@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 
 class TourStep {
   final GlobalKey targetKey;
@@ -31,43 +30,26 @@ class AiTour extends StatefulWidget {
   State<AiTour> createState() => _AiTourState();
 }
 
-class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
+class _AiTourState extends State<AiTour> {
   int _currentStep = 0;
-  late AnimationController _fadeController;
-  late AnimationController _pulseController;
+  int _missingFrames = 0;
+  bool _waitingForTarget = false;
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    )..forward();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _showCurrentStep());
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _pulseController.dispose();
-    super.dispose();
   }
 
   void _next() {
     if (_currentStep < widget.steps.length - 1) {
       setState(() {
         _currentStep++;
-        _fadeController.forward(from: 0.35);
+        _missingFrames = 0;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) => _showCurrentStep());
     } else {
-      _fadeController.reverse().then((_) => widget.onComplete());
+      widget.onComplete();
     }
   }
 
@@ -75,18 +57,34 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
     if (_currentStep == 0) return;
     setState(() {
       _currentStep--;
-      _fadeController.forward(from: 0.35);
+      _missingFrames = 0;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _showCurrentStep());
-  }
-
-  void _skip() {
-    _fadeController.reverse().then((_) => widget.onComplete());
   }
 
   void _showCurrentStep() {
     if (!mounted || widget.steps.isEmpty) return;
     widget.steps[_currentStep].onShow?.call();
+  }
+
+  void _retryMissingTarget() {
+    if (_waitingForTarget) return;
+    _waitingForTarget = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _waitingForTarget = false;
+      if (!mounted) return;
+      _missingFrames++;
+      if (_missingFrames < 10) {
+        setState(() {});
+        return;
+      }
+      _missingFrames = 0;
+      if (_currentStep < widget.steps.length - 1) {
+        _next();
+      } else {
+        widget.onComplete();
+      }
+    });
   }
 
   @override
@@ -97,232 +95,222 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
     final renderBox =
         step.targetKey.currentContext?.findRenderObject() as RenderBox?;
 
-    if (renderBox == null || !renderBox.attached) {
-      return _TourUnavailableOverlay(onSkip: _skip);
+    if (renderBox == null || !renderBox.attached || !renderBox.hasSize) {
+      _retryMissingTarget();
+      return const SizedBox.shrink();
     }
 
+    _missingFrames = 0;
     final size = renderBox.size;
     final offset = renderBox.localToGlobal(Offset.zero);
     final targetRect = Rect.fromLTWH(
-      offset.dx - 8,
-      offset.dy - 8,
-      size.width + 16,
-      size.height + 16,
+      offset.dx - 6,
+      offset.dy - 6,
+      size.width + 12,
+      size.height + 12,
     );
 
-    return FadeTransition(
-      opacity: _fadeController,
-      child: Stack(
-        children: [
-          GestureDetector(
-            onTap: _next,
-            child: CustomPaint(
-              painter: _TourScrimPainter(targetRect: targetRect),
-              child: const SizedBox.expand(),
-            ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {},
+          child: CustomPaint(
+            painter: _TourScrimPainter(targetRect: targetRect),
+            child: const SizedBox.expand(),
           ),
-          Positioned(
-            left: targetRect.left,
-            top: targetRect.top,
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  final pulse = 1 + (_pulseController.value * 5);
-                  return Container(
-                    width: targetRect.width,
-                    height: targetRect.height,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white, width: 2),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withValues(alpha: 0.32),
-                          blurRadius: 12 + pulse,
-                          spreadRadius: pulse,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 12,
-            child: TextButton(
-              onPressed: _skip,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.black.withValues(alpha: 0.28),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+        ),
+        Positioned.fromRect(
+          rect: targetRect,
+          child: const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.all(Radius.circular(16)),
+                border: Border.fromBorderSide(
+                  BorderSide(color: Colors.white, width: 1.5),
                 ),
               ),
-              child: const Text('Skip'),
             ),
           ),
-          _buildTooltip(offset, size),
-        ],
-      ),
+        ),
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 6,
+          right: 8,
+          child: TextButton(
+            onPressed: widget.onComplete,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: const Text(
+              'Skip',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+          ),
+        ),
+        _buildCallout(step, targetRect),
+      ],
     );
   }
 
-  Widget _buildTooltip(Offset targetOffset, Size targetSize) {
-    final screen = MediaQuery.of(context).size;
-    final isBottom = targetOffset.dy < screen.height / 2;
-    final top = targetOffset.dy + targetSize.height + 18;
-    final bottom = (screen.height - targetOffset.dy) + 18;
+  Widget _buildCallout(TourStep step, Rect targetRect) {
+    final media = MediaQuery.of(context);
+    final screen = media.size;
+    const side = 16.0;
+    const gap = 28.0;
+    final spaceAbove = targetRect.top - media.padding.top - gap;
+    final spaceBelow =
+        screen.height - targetRect.bottom - media.padding.bottom - gap;
+    final placeBelow = spaceBelow >= 150 || spaceBelow >= spaceAbove;
 
     return Positioned(
-      left: 20,
-      right: 20,
-      top: isBottom ? top.clamp(80.0, screen.height - 280.0) : null,
-      bottom: !isBottom ? bottom.clamp(80.0, screen.height - 280.0) : null,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF152033).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
+      left: side,
+      right: side,
+      top: placeBelow ? targetRect.bottom + gap : null,
+      bottom: placeBelow ? null : screen.height - targetRect.top + gap,
+      child: _GuideBubble(
+        step: step,
+        stepIndex: _currentStep,
+        stepCount: widget.steps.length,
+        pointUp: placeBelow,
+        targetCenterX: targetRect.center.dx - side,
+        onBack: _currentStep > 0 ? _previous : null,
+        onNext: _next,
+      ),
+    );
+  }
+}
+
+class _GuideBubble extends StatelessWidget {
+  const _GuideBubble({
+    required this.step,
+    required this.stepIndex,
+    required this.stepCount,
+    required this.pointUp,
+    required this.targetCenterX,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final TourStep step;
+  final int stepIndex;
+  final int stepCount;
+  final bool pointUp;
+  final double targetCenterX;
+  final VoidCallback? onBack;
+  final VoidCallback onNext;
+
+  static const _ink = Color(0xFF111827);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tailLeft = (targetCenterX - 9).clamp(
+          64.0,
+          constraints.maxWidth - 28,
+        );
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x24111827),
+                    blurRadius: 28,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(68, 16, 16, 8),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Text(
+                        step.content,
+                        key: ValueKey(step.content),
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 16.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.25,
+                        ),
+                      ),
+                    ),
+                    if (step.actionLabel != null && step.onAction != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: GestureDetector(
+                          onTap: step.onAction,
+                          child: Text(
+                            step.actionLabel!,
+                            style: const TextStyle(
+                              color: _ink,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _ink,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        if (onBack != null)
+                          IconButton(
+                            onPressed: onBack,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            icon: const Icon(
+                              Icons.arrow_back_rounded,
+                              size: 18,
+                              color: _ink,
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 4),
+                        _StepDots(index: stepIndex, count: stepCount),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: onNext,
+                          style: TextButton.styleFrom(
+                            foregroundColor: _ink,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            minimumSize: const Size(0, 36),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                widget.steps[_currentStep].title,
+                                stepIndex == stepCount - 1 ? 'Done' : 'Next',
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(6),
+                              if (stepIndex != stepCount - 1) ...[
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 16,
                                 ),
-                                child: const Text(
-                                  'STREETSYNC AI GUIDE',
-                                  style: TextStyle(
-                                    color: Colors.blue,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                              ),
+                              ],
                             ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            widget.steps[_currentStep].icon,
-                            color: Colors.blue.shade300,
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.steps[_currentStep].content,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 15,
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (widget.steps[_currentStep].actionLabel != null &&
-                        widget.steps[_currentStep].onAction != null) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.steps[_currentStep].onAction,
-                          icon: const Icon(Icons.bolt_rounded, size: 18),
-                          label: Text(widget.steps[_currentStep].actionLabel!),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Row(
-                      children: [
-                        Text(
-                          'Step ${_currentStep + 1}/${widget.steps.length}',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (_currentStep > 0) ...[
-                          TextButton(
-                            onPressed: _previous,
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white70,
-                            ),
-                            child: const Text('Back'),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        FilledButton(
-                          onPressed: _next,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withValues(alpha: 0.1),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                          ),
-                          child: Text(
-                            _currentStep == widget.steps.length - 1
-                                ? 'Finish'
-                                : 'Next',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -331,31 +319,107 @@ class _AiTourState extends State<AiTour> with TickerProviderStateMixin {
                 ),
               ),
             ),
-          ),
-          // 4. Floating Avatar guiding the user
-          Positioned(
-            top: -35,
-            left: 20,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              child: const CircleAvatar(
-                radius: 32,
-                backgroundColor: Color(0xFF152033),
-                child: Icon(
-                  Icons.auto_awesome,
-                  color: Colors.blue,
-                  size: 28,
-                ),
+            Positioned(
+              left: tailLeft,
+              top: pointUp ? -8 : null,
+              bottom: pointUp ? null : -8,
+              child: CustomPaint(
+                size: const Size(18, 10),
+                painter: _TailPainter(pointUp: pointUp),
               ),
             ),
+            const Positioned(left: 12, top: -16, child: _GuideAvatar()),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _GuideAvatar extends StatelessWidget {
+  const _GuideAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      padding: const EdgeInsets.all(2.5),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x2E111827),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/tour_guide.jpg',
+          fit: BoxFit.cover,
+          alignment: const Alignment(0, -0.15),
+        ),
+      ),
     );
+  }
+}
+
+class _StepDots extends StatelessWidget {
+  const _StepDots({required this.index, required this.count});
+
+  final int index;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (i) {
+        final on = i == index;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          margin: const EdgeInsets.only(right: 5),
+          width: on ? 14 : 5,
+          height: 5,
+          decoration: BoxDecoration(
+            color: on ? const Color(0xFF111827) : const Color(0xFFD1D5DB),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _TailPainter extends CustomPainter {
+  _TailPainter({required this.pointUp});
+
+  final bool pointUp;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    if (pointUp) {
+      path
+        ..moveTo(0, size.height)
+        ..lineTo(size.width / 2, 0)
+        ..lineTo(size.width, size.height);
+    } else {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(size.width / 2, size.height)
+        ..lineTo(size.width, 0);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TailPainter oldDelegate) {
+    return oldDelegate.pointUp != pointUp;
   }
 }
 
@@ -368,33 +432,17 @@ class _TourScrimPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final overlayPath = Path()
       ..addRect(Offset.zero & size)
-      ..addRRect(RRect.fromRectAndRadius(targetRect, const Radius.circular(18)))
+      ..addRRect(RRect.fromRectAndRadius(targetRect, const Radius.circular(16)))
       ..fillType = PathFillType.evenOdd;
 
     canvas.drawPath(
       overlayPath,
-      Paint()..color = Colors.black.withValues(alpha: 0.68),
+      Paint()..color = const Color(0xFF111827).withValues(alpha: 0.46),
     );
   }
 
   @override
   bool shouldRepaint(covariant _TourScrimPainter oldDelegate) {
     return oldDelegate.targetRect != targetRect;
-  }
-}
-
-class _TourUnavailableOverlay extends StatelessWidget {
-  final VoidCallback onSkip;
-
-  const _TourUnavailableOverlay({required this.onSkip});
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black.withValues(alpha: 0.68),
-      child: Center(
-        child: FilledButton(onPressed: onSkip, child: const Text('Close tour')),
-      ),
-    );
   }
 }

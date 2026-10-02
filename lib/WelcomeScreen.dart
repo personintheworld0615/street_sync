@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:street_sync/AccessSetupScreen.dart';
+import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/Mainshell.dart';
-import 'package:street_sync/OnboardingFlow.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
+import 'package:street_sync/first_run.dart';
 
-/// Instagram / SeeClickFix-style load splash: logo + small spinner until ready.
+/// Branded startup. Holds for one second, then opens account creation
+/// or the app if a session already exists.
 class WelcomeScreen extends StatefulWidget {
   /// Kept for call-site compat; routing still uses live auth/session state.
   final bool alreadySignedIn;
@@ -20,6 +23,10 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   static const _bg = Color(0xFFF7F8FA);
   static const _ink = Color(0xFF111827);
+  static const _muted = Color(0xFF6B7280);
+  static const _hold = Duration(seconds: 1);
+
+  bool _showWait = false;
 
   @override
   void initState() {
@@ -30,14 +37,30 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _bootstrap();
   }
 
-  bool get _isSignedIn =>
-      ApiService.userId != null || AuthService.isSignedIn;
+  bool get _isSignedIn => ApiService.userId != null || AuthService.isSignedIn;
 
   Future<void> _bootstrap() async {
-    await _ensureInitialized();
+    var ready = false;
+    final init = _ensureInitialized().whenComplete(() => ready = true);
+    await Future<void>.delayed(_hold);
+    if (!ready && mounted) setState(() => _showWait = true);
+    await init;
     if (!mounted) return;
 
-    final next = _isSignedIn ? const MainShell() : const OnboardingFlow();
+    final Widget next;
+    if (_isSignedIn) {
+      await FirstRun.markSignedInBefore();
+      final showTour = await FirstRun.isTourPending();
+      final asked = await FirstRun.permissionsWereAsked();
+      if (!mounted) return;
+      next = showTour && !asked
+          ? const AccessSetupScreen()
+          : MainShell(showAiTourOnStart: showTour);
+    } else {
+      final returning = await FirstRun.hasSignedInBefore();
+      if (!mounted) return;
+      next = LoginScreen(startAsCreateAccount: !returning);
+    }
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -63,37 +86,69 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.sizeOf(context).height * 0.18;
-
     return Scaffold(
       backgroundColor: _bg,
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Padding(
-            padding: EdgeInsets.only(top: topPad),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/splash_logo.png',
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 28),
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: _ink,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final centerY = constraints.maxHeight / 2;
+          return Stack(
+            children: [
+              Positioned(
+                top: centerY - 48,
+                left: 0,
+                right: 0,
+                child: const Center(
+                  child: Image(
+                    image: AssetImage('assets/images/splash_logo.png'),
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.contain,
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
+              ),
+              Positioned(
+                top: centerY + 68,
+                left: 24,
+                right: 24,
+                child: Column(
+                  children: [
+                    const Text(
+                      'StreetSync',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: _ink,
+                        letterSpacing: -0.6,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Report. Track. Improve.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: _muted,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: _showWait
+                          ? const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _ink,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

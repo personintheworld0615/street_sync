@@ -636,17 +636,17 @@ class ApiService {
         : Uri.parse('$baseUrl/auth/delete');
     try {
       final response = await _authorized(
-        () => http.delete(url, headers: _headers).timeout(const Duration(seconds: 12)),
+        () => http
+            .delete(url, headers: _headers)
+            .timeout(const Duration(seconds: 30)),
       );
       if (response == null) return null; // already logged out
 
       if (response.statusCode == 200) {
-        await logout();
-        return null;
-      }
-
-      // If the API row is already gone, still wipe the Supabase session.
-      if (response.statusCode == 404) {
+        final deletedAuth = _responseFlag(response, 'supabase_auth_deleted');
+        if (deletedAuth == false) {
+          return 'Could not delete the sign-in account. Your profile was not removed.';
+        }
         await logout();
         return null;
       }
@@ -654,9 +654,17 @@ class ApiService {
       return _errorFromResponse(response, fallback: 'Could not delete account');
     } catch (e) {
       print('Delete Account Error ($url): $e');
-      await logout();
-      return 'Cannot reach API at $baseUrl. Signed out locally.';
+      return 'Could not delete the account. Try again.';
     }
+  }
+
+  static bool? _responseFlag(http.Response response, String key) {
+    try {
+      final body = jsonDecode(response.body);
+      final value = body is Map ? body[key] : null;
+      if (value is bool) return value;
+    } catch (_) {}
+    return null;
   }
 
   static String _errorFromResponse(

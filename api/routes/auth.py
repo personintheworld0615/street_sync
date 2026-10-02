@@ -24,6 +24,7 @@ from api.services.auth import (
     send_signup_confirmation_email,
     get_current_user,
     hash_password,
+    is_supabase_user_id,
     security,
     supabase_user_id_from_access_token,
     upsert_user_from_supabase,
@@ -216,31 +217,34 @@ def delete_account_route(
     try:
         sb_user = fetch_supabase_user(token)
         raw_id = sb_user.get("id")
-        if isinstance(raw_id, str) and raw_id:
+        if isinstance(raw_id, str) and is_supabase_user_id(raw_id):
             supabase_uid = raw_id
     except HTTPException:
         supabase_uid = None
 
     if not supabase_uid:
-        supabase_uid = supabase_user_id_from_access_token(token)
+        decoded = supabase_user_id_from_access_token(token)
+        if is_supabase_user_id(decoded):
+            supabase_uid = decoded
 
     if not supabase_uid and current_user.email:
-        try:
-            supabase_uid = admin_find_user_id_by_email(current_user.email)
-        except Exception as exc:
-            print(f"admin_find_user_id_by_email failed: {exc}")
-            supabase_uid = None
+        supabase_uid = admin_find_user_id_by_email(current_user.email)
 
-    # Delete Auth user first so they can't keep signing in with Google/email.
-    auth_deleted = False
-    if supabase_uid:
-        auth_deleted = delete_supabase_user(supabase_uid)
-
-    result = delete_account(db, current_user.id)
-    result["supabase_auth_deleted"] = auth_deleted
-    if supabase_uid and not auth_deleted:
-        result["warning"] = (
-            "App profile deleted, but Supabase Auth user may still exist. "
-            "Check SUPABASE_SERVICE_KEY on Render and redeploy."
+    # Auth goes first. A failed Auth delete leaves the profile in place.
+    if supabase_uid and not delete_supabase_user(supabase_uid):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Could not delete the sign-in account. "
+                "Your profile was not removed."
+            ),
         )
+
+    try:
+        result = delete_account(db, current_user.id)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+        result = {"message": "Account deleted successfully"}
+    result["supabase_auth_deleted"] = True
     return result
