@@ -26,9 +26,9 @@ from api.services.auth import (
     hash_password,
     is_supabase_user_id,
     security,
+    supabase_password_grant,
     supabase_user_id_from_access_token,
     upsert_user_from_supabase,
-    verify_password,
 )
 from api.services.rate_limit import client_ip, hit
 from api.services.reports import delete_account
@@ -111,18 +111,40 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    """Legacy email/password login (kept for older clients)."""
+    """Sign in via Supabase and sync the local profile row on success."""
     ip = client_ip(request)
     email = str(body.email).strip().lower()
     hit("auth-login-ip", ip, limit=10, window_seconds=900)
     hit("auth-login-email", email, limit=8, window_seconds=900)
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(body.password, user.password):
+
+    grant = supabase_password_grant(email, body.password)
+    access_token = grant.get("access_token")
+    if not access_token:
+        error = str(grant.get("error") or grant.get("error_code") or "").lower()
+        detail = str(
+            grant.get("msg")
+            or grant.get("error_description")
+            or grant.get("message")
+            or "Invalid credentials"
+        )
+        if "email_not_confirmed" in error or "email not confirmed" in detail.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Please confirm your email before signing in.",
+            )
+        if "rate limit" in detail.lower() or "rate_limit" in error or "too many" in detail.lower():
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests. Try again in a little while.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    return _token_for(user)
+
+    sb_user = fetch_supabase_user(access_token)
+    user = upsert_user_from_supabase(db, sb_user)
+    return _token_for(user, access_token=access_token)
 
 
 @router.post("/ensure-confirmed")

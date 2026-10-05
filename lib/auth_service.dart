@@ -120,16 +120,48 @@ class AuthService {
 
   static Future<String?> signInWithGoogle() async {
     if (!isConfigured) return 'Supabase not configured.';
-    if (googleWebClientId.isEmpty) return 'Google Web Client ID missing.';
 
+    final webClientId = googleWebClientId;
+    final iosClientId = googleIosClientId;
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+
+    if (webClientId.isEmpty) {
+      return 'Google sign-in is not configured: set GOOGLE_WEB_CLIENT_ID in assets/.env.';
+    }
+
+    // Prefer the standard Supabase OAuth redirect flow. It works with the
+    // Google provider configured in Supabase and avoids the brittle native
+    // GoogleSignIn client-ID mismatch that breaks when Android/iOS bundle IDs
+    // or client IDs are not exactly aligned.
+    if (kIsWeb || isIos && iosClientId.isEmpty) {
+      try {
+        await auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: kIsWeb ? null : kAuthRedirectUrl,
+        );
+        return null;
+      } on AuthException catch (e) {
+        final msg = e.message.toLowerCase();
+        if (msg.contains('cancel') || msg.contains('canceled')) return null;
+        debugPrint('Google OAuth flow failed: ${e.message}');
+        return 'Google sign-in failed: ${e.message}';
+      } catch (e) {
+        debugPrint('Google OAuth flow exception: $e');
+        return 'Google sign-in failed. Check your Supabase Google provider setup. Details: $e';
+      }
+    }
+
+    // Only try the native GoogleSignIn path when the required iOS client is set.
     try {
       await _ensureGoogleInitialized();
       final googleUser = await GoogleSignIn.instance.authenticate();
       final googleAuth = googleUser.authentication;
       final idToken = googleAuth.idToken;
-      final accessToken = null; // authenticate() currently only provides idToken in this version
+      final accessToken = null;
 
-      if (idToken == null) return 'Google did not return an ID token.';
+      if (idToken == null) {
+        return 'Google did not return an ID token. Check the Google OAuth client setup in Google Cloud Console.';
+      }
 
       await auth.signInWithIdToken(
         provider: OAuthProvider.google,
@@ -140,7 +172,8 @@ class AuthService {
     } on AuthException catch (e) {
       final msg = e.message.toLowerCase();
       if (msg.contains('cancel') || msg.contains('canceled')) return null;
-      return e.message;
+      debugPrint('Google native sign-in AuthException: ${e.message}');
+      return 'Google sign-in failed: ${e.message}';
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains('cancel') ||
@@ -148,7 +181,8 @@ class AuthService {
           msg.contains('interrupted')) {
         return null;
       }
-      return 'Google sign-in did not finish. Try again.';
+      debugPrint('Google native sign-in exception: $e');
+      return 'Google sign-in failed. Check your Google OAuth setup and Supabase Google provider config. Details: $e';
     }
   }
 

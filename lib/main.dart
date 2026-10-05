@@ -89,6 +89,19 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
     super.dispose();
   }
 
+  static Route<dynamic> _fallbackRoute(RouteSettings settings) {
+    final name = settings.name ?? '';
+    final uri = Uri.tryParse(name);
+    final hasAuthCallback = uri != null &&
+        (uri.queryParameters.containsKey('code') ||
+            uri.queryParameters.containsKey('error') ||
+            uri.queryParameters.containsKey('token'));
+
+    return MaterialPageRoute(
+      builder: (_) => hasAuthCallback ? const LoginScreen() : const WelcomeScreen(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -100,6 +113,8 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
         textTheme: GoogleFonts.interTextTheme(),
       ),
       home: const WelcomeScreen(),
+      onGenerateRoute: (settings) => _fallbackRoute(settings),
+      onUnknownRoute: (settings) => _fallbackRoute(settings),
     );
   }
 }
