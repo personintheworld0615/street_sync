@@ -480,9 +480,9 @@ class ApiService {
     return headers;
   }
 
-  /// Email/password signup: API creates a confirmed Supabase user (no email
-  /// OTP), then we sign in and sync the profile.
-  /// Returns null on success, or an error message on failure.
+  /// Email/password signup through Supabase Auth only.
+  /// Returns null on success, 'confirm-email' when a link is required, or an
+  /// error message. A profile sync failure does not undo a real session.
   static Future<String?> signup({
     required String firstname,
     required String lastname,
@@ -494,47 +494,22 @@ class ApiService {
           'SUPABASE_ANON_KEY to assets/.env';
     }
 
-    final url = Uri.parse('$baseUrl/auth/signup');
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'first_name': firstname,
-              'last_name': lastname,
-              'email': email.trim(),
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        final detail = _friendlyAuthMessage(
-          _errorDetail(response.body) ??
-              'Sign up failed (${response.statusCode})',
-        );
-        return detail;
-      }
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map && decoded['email_confirmation_required'] == true) {
-        return 'confirm-email';
-      }
-    } catch (e) {
-      return 'Sign up failed: $e';
-    }
-
-    final error = await AuthService.signIn(
+    final error = await AuthService.signUp(
       email: email.trim(),
       password: password,
+      firstName: firstname,
+      lastName: lastname,
     );
-    if (error != null) return error;
+    if (error == kEmailConfirmPending) return 'confirm-email';
+    if (error != null) return _friendlyAuthMessage(error);
 
     final syncError = await syncFromSupabase(
       firstName: firstname,
       lastName: lastname,
     );
-    if (syncError != null && userId == null) return syncError;
+    if (syncError != null) {
+      debugPrint('signup profile sync: $syncError');
+    }
     return null;
   }
 
@@ -544,13 +519,15 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    var error = await AuthService.signIn(email: email, password: password);
+    final error = await AuthService.signIn(email: email, password: password);
     if (AuthService.isEmailConfirmBlocker(error)) {
       return 'Confirm your email first. Open the link we sent to ${email.trim()}, then sign in.';
     }
     if (error != null) return _friendlyAuthMessage(error);
     final syncError = await syncFromSupabase();
-    if (syncError != null && userId == null) return syncError;
+    if (syncError != null) {
+      debugPrint('login profile sync: $syncError');
+    }
     return null;
   }
 
@@ -579,7 +556,9 @@ class ApiService {
   static Future<String?> completeOAuthSession() async {
     if (!AuthService.isSignedIn) return 'OAuth sign-in did not complete';
     final syncError = await syncFromSupabase();
-    if (syncError != null && userId == null) return syncError;
+    if (syncError != null) {
+      debugPrint('oauth profile sync: $syncError');
+    }
     return null;
   }
 

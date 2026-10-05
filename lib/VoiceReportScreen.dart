@@ -29,6 +29,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   static const _cta = Color(0xFF111827);
   static const _defaultLatLng = LatLng(40.3334, -74.6004); // Plainsboro, NJ
 
+  final _locationKey = GlobalKey();
   final _micKey = GlobalKey();
   final _transcriptKey = GlobalKey();
   final _submitKey = GlobalKey();
@@ -99,6 +100,16 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   }
 
   List<TourStep> get _tourSteps => [
+    TourStep(
+      targetKey: _locationKey,
+      title: 'Location',
+      content:
+          'This pins the report to the street you’re on. Tap it if you need to move the pin.',
+      icon: Icons.location_on_outlined,
+      onShow: () {
+        _captureLocation(updateUi: true);
+      },
+    ),
     TourStep(
       targetKey: _micKey,
       title: 'Microphone',
@@ -420,7 +431,10 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                     padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
                     child: Column(
                       children: [
-                        _buildLocationPill(),
+                        KeyedSubtree(
+                          key: _locationKey,
+                          child: _buildLocationPill(),
+                        ),
                         if (!_isRecording &&
                             _statusText !=
                                 'Tap the microphone to start recording' &&

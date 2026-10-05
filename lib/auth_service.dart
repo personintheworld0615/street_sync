@@ -1,10 +1,13 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Deep link Supabase sends the session back to. Same scheme on iOS and Android.
 const kAuthRedirectUrl = 'com.example.streetsync://login-callback';
+
+/// Returned by [AuthService.signUp] when the project requires an email link
+/// before a session exists.
+const kEmailConfirmPending = 'confirm-email';
 
 class AuthService {
   AuthService._();
@@ -17,7 +20,6 @@ class AuthService {
   static bool get isSignedIn => session != null;
 
   static bool _initialized = false;
-  static bool _googleInitialized = false;
 
   /// Safely check if Supabase is initialized.
   static bool get isConfigured {
@@ -30,8 +32,6 @@ class AuthService {
 
   static String get supabaseUrl => dotenv.maybeGet('SUPABASE_URL')?.trim() ?? '';
   static String get supabaseAnonKey => dotenv.maybeGet('SUPABASE_ANON_KEY')?.trim() ?? '';
-  static String get googleWebClientId => dotenv.maybeGet('GOOGLE_WEB_CLIENT_ID')?.trim() ?? '';
-  static String get googleIosClientId => dotenv.maybeGet('GOOGLE_IOS_CLIENT_ID')?.trim() ?? '';
 
   static Future<void> initialize() async {
     if (kIsWeb) _initialized = false;
@@ -52,29 +52,12 @@ class AuthService {
         authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
       );
       _initialized = true;
-      unawaited(_ensureGoogleInitialized());
     } catch (e) {
       if (e.toString().contains('already been initialized')) {
         _initialized = true;
       } else {
         debugPrint('Sorry there was an error on our end. Please try again later.');
       }
-    }
-  }
-
-  static Future<void> _ensureGoogleInitialized() async {
-    if (_googleInitialized) return;
-    final webClientId = googleWebClientId;
-    if (webClientId.isEmpty) return;
-    
-    try {
-      await GoogleSignIn.instance.initialize(
-        clientId: googleIosClientId.isEmpty ? null : googleIosClientId,
-        serverClientId: webClientId,
-      );
-      _googleInitialized = true;
-    } catch (e) {
-      debugPrint('Sorry there was an error signing you in with Google. Please try again later.');
     }
   }
 
@@ -93,7 +76,7 @@ class AuthService {
         emailRedirectTo: kAuthRedirectUrl,
       );
       if (res.session == null && res.user != null) {
-        return 'Check your email to confirm your account.';
+        return kEmailConfirmPending;
       }
       return null;
     } on AuthException catch (e) {
@@ -118,72 +101,11 @@ class AuthService {
     }
   }
 
-  static Future<String?> signInWithGoogle() async {
-    if (!isConfigured) return 'Supabase not configured.';
-
-    final webClientId = googleWebClientId;
-    final iosClientId = googleIosClientId;
-    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
-
-    if (webClientId.isEmpty) {
-      return 'Google sign-in is not configured: set GOOGLE_WEB_CLIENT_ID in assets/.env.';
-    }
-
-    // Prefer the standard Supabase OAuth redirect flow. It works with the
-    // Google provider configured in Supabase and avoids the brittle native
-    // GoogleSignIn client-ID mismatch that breaks when Android/iOS bundle IDs
-    // or client IDs are not exactly aligned.
-    if (kIsWeb || isIos && iosClientId.isEmpty) {
-      try {
-        await auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: kIsWeb ? null : kAuthRedirectUrl,
-        );
-        return null;
-      } on AuthException catch (e) {
-        final msg = e.message.toLowerCase();
-        if (msg.contains('cancel') || msg.contains('canceled')) return null;
-        debugPrint('Google OAuth flow failed: ${e.message}');
-        return 'Google sign-in failed: ${e.message}';
-      } catch (e) {
-        debugPrint('Google OAuth flow exception: $e');
-        return 'Google sign-in failed. Check your Supabase Google provider setup. Details: $e';
-      }
-    }
-
-    // Only try the native GoogleSignIn path when the required iOS client is set.
-    try {
-      await _ensureGoogleInitialized();
-      final googleUser = await GoogleSignIn.instance.authenticate();
-      final googleAuth = googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      final accessToken = null;
-
-      if (idToken == null) {
-        return 'Google did not return an ID token. Check the Google OAuth client setup in Google Cloud Console.';
-      }
-
-      await auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-      return null;
-    } on AuthException catch (e) {
-      final msg = e.message.toLowerCase();
-      if (msg.contains('cancel') || msg.contains('canceled')) return null;
-      debugPrint('Google native sign-in AuthException: ${e.message}');
-      return 'Google sign-in failed: ${e.message}';
-    } catch (e) {
-      final msg = e.toString().toLowerCase();
-      if (msg.contains('cancel') ||
-          msg.contains('canceled') ||
-          msg.contains('interrupted')) {
-        return null;
-      }
-      debugPrint('Google native sign-in exception: $e');
-      return 'Google sign-in failed. Check your Google OAuth setup and Supabase Google provider config. Details: $e';
-    }
+  /// Google goes through Supabase Auth’s OAuth redirect, same as Apple.
+  /// The Google provider is configured in the Supabase dashboard, so the app
+  /// does not depend on a native Google client matching each bundle id.
+  static Future<String?> signInWithGoogle() {
+    return signInWithOAuth(OAuthProvider.google);
   }
 
   static Future<String?> signInWithOAuth(OAuthProvider provider) async {
@@ -227,7 +149,6 @@ class AuthService {
   static Future<void> signOut() async {
     if (!isConfigured) return;
     try {
-      if (_googleInitialized) await GoogleSignIn.instance.signOut();
       await auth.signOut();
     } catch (_) {}
   }

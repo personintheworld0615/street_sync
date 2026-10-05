@@ -22,6 +22,8 @@ class HomeScreen extends StatefulWidget {
     this.quickActionsTourKey,
     this.recentReportsTourKey,
     this.voiceActionTourKey,
+    this.locationTourKey,
+    this.registerLocationReload,
   });
 
   /// Opens the Map tab; pass [reportId] to focus that pin.
@@ -30,6 +32,10 @@ class HomeScreen extends StatefulWidget {
   final GlobalKey? quickActionsTourKey;
   final GlobalKey? recentReportsTourKey;
   final GlobalKey? voiceActionTourKey;
+  final GlobalKey? locationTourKey;
+
+  /// Lets the home tour refresh the city label after location is allowed.
+  final void Function(Future<void> Function() reload)? registerLocationReload;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -112,6 +118,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.registerLocationReload?.call(
+      () => _loadLocation(forceRefresh: true),
+    );
     _loadReports();
     _loadLocation();
   }
@@ -815,9 +824,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: _tGreeting,
               ),
               const SizedBox(height: 4),
-              Text(
-                _locationLabel,
-                style: _tLocation,
+              KeyedSubtree(
+                key: widget.locationTourKey,
+                child: Text(
+                  _locationLabel,
+                  style: _tLocation,
+                ),
               ),
               const SizedBox(height: 28),
               threecard(),

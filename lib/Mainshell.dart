@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/ai_tour.dart';
@@ -39,6 +40,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   bool _showWelcome = false;
 
   final _statsTourKey = GlobalKey();
+  final _locationTourKey = GlobalKey();
   final _quickActionsTourKey = GlobalKey();
   final _recentReportsTourKey = GlobalKey();
   final _voiceActionTourKey = GlobalKey();
@@ -47,6 +49,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   final _addNavTourKey = GlobalKey();
   final _updatesNavTourKey = GlobalKey();
   final _profileNavTourKey = GlobalKey();
+  Future<void> Function()? _reloadHomeLocation;
+  bool _locationPrompted = false;
 
   @override
   void initState() {
@@ -108,7 +112,29 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _allowLocation({bool force = false}) async {
+    if (_locationPrompted && !force) return;
+    _locationPrompted = true;
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+    } catch (_) {}
+    await _reloadHomeLocation?.call();
+  }
+
   List<TourStep> get _tourSteps => [
+    TourStep(
+      targetKey: _locationTourKey,
+      title: 'Location',
+      content:
+          'This is where you are. Reports get pinned to this street so a crew can find the problem without guessing.',
+      icon: Icons.location_on_outlined,
+      actionLabel: 'Allow location',
+      onAction: () => _allowLocation(force: true),
+      onShow: _allowLocation,
+    ),
     TourStep(
       targetKey: _statsTourKey,
       title: 'Neighborhood',
@@ -250,9 +276,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               HomeScreen(
                 onOpenOnMap: openMap,
                 statsTourKey: _statsTourKey,
+                locationTourKey: _locationTourKey,
                 quickActionsTourKey: _quickActionsTourKey,
                 recentReportsTourKey: _recentReportsTourKey,
                 voiceActionTourKey: _voiceActionTourKey,
+                registerLocationReload: (reload) => _reloadHomeLocation = reload,
               ),
               MapScreen(isActive: _index == 1, initialReportId: _focusReportId),
               UpdatesScreen(isActive: _index == 2),

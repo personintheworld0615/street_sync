@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:street_sync/PrivacyPolicyScreen.dart';
+import 'package:street_sync/error_popup.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
@@ -113,6 +115,270 @@ class TermsScreen extends StatelessWidget {
               fontSize: 14,
               height: 1.5,
               color: _muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown after the create-account form. The account is created only when the
+/// reader reaches the end and taps agree.
+class TermsAgreementScreen extends StatefulWidget {
+  const TermsAgreementScreen({super.key, this.onAgree});
+
+  /// Runs the real signup. Return null on success, `confirm-email` when a
+  /// link is required, or an error message. Omit this to only record agreement.
+  final Future<String?> Function()? onAgree;
+
+  @override
+  State<TermsAgreementScreen> createState() => _TermsAgreementScreenState();
+}
+
+class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
+  static const _pageBg = Color(0xFFF7F8FA);
+  static const _ink = Color(0xFF111827);
+  static const _muted = Color(0xFF5E5D5D);
+
+  final _scroll = ScrollController();
+  bool _atEnd = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onScroll());
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final atEnd = position.maxScrollExtent <= 8 ||
+        position.pixels >= position.maxScrollExtent - 32;
+    if (atEnd != _atEnd) setState(() => _atEnd = atEnd);
+  }
+
+  Future<void> _agree() async {
+    if (!_atEnd || _busy) return;
+    final create = widget.onAgree;
+    if (create == null) {
+      Navigator.of(context).pop('ok');
+      return;
+    }
+    setState(() => _busy = true);
+    final error = await create();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (error == 'confirm-email') {
+      Navigator.of(context).pop('confirm-email');
+      return;
+    }
+    if (error != null) {
+      await showErrorPopup(context, error);
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop('ok');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = GoogleFonts.inter(
+      fontSize: 15,
+      height: 1.55,
+      color: TermsScreen._ink,
+    );
+    return Scaffold(
+      backgroundColor: _pageBg,
+      appBar: AppBar(
+        backgroundColor: _pageBg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        foregroundColor: _ink,
+        title: Text(
+          'Terms',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            letterSpacing: -0.3,
+            color: _ink,
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              children: [
+                Text(
+                  'Read this before your account is created',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: _ink,
+                    height: 1.15,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Nothing is created until you scroll to the end and agree.',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: _muted,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'These terms are written in plain language for a student-made app. They are not a substitute for a lawyer’s review.',
+                  style: body,
+                ),
+                const SizedBox(height: 24),
+                for (final section in TermsScreen._sections) ...[
+                  Text(
+                    section.$1,
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: _ink,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(section.$2, style: body),
+                  const SizedBox(height: 22),
+                ],
+                Text(
+                  'Privacy',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'StreetSync stores the name and email on your account, and the reports you send, including photos and location. You can read the full policy before you agree.',
+                  style: body,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const PrivacyPolicyScreen(),
+                              ),
+                            );
+                          },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: _ink,
+                    ),
+                    child: const Text(
+                      'Privacy Policy',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'By agreeing you confirm you are 13 or older.',
+                  style: body,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Questions: ${TermsScreen.contactEmail}',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: _muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              12,
+              24,
+              16 + MediaQuery.paddingOf(context).bottom,
+            ),
+            decoration: const BoxDecoration(
+              color: _pageBg,
+              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _atEnd
+                      ? 'You’ve reached the end.'
+                      : 'Scroll to the end to agree.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _muted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _atEnd && !_busy ? _agree : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _ink,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: _ink.withValues(alpha: 0.28),
+                      disabledForegroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'I agree',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/first_run.dart';
 
-/// Last step of account setup. Explains location and the microphone, then
-/// raises the system dialogs before the home guide starts.
+/// Last step of account setup. Explains the microphone, then raises the
+/// system dialog before the home guide. Location is part of that guide.
 class AccessSetupScreen extends StatefulWidget {
   const AccessSetupScreen({super.key});
 
@@ -23,12 +22,6 @@ class _AccessSetupScreenState extends State<AccessSetupScreen> {
   Future<void> _allow() async {
     if (_busy) return;
     setState(() => _busy = true);
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
-      }
-    } catch (_) {}
     try {
       await SpeechToText().initialize();
     } catch (_) {}
@@ -82,7 +75,7 @@ class _AccessSetupScreenState extends State<AccessSetupScreen> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'A report only helps if someone can find the problem and understand it. We ask for these when you create an account so that moment isn’t a surprise later.',
+                        'A report is easier to understand when you can say what’s wrong. We ask for the microphone now so that moment isn’t a surprise later. Location comes up in the short tour on the next screen.',
                         style: TextStyle(
                           fontSize: 16,
                           height: 1.4,
@@ -91,13 +84,6 @@ class _AccessSetupScreenState extends State<AccessSetupScreen> {
                         ),
                       ),
                       const SizedBox(height: 28),
-                      const _AccessRow(
-                        icon: Icons.location_on_outlined,
-                        title: 'Location',
-                        body:
-                            'So the report is pinned to the street you’re standing on. A crew can go there directly instead of guessing from a description.',
-                      ),
-                      const SizedBox(height: 12),
                       const _AccessRow(
                         icon: Icons.mic_none_rounded,
                         title: 'Microphone',

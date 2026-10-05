@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:street_sync/AccessSetupScreen.dart';
 import 'package:street_sync/ForgotPasswordScreen.dart';
 import 'package:street_sync/Mainshell.dart';
-import 'package:street_sync/PrivacyPolicyScreen.dart';
 import 'package:street_sync/TermsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/auth_service.dart';
@@ -38,7 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
   late bool _isLogin;
   bool _loading = false;
   bool _didRoute = false;
-  bool _acceptedTerms = false;
   String _passwordText = '';
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -63,7 +61,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _isLogin = !widget.startAsCreateAccount;
     if (AuthService.isConfigured) {
       _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
-        if (data.event != AuthChangeEvent.signedIn ||
+        // Email signup finishes on the terms page. This listener is only for
+        // the browser OAuth redirect, which sets [_loading] before it returns.
+        if (!_loading ||
+            data.event != AuthChangeEvent.signedIn ||
             data.session == null ||
             !mounted) {
           return;
@@ -111,11 +112,37 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-    if (!_isLogin && !_acceptedTerms) {
-      await showErrorPopup(
-        context,
-        'Agree to the Terms and Privacy Policy to create an account',
+
+    if (!_isLogin) {
+      final first = _nameCtrl.text.trim();
+      final last = _lastNameCtrl.text.trim();
+      final email = _emailCtrl.text.trim();
+      final password = _passwordCtrl.text;
+      final outcome = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (_) => TermsAgreementScreen(
+            onAgree: () => ApiService.signup(
+              firstname: first,
+              lastname: last,
+              email: email,
+              password: password,
+            ),
+          ),
+        ),
       );
+      if (!mounted || outcome == null) return;
+      if (outcome == 'confirm-email') {
+        setState(() => _isLogin = true);
+        await showAppDialog(
+          context,
+          'We sent a confirmation link to $email. Open it, then sign in.',
+        );
+        return;
+      }
+      if (outcome == 'ok' &&
+          (ApiService.userId != null || AuthService.isSignedIn)) {
+        await _finishAuth(firstRun: true);
+      }
       return;
     }
 
@@ -123,19 +150,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     String? error;
     try {
-      if (_isLogin) {
-        error = await ApiService.login(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
-        );
-      } else {
-        error = await ApiService.signup(
-          firstname: _nameCtrl.text.trim(),
-          lastname: _lastNameCtrl.text.trim(),
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
-        );
-      }
+      error = await ApiService.login(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
     } catch (e) {
       error = 'Something went wrong. Try again.';
     }
@@ -199,12 +217,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _oauth(OAuthProvider provider) async {
-    if (!_acceptedTerms) {
-      await showErrorPopup(
-        context,
-        'Agree to the Terms and Privacy Policy to continue',
+    if (!_isLogin) {
+      final outcome = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const TermsAgreementScreen()),
       );
-      return;
+      if (!mounted || outcome != 'ok') return;
     }
     setState(() => _loading = true);
 
@@ -220,12 +237,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (provider == OAuthProvider.google && !AuthService.isSignedIn) {
-      setState(() => _loading = false);
-      return;
-    }
-
-    // Native Google completes with a session immediately.
+    // Browser OAuth returns before the redirect finishes. A session that is
+    // already present (rare) can finish here; otherwise wait for auth state.
     if (AuthService.isSignedIn) {
       final syncError = await ApiService.completeOAuthSession();
       if (!mounted) return;
@@ -365,8 +378,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               const SizedBox(height: 18),
-              _termsCheckbox(),
-              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -523,79 +534,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _termsCheckbox() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 24,
-          height: 24,
-          child: Checkbox(
-            value: _acceptedTerms,
-            activeColor: _ink,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            onChanged: _loading
-                ? null
-                : (value) => setState(() => _acceptedTerms = value ?? false),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text(
-                  'I am 13 or older and agree to the ',
-                  style: TextStyle(fontSize: 13, color: _muted, height: 1.35),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const TermsScreen()),
-                    );
-                  },
-                  child: const Text(
-                    'Terms',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _ink,
-                      fontWeight: FontWeight.w700,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-                const Text(
-                  ' and ',
-                  style: TextStyle(fontSize: 13, color: _muted, height: 1.35),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PrivacyPolicyScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Privacy Policy',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _ink,
-                      fontWeight: FontWeight.w700,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
