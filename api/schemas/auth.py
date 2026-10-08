@@ -15,6 +15,8 @@ class LoginRequest(BaseModel):
 class SyncRequest(BaseModel):
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
+    ## When False, return 404 instead of creating a profile row.
+    create_if_missing: bool = True
 
 
 class TokenResponse(BaseModel):
@@ -26,6 +28,8 @@ class TokenResponse(BaseModel):
     email: EmailStr
     picture: Optional[str] = None
     email_confirmation_required: bool = False
+    is_new_user: bool = False
+    ai_tour_completed: bool = False
 
 
 class PictureResponse(BaseModel):

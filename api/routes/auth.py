@@ -42,6 +42,7 @@ def _token_for(
     access_token: str | None = None,
     *,
     email_confirmation_required: bool = False,
+    is_new_user: bool = False,
 ) -> TokenResponse:
     return TokenResponse(
         access_token=access_token or create_access_token(user.id),
@@ -52,6 +53,8 @@ def _token_for(
         email=user.email,
         picture=user.picture,
         email_confirmation_required=email_confirmation_required,
+        is_new_user=is_new_user,
+        ai_tour_completed=bool(getattr(user, "ai_tour_completed", False)),
     )
 
 
@@ -98,6 +101,7 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
         last_name=body.last_name,
         email=email,
         password=hash_password(body.password),
+        ai_tour_completed=False,
     )
     db.add(user)
     db.commit()
@@ -106,7 +110,7 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
     if not sent:
         # Mail is not configured. Confirm the account so signup is not a dead end.
         admin_confirm_user_email(email)
-    return _token_for(user, email_confirmation_required=sent)
+    return _token_for(user, email_confirmation_required=sent, is_new_user=True)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -143,8 +147,8 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
         )
 
     sb_user = fetch_supabase_user(access_token)
-    user = upsert_user_from_supabase(db, sb_user)
-    return _token_for(user, access_token=access_token)
+    user, created = upsert_user_from_supabase(db, sb_user)
+    return _token_for(user, access_token=access_token, is_new_user=created)
 
 
 @router.post("/ensure-confirmed")
@@ -175,13 +179,29 @@ def sync_supabase_user(
     """Upsert the local user from a Supabase access token and return profile."""
     token = credentials.credentials
     sb_user = fetch_supabase_user(token)
-    user = upsert_user_from_supabase(
+    user, created = upsert_user_from_supabase(
         db,
         sb_user,
         first_name=body.first_name,
         last_name=body.last_name,
+        create_if_missing=body.create_if_missing,
     )
-    return _token_for(user, access_token=token)
+    return _token_for(user, access_token=token, is_new_user=created)
+
+
+@router.post("/tour-complete", response_model=TokenResponse)
+def complete_ai_tour(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark the home AI tour as finished or skipped."""
+    if not current_user.ai_tour_completed:
+        current_user.ai_tour_completed = True
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+    return _token_for(current_user, access_token=credentials.credentials)
 
 
 @router.get("/me", response_model=TokenResponse)

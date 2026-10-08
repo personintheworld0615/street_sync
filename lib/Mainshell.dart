@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/ai_tour.dart';
+import 'package:street_sync/api_service.dart';
 import 'package:street_sync/first_run.dart';
 import 'package:street_sync/Profile.dart';
 import 'package:street_sync/UpdatesScreen.dart';
@@ -99,7 +100,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   Future<void> _completeTour() async {
-    await FirstRun.markTourSeen();
+    await FirstRun.markTourSeen(userId: ApiService.userId);
+    await ApiService.markAiTourCompleted();
     if (!mounted) return;
     setState(() => _showTour = false);
   }

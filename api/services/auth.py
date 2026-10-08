@@ -434,7 +434,9 @@ def upsert_user_from_supabase(
     *,
     first_name: str | None = None,
     last_name: str | None = None,
-) -> User:
+    create_if_missing: bool = True,
+) -> tuple[User, bool]:
+    """Return (user, created). Raises 404 when missing and create_if_missing is False."""
     email = (sb_user.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(
@@ -456,17 +458,23 @@ def upsert_user_from_supabase(
 
     user = db.query(User).filter(User.email == email).first()
     if user is None:
+        if not create_if_missing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Profile not found",
+            )
         user = User(
             first_name=first,
             last_name=last,
             email=email,
             password=hash_password(secrets.token_urlsafe(32)),
             picture=picture,
+            ai_tour_completed=False,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        return user
+        return user, True
 
     changed = False
     if first_name and user.first_name != first:
@@ -482,7 +490,7 @@ def upsert_user_from_supabase(
         db.add(user)
         db.commit()
         db.refresh(user)
-    return user
+    return user, False
 
 
 def _user_from_legacy_jwt(token: str, db: Session) -> User | None:
@@ -509,7 +517,8 @@ def get_current_user(
         return legacy
 
     sb_user = fetch_supabase_user(token)
-    return upsert_user_from_supabase(db, sb_user)
+    user, _created = upsert_user_from_supabase(db, sb_user)
+    return user
 
 
 def get_optional_user(

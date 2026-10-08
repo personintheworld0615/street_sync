@@ -50,7 +50,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final Widget next;
     if (_isSignedIn) {
       await FirstRun.markSignedInBefore();
-      final showTour = await FirstRun.isTourPending();
+      final localPending =
+          await FirstRun.isTourPending(userId: ApiService.userId);
+      final showTour = ApiService.needsAiTour || localPending;
       final asked = await FirstRun.permissionsWereAsked();
       if (!mounted) return;
       next = showTour && !asked

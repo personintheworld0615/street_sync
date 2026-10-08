@@ -37,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
   late bool _isLogin;
   bool _loading = false;
   bool _didRoute = false;
+  /// True while we are finishing an OAuth redirect (login or create).
+  bool _oauthInFlight = false;
   String _passwordText = '';
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -62,22 +64,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (AuthService.isConfigured) {
       _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
         // Email signup finishes on the terms page. This listener is only for
-        // the browser OAuth redirect, which sets [_loading] before it returns.
-        if (!_loading ||
+        // the browser OAuth redirect, which sets [_oauthInFlight] first.
+        if (!_oauthInFlight ||
             data.event != AuthChangeEvent.signedIn ||
             data.session == null ||
             !mounted) {
           return;
         }
-        setState(() => _loading = true);
-        final error = await ApiService.completeOAuthSession();
-        if (!mounted) return;
-        setState(() => _loading = false);
-        if (ApiService.userId != null || error == null) {
-          await _finishAuth(firstRun: !_isLogin);
-        } else {
-          await showErrorPopup(context, error);
-        }
+        await _completeOAuthAfterRedirect();
       });
     }
   }
@@ -114,35 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (!_isLogin) {
-      final first = _nameCtrl.text.trim();
-      final last = _lastNameCtrl.text.trim();
-      final email = _emailCtrl.text.trim();
-      final password = _passwordCtrl.text;
-      final outcome = await Navigator.of(context).push<String>(
-        MaterialPageRoute(
-          builder: (_) => TermsAgreementScreen(
-            onAgree: () => ApiService.signup(
-              firstname: first,
-              lastname: last,
-              email: email,
-              password: password,
-            ),
-          ),
-        ),
-      );
-      if (!mounted || outcome == null) return;
-      if (outcome == 'confirm-email') {
-        setState(() => _isLogin = true);
-        await showAppDialog(
-          context,
-          'We sent a confirmation link to $email. Open it, then sign in.',
-        );
-        return;
-      }
-      if (outcome == 'ok' &&
-          (ApiService.userId != null || AuthService.isSignedIn)) {
-        await _finishAuth(firstRun: true);
-      }
+      await _handleEmailCreate();
       return;
     }
 
@@ -172,28 +138,166 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (error != null) {
+      if (ApiService.isInvalidCredentials(error)) {
+        final create = await _promptCreateAccount();
+        if (!mounted) return;
+        if (create) setState(() => _isLogin = false);
+        return;
+      }
       await showErrorPopup(context, error);
       return;
     }
 
     if (ApiService.userId != null || AuthService.isSignedIn) {
-      await _finishAuth(firstRun: !_isLogin);
+      await _finishAuth(firstRun: ApiService.needsAiTour);
     }
+  }
+
+  /// Create-account email: terms → signup. If the email already exists, sign in.
+  Future<void> _handleEmailCreate() async {
+    final first = _nameCtrl.text.trim();
+    final last = _lastNameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    final outcome = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => TermsAgreementScreen(
+          onAgree: () async {
+            final error = await ApiService.signup(
+              firstname: first,
+              lastname: last,
+              email: email,
+              password: password,
+            );
+            if (ApiService.isAlreadyRegistered(error)) {
+              final loginError = await ApiService.login(
+                email: email,
+                password: password,
+              );
+              if (loginError == null) return 'signed-in-existing';
+              return 'That email already has an account. Try signing in.';
+            }
+            return error;
+          },
+        ),
+      ),
+    );
+    if (!mounted || outcome == null) return;
+    if (outcome == 'confirm-email') {
+      setState(() => _isLogin = true);
+      await showAppDialog(
+        context,
+        'We sent a confirmation link to $email. Open it, then sign in.',
+      );
+      return;
+    }
+    if (outcome == 'signed-in-existing' &&
+        (ApiService.userId != null || AuthService.isSignedIn)) {
+      await _finishAuth(firstRun: ApiService.needsAiTour);
+      return;
+    }
+    if (outcome == 'ok' &&
+        (ApiService.userId != null || AuthService.isSignedIn)) {
+      await _finishAuth(firstRun: true);
+    }
+  }
+
+  Future<bool> _promptCreateAccount() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
+      builder: (dialogContext) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'No account found for that email, or the password is wrong. Create an account if you\'re new.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111827),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFF111827),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Create account',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _muted,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      child: const Text(
+                        'Try again',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    return result == true;
   }
 
   Future<void> _finishAuth({required bool firstRun}) async {
     if (_didRoute || !mounted) return;
     if (ApiService.userId == null && !AuthService.isSignedIn) return;
     _didRoute = true;
+    _oauthInFlight = false;
     await FirstRun.markSignedInBefore();
     if (!mounted) return;
 
     if (firstRun) {
-      await FirstRun.markTourPending();
+      await FirstRun.markTourPending(userId: ApiService.userId);
       if (!mounted) return;
+      final asked = await FirstRun.permissionsWereAsked();
+      if (!mounted) return;
+      final Widget next = asked
+          ? const MainShell(showAiTourOnStart: true)
+          : const AccessSetupScreen();
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const AccessSetupScreen(),
+          pageBuilder: (_, __, ___) => next,
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 280),
@@ -216,14 +320,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Google/Apple: OAuth first. Existing profile → sign in. New → terms, then
+  /// create profile and AI tour.
   Future<void> _oauth(OAuthProvider provider) async {
-    if (!_isLogin) {
-      final outcome = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => const TermsAgreementScreen()),
-      );
-      if (!mounted || outcome != 'ok') return;
-    }
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _oauthInFlight = true;
+    });
 
     final error = provider == OAuthProvider.google
         ? await AuthService.signInWithGoogle()
@@ -232,29 +335,70 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (error != null) {
+      _oauthInFlight = false;
       setState(() => _loading = false);
       await showErrorPopup(context, error);
       return;
     }
 
-    // Browser OAuth returns before the redirect finishes. A session that is
-    // already present (rare) can finish here; otherwise wait for auth state.
+    // Session already present (rare / native). Otherwise wait for redirect.
     if (AuthService.isSignedIn) {
-      final syncError = await ApiService.completeOAuthSession();
-      if (!mounted) return;
-      setState(() => _loading = false);
-      if (syncError != null && ApiService.userId == null) {
-        await showErrorPopup(context, syncError);
-        return;
-      }
-      await _finishAuth(firstRun: !_isLogin);
+      await _completeOAuthAfterRedirect();
       return;
     }
 
-    // Browser OAuth: keep spinner until onAuthStateChange fires (or timeout).
     Future<void>.delayed(const Duration(seconds: 90), () {
-      if (mounted && _loading) setState(() => _loading = false);
+      if (mounted && _loading && _oauthInFlight) {
+        _oauthInFlight = false;
+        setState(() => _loading = false);
+      }
     });
+  }
+
+  Future<void> _completeOAuthAfterRedirect() async {
+    if (_didRoute || !mounted) return;
+    setState(() => _loading = true);
+
+    // Look up profile without creating — new users must accept terms first.
+    final lookup = await ApiService.completeOAuthSession(createIfMissing: false);
+    if (!mounted) return;
+
+    if (lookup == 'user-not-found') {
+      setState(() => _loading = false);
+      final outcome = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (_) => TermsAgreementScreen(
+            onAgree: () =>
+                ApiService.completeOAuthSession(createIfMissing: true),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (outcome == 'ok' &&
+          (ApiService.userId != null || AuthService.isSignedIn)) {
+        await _finishAuth(firstRun: true);
+      } else {
+        _oauthInFlight = false;
+        // User backed out of terms — drop the orphan OAuth session.
+        await AuthService.signOut();
+        if (mounted) setState(() {});
+      }
+      return;
+    }
+
+    setState(() => _loading = false);
+
+    if (lookup != null && ApiService.userId == null) {
+      _oauthInFlight = false;
+      await showErrorPopup(context, lookup);
+      return;
+    }
+
+    if (ApiService.userId != null || AuthService.isSignedIn) {
+      await _finishAuth(firstRun: ApiService.needsAiTour);
+    } else {
+      _oauthInFlight = false;
+    }
   }
 
   @override

@@ -89,6 +89,21 @@ class ApiService {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  /// True when /auth/sync just created this profile row.
+  static bool get isNewUser => currentUser?['is_new_user'] == true;
+
+  /// Server flag; missing means unknown (do not force the tour).
+  static bool get aiTourCompleted {
+    final v = currentUser?['ai_tour_completed'];
+    return v is bool ? v : true;
+  }
+
+  static bool get needsAiTour {
+    final v = currentUser?['ai_tour_completed'];
+    if (v is bool) return !v;
+    return false;
+  }
+
   static String? get token {
     if (AuthService.isConfigured) {
       final supabaseToken = AuthService.accessToken;
@@ -204,10 +219,12 @@ class ApiService {
 
   /// Pulls the Supabase session into [currentUser] and ensures a matching
   /// row exists in the StreetSync API (`/auth/sync`).
-  /// Returns null on success, or an error message.
+  /// Returns null on success, `'user-not-found'` when [createIfMissing] is
+  /// false and no profile exists, or an error message.
   static Future<String?> syncFromSupabase({
     String? firstName,
     String? lastName,
+    bool createIfMissing = true,
   }) async {
     await AuthService.ensureFreshSession();
     final access = AuthService.accessToken;
@@ -232,11 +249,16 @@ class ApiService {
                 if (firstName != null && firstName.isNotEmpty)
                   'first_name': firstName,
                 if (lastName != null && lastName.isNotEmpty) 'last_name': lastName,
+                'create_if_missing': createIfMissing,
               }),
             )
             .timeout(const Duration(seconds: 12)),
       );
       if (response == null) return 'Not signed in';
+
+      if (response.statusCode == 404) {
+        return 'user-not-found';
+      }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -249,6 +271,10 @@ class ApiService {
       }
 
       // Soft-fallback so the app can still open if the API is down.
+      // Skip inventing a profile when the caller asked not to create one.
+      if (!createIfMissing) {
+        return _errorFromResponse(response, fallback: 'Could not sync profile');
+      }
       currentUser = {
         'access_token': AuthService.accessToken ?? access,
         'user_id': currentUser?['user_id'],
@@ -264,11 +290,16 @@ class ApiService {
         'picture': currentUser?['picture'] ??
             authUser.userMetadata?['avatar_url'] ??
             authUser.userMetadata?['picture'],
+        'ai_tour_completed': currentUser?['ai_tour_completed'] ?? true,
+        'is_new_user': false,
       };
       await _saveSession();
       return _errorFromResponse(response, fallback: 'Could not sync profile');
     } catch (e) {
       print('syncFromSupabase Error ($url): $e');
+      if (!createIfMissing) {
+        return 'Cannot reach API at $baseUrl. Is the server running?';
+      }
       currentUser = {
         'access_token': AuthService.accessToken ?? access,
         'user_id': currentUser?['user_id'],
@@ -277,6 +308,8 @@ class ApiService {
         'email': authUser.email,
         'picture': authUser.userMetadata?['avatar_url'] ??
             authUser.userMetadata?['picture'],
+        'ai_tour_completed': currentUser?['ai_tour_completed'] ?? true,
+        'is_new_user': false,
       };
       await _saveSession();
       return 'Cannot reach API at $baseUrl. Is the server running?';
@@ -537,7 +570,28 @@ class ApiService {
         (lower.contains('credential') || lower.contains('login'))) {
       return 'Email or password is incorrect.';
     }
+    if (lower.contains('already') &&
+        (lower.contains('registered') || lower.contains('exist'))) {
+      return 'Email already registered';
+    }
     return message;
+  }
+
+  static bool isInvalidCredentials(String? message) {
+    if (message == null) return false;
+    final lower = message.toLowerCase();
+    return lower.contains('incorrect') ||
+        (lower.contains('invalid') &&
+            (lower.contains('credential') || lower.contains('login')));
+  }
+
+  static bool isAlreadyRegistered(String? message) {
+    if (message == null) return false;
+    final lower = message.toLowerCase();
+    return lower.contains('already') &&
+        (lower.contains('registered') ||
+            lower.contains('exist') ||
+            lower.contains('in use'));
   }
 
   static String? _errorDetail(String body) {
@@ -553,13 +607,52 @@ class ApiService {
   }
 
   /// Completes an OAuth session (after deep link) and syncs the API profile.
-  static Future<String?> completeOAuthSession() async {
+  /// Pass [createIfMissing] false to detect a brand-new Google/Apple user
+  /// before terms agreement creates the profile.
+  static Future<String?> completeOAuthSession({
+    bool createIfMissing = true,
+  }) async {
     if (!AuthService.isSignedIn) return 'OAuth sign-in did not complete';
-    final syncError = await syncFromSupabase();
+    final syncError = await syncFromSupabase(createIfMissing: createIfMissing);
+    if (syncError == 'user-not-found') return syncError;
     if (syncError != null) {
       debugPrint('oauth profile sync: $syncError');
+      if (!createIfMissing) return syncError;
     }
     return null;
+  }
+
+  /// Persist that the home AI tour was finished or skipped.
+  static Future<void> markAiTourCompleted() async {
+    if (currentUser != null) {
+      currentUser = {...currentUser!, 'ai_tour_completed': true};
+      await _saveSession();
+    }
+    if (userId == null || token == null) return;
+    final url = Uri.parse('$baseUrl/auth/tour-complete');
+    try {
+      final response = await _authorized(
+        () => http
+            .post(
+              url,
+              headers: _headers,
+            )
+            .timeout(const Duration(seconds: 12)),
+      );
+      if (response == null) return;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        currentUser = {
+          ...?currentUser,
+          ...body,
+          'ai_tour_completed': true,
+          'access_token': token,
+        };
+        await _saveSession();
+      }
+    } catch (e) {
+      debugPrint('markAiTourCompleted: $e');
+    }
   }
 
   /// Uploads a profile photo to Supabase via the API.

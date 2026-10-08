@@ -18,6 +18,8 @@ class User(Base):
     ## Public Supabase Storage URL for profile avatar (nullable).
     picture: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     total_reports: Mapped[int] = mapped_column(Integer, default=0)
+    ## False until the home AI tour is finished or skipped.
+    ai_tour_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     reports: Mapped[List["Report"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",

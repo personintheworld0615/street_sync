@@ -178,16 +178,16 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
     final error = await create();
     if (!mounted) return;
     setState(() => _busy = false);
-    if (error == 'confirm-email') {
-      Navigator.of(context).pop('confirm-email');
+    if (error == null) {
+      Navigator.of(context).pop('ok');
       return;
     }
-    if (error != null) {
-      await showErrorPopup(context, error);
+    // Special outcomes the login screen handles (not plain errors).
+    if (error == 'confirm-email' || error == 'signed-in-existing') {
+      Navigator.of(context).pop(error);
       return;
     }
-    if (!mounted) return;
-    Navigator.of(context).pop('ok');
+    await showErrorPopup(context, error);
   }
 
   @override

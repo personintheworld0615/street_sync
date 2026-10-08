@@ -80,7 +80,11 @@ def _add_missing_columns(table: str, columns: list[tuple[str, str]]) -> None:
 
 _add_missing_columns(
     "users",
-    [("picture", "VARCHAR")],
+    [
+        ("picture", "VARCHAR"),
+        # Existing rows default true so upgrades do not replay the tour.
+        ("ai_tour_completed", "BOOLEAN DEFAULT TRUE"),
+    ],
 )
 _add_missing_columns(
     "reports",
