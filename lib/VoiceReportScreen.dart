@@ -362,16 +362,22 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
       if (!mounted) return;
 
+      final aiDescription =
+          (judgment.description != null && judgment.description!.isNotEmpty)
+              ? judgment.description!
+              : _transcript;
+
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ConfirmationVoiceReport(
             title: judgment.title.isNotEmpty ? judgment.title : _transcript,
-            description: _transcript,
+            description: aiDescription,
             location: location,
             latitude: lat ?? 0.0,
             longitude: lng ?? 0.0,
             category: judgment.category,
+            aiRationale: judgment.rationale,
             rawTranscript: _transcript,
           ),
         ),

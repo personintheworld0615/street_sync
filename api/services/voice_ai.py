@@ -1,3 +1,4 @@
+import json
 import os
 
 import httpx
@@ -97,21 +98,115 @@ def analyze_voice_report(description: str) -> ModelOutput:
         raise HTTPException(400, "Description required")
 
     category, emergency, needs_detail = _judge(text)
+    title, polished_description = _generate_ai_title_and_description(text)
     return ModelOutput(
-        title=_title_from(text),
-        description=text,
+        title=title,
+        description=polished_description,
         category=category,
         emergency=emergency,
         needs_detail=needs_detail,
     )
 
 
-def _title_from(text: str) -> str:
-    words = text.split()
+def _generate_ai_title_and_description(text: str) -> tuple[str, str]:
+    """Generates both a professional title and a polished description from raw speech transcript."""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if api_key:
+        try:
+            model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-lite-001")
+            response = httpx.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "https://streetsync.app"),
+                    "X-Title": os.getenv("OPENROUTER_APP_TITLE", "Street Sync"),
+                },
+                json={
+                    "model": model,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a civic infrastructure report assistant. Given a raw spoken transcript of a civic issue, "
+                                "return a JSON object with two fields:\n"
+                                "1. 'title': A short, title-cased, professional summary (3 to 6 words max, no quotation marks).\n"
+                                "2. 'description': A clear, concise, polished description (1 to 2 sentences) removing conversational filler "
+                                "(e.g., 'um', 'yeah', 'so I am walking') while preserving all factual details, locations, and numbers.\n"
+                                'JSON format: {"title": "...", "description": "..."}'
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": text,
+                        },
+                    ],
+                    "max_tokens": 120,
+                    "temperature": 0.2,
+                },
+                timeout=8,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices")
+                if isinstance(choices, list) and len(choices) > 0:
+                    raw_content = choices[0].get("message", {}).get("content", "").strip()
+                    if raw_content:
+                        try:
+                            parsed = json.loads(raw_content)
+                            ai_title = parsed.get("title", "").strip().strip('"\'')
+                            ai_desc = parsed.get("description", "").strip()
+                            if ai_title and ai_desc:
+                                return ai_title, ai_desc
+                        except Exception:
+                            pass
+        except Exception as err:
+            print(f"OpenRouter title & description generation error: {err}")
+
+    title = _smart_fallback_title(text)
+    desc = _smart_fallback_description(text)
+    return title, desc
+
+
+def _smart_fallback_description(text: str) -> str:
+    cleaned = text.strip()
+    prefixes = [
+        "there is a ", "there is ", "there's a ", "there's ", "i noticed a ", "i noticed ",
+        "i want to report a ", "i want to report ", "reporting a ", "reporting ",
+        "i see a ", "i see ", "hey ", "hi ", "please fix ", "can you fix "
+    ]
+    lowered = cleaned.lower()
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            lowered = cleaned.lower()
+            break
+
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned if cleaned else text
+
+
+def _smart_fallback_title(text: str) -> str:
+    cleaned = text.strip()
+    prefixes = [
+        "there is a ", "there is ", "there's a ", "there's ", "i noticed a ", "i noticed ",
+        "i want to report a ", "i want to report ", "reporting a ", "reporting ",
+        "i see a ", "i see ", "hey ", "hi ", "please fix ", "can you fix "
+    ]
+    lowered = cleaned.lower()
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            lowered = cleaned.lower()
+            break
+
+    words = cleaned.split()
     title = " ".join(words[:6]).strip()
-    if len(title) > 80:
-        title = title[:77].rstrip() + "..."
-    return title or "Report"
+    if len(title) > 60:
+        title = title[:57].rstrip() + "..."
+    return title.title() if title else "Civic Report"
 
 
 def _judge(text: str) -> tuple[str, bool, bool]:

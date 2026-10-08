@@ -10,12 +10,16 @@ class ReportJudgment {
     required this.emergency,
     required this.needsDetail,
     required this.title,
+    this.description,
+    this.rationale,
   });
 
   final String? category;
   final bool emergency;
   final bool needsDetail;
   final String title;
+  final String? description;
+  final String? rationale;
 }
 
 /// Asks Jev about [description]. Returns null when the person should stay
@@ -58,6 +62,8 @@ Future<ReportJudgment?> reviewReportText(
     emergency: false,
     needsDetail: false,
     title: (result['title'] as String?)?.trim() ?? '',
+    description: (result['description'] as String?)?.trim(),
+    rationale: (result['rationale'] as String?)?.trim(),
   );
 }
 

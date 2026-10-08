@@ -383,7 +383,7 @@ class _ConfirmationVoiceReportState extends State<ConfirmationVoiceReport> {
   Widget _buildSummaryCard() {
     final rationale = widget.aiRationale?.trim();
     final raw = widget.rawTranscript?.trim();
-    final showRaw = raw != null && raw.isNotEmpty && raw != _description.trim();
+    final showRaw = raw != null && raw.isNotEmpty;
 
     return Card(
       elevation: 2,
