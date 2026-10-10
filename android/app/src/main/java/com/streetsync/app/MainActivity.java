@@ -1,4 +1,4 @@
-package com.example.street_sync;
+package com.streetsync.app;
 
 import io.flutter.embedding.android.FlutterActivity;
 

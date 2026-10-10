@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Deep link Supabase sends the session back to. Same scheme on iOS and Android.
-const kAuthRedirectUrl = 'com.example.streetsync://login-callback';
+const kAuthRedirectUrl = 'com.streetsync.app://login-callback';
 
 /// Returned by [AuthService.signUp] when the project requires an email link
 /// before a session exists.

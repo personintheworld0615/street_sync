@@ -32,10 +32,10 @@
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLName</key>
-				<string>com.example.streetsync</string>
+				<string>com.streetsync.app</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>com.example.streetsync</string>
+					<string>com.streetsync.app</string>
 				</array>
 			</dict>
 			<dict>
