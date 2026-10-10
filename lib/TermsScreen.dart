@@ -68,53 +68,129 @@ class TermsScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
-          Text(
-            'Street Sync Terms',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 28,
-              fontWeight: FontWeight.w600,
-              color: _ink,
-              height: 1.15,
-              letterSpacing: -0.3,
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF111827).withValues(alpha: 0.04),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'Street Sync',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: const Color(0xFF4338CA),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Street Sync Terms',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: _ink,
+                    height: 1.15,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Last updated: September 28, 2026',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: _muted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'These terms are written in plain language for a student-made app. They are not a substitute for a lawyer’s review.',
+                  style: body,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Last updated: September 28, 2026',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: _muted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'These terms are written in plain language for a student-made app. They are not a substitute for a lawyer’s review.',
-            style: body,
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           for (final section in _sections) ...[
-            Text(
-              section.$1,
-              style: GoogleFonts.inter(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: _ink,
-                letterSpacing: -0.2,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    section.$1,
+                    style: GoogleFonts.inter(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: _ink,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(section.$2, style: body),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(section.$2, style: body),
-            const SizedBox(height: 22),
           ],
-          Text(
-            'Questions: $contactEmail',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              height: 1.5,
-              color: _muted,
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Questions',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Questions: $contactEmail',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: _muted,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -219,102 +295,168 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
           Expanded(
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                Text(
-                  'Read this before your account is created',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
-                    color: _ink,
-                    height: 1.15,
-                    letterSpacing: -0.3,
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF111827).withValues(alpha: 0.04),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Before you continue',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: const Color(0xFF4338CA),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Read this before your account is created',
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          color: _ink,
+                          height: 1.15,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nothing is created until you scroll to the end and agree.',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: _muted,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Nothing is created until you scroll to the end and agree.',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
                   'These terms are written in plain language for a student-made app. They are not a substitute for a lawyer’s review.',
                   style: body,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 for (final section in TermsScreen._sections) ...[
-                  Text(
-                    section.$1,
-                    style: GoogleFonts.inter(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: _ink,
-                      letterSpacing: -0.2,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          section.$1,
+                          style: GoogleFonts.inter(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: _ink,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(section.$2, style: body),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(section.$2, style: body),
-                  const SizedBox(height: 22),
                 ],
-                Text(
-                  'Privacy',
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
-                    letterSpacing: -0.2,
+                Container(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'StreetSync stores the name and email on your account, and the reports you send, including photos and location. You can read the full policy before you agree.',
-                  style: body,
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const PrivacyPolicyScreen(),
-                              ),
-                            );
-                          },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      foregroundColor: _ink,
-                    ),
-                    child: const Text(
-                      'Privacy Policy',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.underline,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Privacy',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: _ink,
+                          letterSpacing: -0.2,
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'By agreeing you confirm you are 13 or older.',
-                  style: body,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Questions: ${TermsScreen.contactEmail}',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: _muted,
+                      const SizedBox(height: 8),
+                      Text(
+                        'StreetSync stores the name and email on your account, and the reports you send, including photos and location. You can read the full policy before you agree.',
+                        style: body,
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const PrivacyPolicyScreen(),
+                                    ),
+                                  );
+                                },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: _ink,
+                          ),
+                          child: const Text(
+                            'Privacy Policy',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'By agreeing you confirm you are 13 or older.',
+                        style: body,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Questions: ${TermsScreen.contactEmail}',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: _muted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -322,14 +464,21 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
           ),
           Container(
             padding: EdgeInsets.fromLTRB(
-              24,
+              20,
               12,
-              24,
+              20,
               16 + MediaQuery.paddingOf(context).bottom,
             ),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: _pageBg,
               border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF111827).withValues(alpha: 0.04),
+                  blurRadius: 18,
+                  offset: const Offset(0, -6),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
