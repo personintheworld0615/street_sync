@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (ApiService.userId != null || AuthService.isSignedIn) {
+    if (ApiService.userId != null) {
       await _finishAuth(firstRun: ApiService.needsAiTour);
     }
   }
@@ -191,14 +191,14 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-    if (outcome == 'signed-in-existing' &&
-        (ApiService.userId != null || AuthService.isSignedIn)) {
+    if (outcome == 'signed-in-existing' && ApiService.userId != null) {
       await _finishAuth(firstRun: ApiService.needsAiTour);
       return;
     }
-    if (outcome == 'ok' &&
-        (ApiService.userId != null || AuthService.isSignedIn)) {
+    if (outcome == 'ok' && ApiService.userId != null) {
       await _finishAuth(firstRun: true);
+    } else if (outcome != 'ok' && outcome != 'signed-in-existing') {
+      await showErrorPopup(context, outcome);
     }
   }
 
@@ -281,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _finishAuth({required bool firstRun}) async {
     if (_didRoute || !mounted) return;
-    if (ApiService.userId == null && !AuthService.isSignedIn) return;
+    if (ApiService.userId == null) return;
     _didRoute = true;
     _oauthInFlight = false;
     await FirstRun.markSignedInBefore();
@@ -347,10 +347,14 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    Future<void>.delayed(const Duration(seconds: 90), () {
+    Future<void>.delayed(const Duration(seconds: 45), () async {
       if (mounted && _loading && _oauthInFlight) {
         _oauthInFlight = false;
         setState(() => _loading = false);
+        await showErrorPopup(
+          context,
+          'Sign-in took too long. Close the browser and try again.',
+        );
       }
     });
   }
@@ -374,14 +378,18 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
       if (!mounted) return;
-      if (outcome == 'ok' &&
-          (ApiService.userId != null || AuthService.isSignedIn)) {
+      if (outcome == 'ok' && ApiService.userId != null) {
         await _finishAuth(firstRun: true);
       } else {
         _oauthInFlight = false;
         // User backed out of terms — drop the orphan OAuth session.
         await AuthService.signOut();
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() => _loading = false);
+          if (outcome != null && outcome != 'ok') {
+            await showErrorPopup(context, outcome);
+          }
+        }
       }
       return;
     }
@@ -394,10 +402,14 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (ApiService.userId != null || AuthService.isSignedIn) {
+    if (ApiService.userId != null) {
       await _finishAuth(firstRun: ApiService.needsAiTour);
     } else {
       _oauthInFlight = false;
+      await showErrorPopup(
+        context,
+        'Could not finish sign-in. Try again.',
+      );
     }
   }
 

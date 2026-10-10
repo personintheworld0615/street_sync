@@ -25,7 +25,11 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Startup init error: $e');
   }
-  await LiquidGlassWidgets.initialize();
+  try {
+    await LiquidGlassWidgets.initialize();
+  } catch (e) {
+    debugPrint('LiquidGlass init error: $e');
+  }
   runApp(
     LiquidGlassWidgets.wrap(
       child: const StreetSyncApp(),

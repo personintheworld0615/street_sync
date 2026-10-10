@@ -121,17 +121,30 @@ class ApiService {
   static Future<void> loadSession() async {
     if (AuthService.isConfigured) {
       final fresh = await AuthService.ensureFreshSession();
-      if (fresh) {
-        final error = await syncFromSupabase();
-        if (error == null) return;
-        print('loadSession sync error: $error');
-        // Soft-fallback in syncFromSupabase may still have set currentUser.
-        if (userId != null) return;
+      if (!fresh) {
+        currentUser = null;
+        await _saveSession();
+        return;
       }
 
-      // Supabase is on — don't resurrect a legacy session token.
+      final error = await syncFromSupabase();
+      if (error == null || userId != null) return;
+
+      print('loadSession sync error: $error');
+      // API is down or slow — keep a previously cached profile so the app
+      // still opens instead of landing in MainShell with no user_id.
+      final cached = await _readCachedProfile();
+      if (cached != null) {
+        currentUser = {
+          ...cached,
+          'access_token': AuthService.accessToken ?? cached['access_token'],
+        };
+        return;
+      }
+
+      // Signed into Supabase but no profile we can use — clear so Welcome
+      // routes to login instead of a half-broken shell.
       currentUser = null;
-      await _saveSession();
       return;
     }
 
@@ -144,6 +157,21 @@ class ApiService {
       print('loadSession Error: $e');
       currentUser = null;
       await _saveSession();
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _readCachedProfile() async {
+    final raw = await _readSessionRaw();
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      final map = Map<String, dynamic>.from(decoded);
+      final id = map['user_id'];
+      if (id is! int && id is! num) return null;
+      return map;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -252,7 +280,8 @@ class ApiService {
                 'create_if_missing': createIfMissing,
               }),
             )
-            .timeout(const Duration(seconds: 12)),
+            // Render free tier can cold-start for ~20–30s.
+            .timeout(const Duration(seconds: 25)),
       );
       if (response == null) return 'Not signed in';
 
@@ -540,10 +569,12 @@ class ApiService {
       firstName: firstname,
       lastName: lastname,
     );
+    if (userId != null) return null;
     if (syncError != null) {
       debugPrint('signup profile sync: $syncError');
+      return syncError;
     }
-    return null;
+    return 'Could not create your profile. Try again.';
   }
 
   /// Email/password login via Supabase Auth, then profile sync with the API.
@@ -558,10 +589,12 @@ class ApiService {
     }
     if (error != null) return _friendlyAuthMessage(error);
     final syncError = await syncFromSupabase();
+    if (userId != null) return null;
     if (syncError != null) {
       debugPrint('login profile sync: $syncError');
+      return syncError;
     }
-    return null;
+    return 'Could not load your profile. Try again.';
   }
 
   static String _friendlyAuthMessage(String message) {
@@ -1189,7 +1222,9 @@ class ApiService {
     final url = Uri.parse('$baseUrl/updates?amount=$amount');
     try {
       final response = await _authorized(
-        () => http.get(url, headers: _headers),
+        () => http
+            .get(url, headers: _headers)
+            .timeout(const Duration(seconds: 10)),
       );
       if (response == null) return null;
       if (response.statusCode == 200) {

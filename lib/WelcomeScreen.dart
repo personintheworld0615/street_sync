@@ -37,7 +37,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _bootstrap();
   }
 
-  bool get _isSignedIn => ApiService.userId != null || AuthService.isSignedIn;
+  /// Need a real API profile — a bare Supabase session is not enough to open
+  /// the shell (feeds, submit, profile all need user_id).
+  bool get _isSignedIn => ApiService.userId != null;
 
   Future<void> _bootstrap() async {
     var ready = false;
@@ -46,6 +48,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (!ready && mounted) setState(() => _showWait = true);
     await init;
     if (!mounted) return;
+
+    // Orphan OAuth/email session with no profile → force a clean login.
+    if (!_isSignedIn && AuthService.isSignedIn) {
+      await AuthService.signOut();
+    }
 
     final Widget next;
     if (_isSignedIn) {
@@ -79,8 +86,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       if (dotenv.env.isEmpty) {
         await dotenv.load(fileName: 'assets/.env', isOptional: true);
       }
-      await AuthService.initialize();
-      await ApiService.loadSession();
+      // main() already ran Auth + loadSession; only fill gaps (hot restart).
+      if (!AuthService.isConfigured) {
+        await AuthService.initialize();
+      }
+      if (ApiService.userId == null && AuthService.isSignedIn) {
+        await ApiService.loadSession();
+      } else if (!AuthService.isConfigured) {
+        await ApiService.loadSession();
+      }
     } catch (e) {
       debugPrint('Init error: $e');
     }

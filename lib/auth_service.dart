@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -69,18 +71,22 @@ class AuthService {
   }) async {
     if (!isConfigured) return 'Supabase not configured.';
     try {
-      final res = await auth.signUp(
-        email: email,
-        password: password,
-        data: {'first_name': firstName, 'last_name': lastName},
-        emailRedirectTo: kAuthRedirectUrl,
-      );
+      final res = await auth
+          .signUp(
+            email: email,
+            password: password,
+            data: {'first_name': firstName, 'last_name': lastName},
+            emailRedirectTo: kAuthRedirectUrl,
+          )
+          .timeout(const Duration(seconds: 20));
       if (res.session == null && res.user != null) {
         return kEmailConfirmPending;
       }
       return null;
     } on AuthException catch (e) {
       return e.message;
+    } on TimeoutException {
+      return 'Sign up timed out. Check your connection and try again.';
     } catch (e) {
       return 'Sign up failed: $e';
     }
@@ -92,10 +98,14 @@ class AuthService {
   }) async {
     if (!isConfigured) return 'Supabase not configured.';
     try {
-      await auth.signInWithPassword(email: email, password: password);
+      await auth
+          .signInWithPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 20));
       return null;
     } on AuthException catch (e) {
       return e.message;
+    } on TimeoutException {
+      return 'Sign-in timed out. Check your connection and try again.';
     } catch (e) {
       return 'Login failed: $e';
     }
@@ -156,7 +166,9 @@ class AuthService {
   static Future<bool> refreshSession() async {
     if (!isConfigured) return false;
     try {
-      final result = await auth.refreshSession();
+      final result = await auth
+          .refreshSession()
+          .timeout(const Duration(seconds: 15));
       return result.session != null;
     } catch (_) {
       return false;
