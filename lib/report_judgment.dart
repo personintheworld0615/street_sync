@@ -46,12 +46,13 @@ Future<ReportJudgment?> reviewReportText(
   try {
     result = await ApiService.analyzeVoiceReport(description, rewrite: rewrite);
   } catch (e) {
-    return ReportJudgment(
-      category: null,
-      emergency: false,
-      needsDetail: false,
-      title: '',
-    );
+    if (context.mounted) {
+      await showErrorPopup(
+        context,
+        'Could not check your report. Check your connection and try again.',
+      );
+    }
+    return null;
   }
   if (!context.mounted) return null;
 

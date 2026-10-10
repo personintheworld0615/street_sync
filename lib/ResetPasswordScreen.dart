@@ -55,8 +55,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
 
-    if (syncError != null) {
-      await showErrorPopup(context, syncError);
+    if (ApiService.userId == null) {
+      await showErrorPopup(
+        context,
+        syncError ?? 'Could not load your profile. Sign in again.',
+      );
       return;
     }
 

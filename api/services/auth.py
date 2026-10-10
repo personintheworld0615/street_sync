@@ -218,37 +218,6 @@ def admin_find_user_id_by_email(email: str) -> str | None:
     return None
 
 
-def send_signup_confirmation_email(email: str) -> bool:
-    """Ask Supabase to email a signup confirmation link. False if it did not send."""
-    if not SUPABASE_URL or not _supabase_apikey():
-        return False
-    body = json.dumps(
-        {
-            "type": "signup",
-            "email": email.strip().lower(),
-            "options": {"email_redirect_to": "com.streetsync.mobile://login-callback"},
-        }
-    ).encode("utf-8")
-    req = urllib.request.Request(
-        f"{SUPABASE_URL}/auth/v1/resend",
-        data=body,
-        headers={
-            "apikey": _supabase_apikey(),
-            "Authorization": f"Bearer {_supabase_apikey()}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return resp.status < 400
-    except urllib.error.HTTPError:
-        return False
-    except Exception as exc:
-        print(f"send_signup_confirmation_email failed: {exc}")
-        return False
-
-
 def admin_create_confirmed_user(
     *,
     email: str,
@@ -257,7 +226,7 @@ def admin_create_confirmed_user(
     last_name: str,
     email_confirm: bool = True,
 ) -> dict[str, Any]:
-    """Create a Supabase Auth user. Signup passes email_confirm=False so a confirmation email can be sent."""
+    """Create a Supabase Auth user. Signup uses email_confirm=True (no confirmation email)."""
     status_code, payload = _supabase_admin_request(
         "POST",
         "/admin/users",
@@ -510,6 +479,11 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
+    """Resolve the StreetSync profile for a token.
+
+    The local users table is the source of truth. A bare Supabase Auth session
+    (e.g. Google before terms) must NOT auto-create a profile row here.
+    """
     token = credentials.credentials
 
     legacy = _user_from_legacy_jwt(token, db)
@@ -517,7 +491,11 @@ def get_current_user(
         return legacy
 
     sb_user = fetch_supabase_user(token)
-    user, _created = upsert_user_from_supabase(db, sb_user)
+    user, _created = upsert_user_from_supabase(
+        db,
+        sb_user,
+        create_if_missing=False,
+    )
     return user
 
 

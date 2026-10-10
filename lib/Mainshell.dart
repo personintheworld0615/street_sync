@@ -70,22 +70,38 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void dispose() {
     UpdateAlerts.notice.removeListener(_onUpdateNotice);
     WidgetsBinding.instance.removeObserver(this);
-    UpdateAlerts.stop();
+    UpdateAlerts.reset();
     super.dispose();
   }
 
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+
   void _onUpdateNotice() {
-    if (!mounted || UpdateAlerts.unseen.value == 0 || _index == 2) return;
+    if (!mounted ||
+        _lifecycle != AppLifecycleState.resumed ||
+        UpdateAlerts.unseen.value == 0 ||
+        _index == 2) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _index == 2) return;
+      if (!mounted ||
+          _lifecycle != AppLifecycleState.resumed ||
+          _index == 2) {
+        return;
+      }
       showAppDialog(context, 'You got an update. Check the updates tab.');
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    // Background/kill: stop polling so native plugins aren't hit mid-teardown.
     if (state == AppLifecycleState.resumed) {
+      UpdateAlerts.start();
       UpdateAlerts.poll();
+    } else {
+      UpdateAlerts.stop();
     }
   }
 

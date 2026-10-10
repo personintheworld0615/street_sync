@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:street_sync/LoginScreen.dart';
 import 'package:street_sync/ResetPasswordScreen.dart';
 import 'package:street_sync/WelcomeScreen.dart';
@@ -25,18 +24,7 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Startup init error: $e');
   }
-  try {
-    await LiquidGlassWidgets.initialize();
-  } catch (e) {
-    debugPrint('LiquidGlass init error: $e');
-  }
-  runApp(
-    LiquidGlassWidgets.wrap(
-      child: const StreetSyncApp(),
-      adaptiveQuality: true,
-      brightnessResolver: Theme.maybeBrightnessOf,
-    ),
-  );
+  runApp(const StreetSyncApp());
 }
 
 class StreetSyncApp extends StatefulWidget {
@@ -72,13 +60,21 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
     _listening = true;
     _authSub = AuthService.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.passwordRecovery) {
-        _navKey.currentState?.push(
+        final nav = _navKey.currentState;
+        if (nav == null) return;
+        // Replace stack so repeated deep links don't stack reset screens.
+        nav.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+          (_) => false,
         );
         return;
       }
       if (data.event == AuthChangeEvent.signedOut) {
+        // Only hard-reset the stack when we were actually in the app.
+        // Orphan/local sign-outs on Welcome/Login (no profile yet) keep their UI.
+        final wasInApp = ApiService.userId != null;
         ApiService.currentUser = null;
+        if (!wasInApp) return;
         _navKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
           (_) => false,

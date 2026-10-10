@@ -10,6 +10,7 @@ import 'config.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/error_popup.dart';
@@ -28,6 +29,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
   static const _cta = Color(0xFF111827);
+  static const _warn = Color(0xFFD32F2F);
   static const _defaultLatLng = LatLng(40.3334, -74.6004); // Plainsboro, NJ
 
   final _locationKey = GlobalKey();
@@ -41,12 +43,17 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   bool _isRecording = false;
   bool _isSubmitting = false;
   bool _locationLoading = true;
+  /// null while unknown/loading; false outside Plainsboro.
+  bool? _inPlainsboro;
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
   String _locationLabel = 'Finding location…';
   double? _lat;
   double? _long;
   Future<void>? _locationFuture;
+
+  bool get _canSubmitLocation =>
+      !_locationLoading && _lat != null && _long != null && _inPlainsboro == true;
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
 
@@ -180,6 +187,17 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     super.dispose();
   }
 
+  Future<void> _setCoords(double lat, double lng, {bool updateUi = true}) async {
+    final label = await _shortLabelFromCoords(lat, lng);
+    final inTown = await isLocationInPlainsboro(lat, lng);
+    _lat = lat;
+    _long = lng;
+    _locationLabel = label;
+    _locationLoading = false;
+    _inPlainsboro = inTown;
+    if (updateUi && mounted) setState(() {});
+  }
+
   Future<void> _captureLocation({bool updateUi = false}) async {
     try {
       var permission = await Geolocator.requestPermission();
@@ -192,28 +210,19 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
           setState(() {
             _locationLoading = false;
             _locationLabel = 'Set location';
+            _inPlainsboro = false;
           });
         }
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
-      _lat = pos.latitude;
-      _long = pos.longitude;
-      final label = await _shortLabelFromCoords(pos.latitude, pos.longitude);
-      if (updateUi && mounted) {
-        setState(() {
-          _locationLoading = false;
-          _locationLabel = label;
-        });
-      } else {
-        _locationLabel = label;
-        _locationLoading = false;
-      }
+      await _setCoords(pos.latitude, pos.longitude, updateUi: updateUi);
     } catch (_) {
       if (updateUi && mounted) {
         setState(() {
           _locationLoading = false;
           _locationLabel = 'Set location';
+          _inPlainsboro = false;
         });
       }
     }
@@ -383,17 +392,7 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     );
 
     if (picked == null || !mounted) return;
-    final label = await _shortLabelFromCoords(
-      picked.latitude,
-      picked.longitude,
-    );
-    if (!mounted) return;
-    setState(() {
-      _lat = picked.latitude;
-      _long = picked.longitude;
-      _locationLabel = label;
-      _locationLoading = false;
-    });
+    await _setCoords(picked.latitude, picked.longitude);
   }
 
   Future<void> _goToConfirmation() async {
@@ -401,6 +400,15 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     setState(() => _isSubmitting = true);
     try {
       await _locationFuture;
+      if (!mounted) return;
+      if (!_canSubmitLocation) {
+        await showAppDialog(
+          context,
+          'Reports can only be submitted in Plainsboro. '
+          'Move the pin into Plainsboro to continue.',
+        );
+        return;
+      }
 
       final judgment = await reviewReportText(context, _transcript);
       if (!mounted || judgment == null) return;
@@ -580,6 +588,8 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   }
 
   Widget _buildLocationPill() {
+    final outside = !_locationLoading && _inPlainsboro == false;
+    final accent = outside ? _warn : _ink;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -588,14 +598,18 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.7),
+            color: outside
+                ? _warn.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(
+              color: outside ? _warn : const Color(0xFFE5E7EB),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.location_on_outlined, size: 16, color: _ink),
+              Icon(Icons.location_on_outlined, size: 16, color: accent),
               const SizedBox(width: 6),
               if (_locationLoading)
                 const SizedBox(
@@ -608,15 +622,30 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                 )
               else
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 200),
-                  child: Text(
-                    _locationLabel,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _ink,
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _locationLabel,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: accent,
+                          ),
+                        ),
+                        if (outside)
+                          const TextSpan(
+                            text: ' · Not in Plainsboro',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _warn,
+                            ),
+                          ),
+                      ],
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
             ],
@@ -823,13 +852,14 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
   }
 
   Widget _buildSubmitBar(double bottomInset) {
+    final blocked = !widget.isTour && !_canSubmitLocation;
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 8, 24, 16 + bottomInset),
       child: SizedBox(
         height: 52,
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _isSubmitting
+          onPressed: _isSubmitting || blocked
               ? null
               : widget.isTour
               ? _returnHomeFromTour
@@ -853,7 +883,9 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
                   ),
                 )
               : Text(
-                  widget.isTour ? 'Submit Report' : 'Continue',
+                  blocked
+                      ? 'Not in Plainsboro'
+                      : (widget.isTour ? 'Submit Report' : 'Continue'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

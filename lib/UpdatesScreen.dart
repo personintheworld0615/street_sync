@@ -72,11 +72,32 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 
   Future<void> _load({bool quiet = false}) async {
-    if (!quiet) setState(() => _loading = true);
+    if (!mounted) return;
+
+    if (!quiet) {
+      final cached = await ApiService.getCachedUpdates();
+      if (!mounted) return;
+      if (cached != null) {
+        setState(() {
+          _updates = cached
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          _loading = false;
+        });
+      } else {
+        setState(() => _loading = true);
+      }
+    }
+
     final raw = await ApiService.getUpdates();
     if (!mounted) return;
+    if (raw == null) {
+      if (!quiet && _updates.isEmpty) setState(() => _loading = false);
+      return;
+    }
     setState(() {
-      _updates = (raw ?? [])
+      _updates = raw
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();

@@ -1,5 +1,29 @@
 import 'package:geocoding/geocoding.dart';
 
+/// StreetSync only accepts reports inside Plainsboro Township, NJ.
+bool looksLikePlainsboro(String? value) {
+  if (value == null) return false;
+  return value.toLowerCase().contains('plainsboro');
+}
+
+bool isPlainsboroPlacemark(Placemark place) {
+  return looksLikePlainsboro(place.locality) ||
+      looksLikePlainsboro(place.subLocality) ||
+      looksLikePlainsboro(place.subAdministrativeArea) ||
+      looksLikePlainsboro(place.name);
+}
+
+/// Reverse-geocode [latitude]/[longitude] and check township name.
+Future<bool> isLocationInPlainsboro(double latitude, double longitude) async {
+  try {
+    final places = await placemarkFromCoordinates(latitude, longitude);
+    if (places.isEmpty) return false;
+    return isPlainsboroPlacemark(places.first);
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Reverse-geocodes coordinates into a readable address (street + city).
 Future<String> translateLocation(
   double latitude,

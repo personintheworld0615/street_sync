@@ -33,6 +33,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF757575);
   static const _cta = Color(0xFF111827);
+  static const _warn = Color(0xFFD32F2F);
   static const _fieldBorder = Color(0xFFE5E7EB);
   final ImagePicker _picker = ImagePicker();
   XFile? _image;
@@ -53,12 +54,16 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   bool _speechReady = false;
   bool _isRecording = false;
   bool _locationLoading = true;
+  /// null while unknown/loading; false outside Plainsboro.
+  bool? _inPlainsboro;
   String _locationLabel = 'Finding location…';
   String _statusText = 'Tap the microphone to start recording';
   String _transcript = '';
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
   bool get _busy => _submitting || _savingDraft;
+  bool get _canSubmitLocation =>
+      !_locationLoading && _markers.isNotEmpty && _inPlainsboro == true;
 
   @override
   void dispose() {
@@ -262,6 +267,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   }
 
   Widget _buildLocationPill() {
+    final outside = !_locationLoading && _inPlainsboro == false;
+    final accent = outside ? _warn : _ink;
     return Center(
       child: Material(
         color: Colors.transparent,
@@ -271,17 +278,19 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: outside
+                  ? _warn.withValues(alpha: 0.08)
+                  : Colors.white.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: _fieldBorder),
+              border: Border.all(color: outside ? _warn : _fieldBorder),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.location_on_outlined,
                   size: 16,
-                  color: _ink,
+                  color: accent,
                 ),
                 const SizedBox(width: 6),
                 if (_locationLoading)
@@ -296,14 +305,29 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 else
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 280),
-                    child: Text(
-                      _locationLabel,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _ink,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _locationLabel,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: accent,
+                            ),
+                          ),
+                          if (outside)
+                            const TextSpan(
+                              text: ' · Not in Plainsboro',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _warn,
+                              ),
+                            ),
+                        ],
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
               ],
@@ -316,6 +340,8 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
   Future<void> _applyPickedLocation(LatLng latLng) async {
     final label = await translateLocation(latLng.latitude, latLng.longitude);
+    final inTown =
+        await isLocationInPlainsboro(latLng.latitude, latLng.longitude);
     if (!mounted) return;
     setState(() {
       position = latLng;
@@ -325,6 +351,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
       _ready = true;
       _locationLoading = false;
       _locationLabel = label;
+      _inPlainsboro = inTown;
     });
     await _controller?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
   }
@@ -731,42 +758,51 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
     try {
       final userLocation = await Geolocator.getCurrentPosition();
       final userLatLng = LatLng(userLocation.latitude, userLocation.longitude);
-      final label = await translateLocation(
-        userLatLng.latitude,
-        userLatLng.longitude,
-      );
-      if (!mounted) return;
-      setState(() {
-         position = userLatLng;
-         _markers = {
-           Marker(
-             markerId: const MarkerId('report'),
-             position: userLatLng,
-           ),
-         };
-         _ready = true;
-         _locationLoading = false;
-         _locationLabel = label;
-      });
-      await _controller?.animateCamera(CameraUpdate.newLatLngZoom(position,15));
+      await _applyPickedLocation(userLatLng);
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _locationLoading = false;
         _locationLabel = 'Set location';
+        _inPlainsboro = false;
       });
     }
   }
 
   Widget _buildLocationCard(){
-    return _section(
+    final outside = !_locationLoading && _inPlainsboro == false;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: outside ? _warn.withValues(alpha: 0.06) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: outside ? _warn : _fieldBorder, width: outside ? 1.5 : 1),
+      ),
       child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.grey[800])),
-          SizedBox(height: 10,),
+          Text(
+            'Location',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: outside ? _warn : Colors.grey[800],
+            ),
+          ),
+          if (outside) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Not in Plainsboro — cannot submit',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _warn,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
           SizedBox(
             height: 220,
             child: ClipRRect(
@@ -803,7 +839,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
           ),
         ],
       ),
-    )
+    ),
     );
   }
 
@@ -1407,6 +1443,13 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
 
   Future<void> _submitDirectly() async {
     if (_busy) return;
+    if (!_canSubmitLocation) {
+      showAppDialog(
+        context,
+        'Not in Plainsboro — cannot submit.',
+      );
+      return;
+    }
     setState(() => _submitting = true);
 
     String location = 'Location not set';
@@ -1522,6 +1565,15 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 return;
               }
 
+              if (!_canSubmitLocation) {
+                showAppDialog(
+                  context,
+                  'Not in Plainsboro — cannot submit. '
+                  'Move the pin into Plainsboro to continue.',
+                );
+                return;
+              }
+
               final described = _reportMode == 'voice' && _transcript.trim().isNotEmpty
                   ? _transcript.trim()
                   : _descriptionController.text.trim();
@@ -1618,7 +1670,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
               height: 52,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _busy ? _cta.withValues(alpha: 0.45) : _cta,
+                color: (_busy || !_canSubmitLocation)
+                    ? _cta.withValues(alpha: 0.45)
+                    : _cta,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: _submitting
@@ -1631,7 +1685,9 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                       ),
                     )
                   : Text(
-                      _reportMode == 'manual' ? 'Submit' : 'Review',
+                      !_canSubmitLocation
+                          ? 'Not in Plainsboro'
+                          : (_reportMode == 'manual' ? 'Submit' : 'Review'),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

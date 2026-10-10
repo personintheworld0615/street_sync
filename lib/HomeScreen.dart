@@ -164,11 +164,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadReports({bool forceNetwork = false}) async {
+    final gen = ++_loadGen;
+    final selected = _selectedCat;
+
     if (!forceNetwork) {
       await _paintCachedFeed();
     }
+    if (!mounted || gen != _loadGen) return;
 
-    final selected = _selectedCat;
     final results = await Future.wait([
       ApiService.getReportsFeed(
         amount: _pageSize + 1,
@@ -180,13 +183,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final raw = results[0] as List<dynamic>?;
     final stats = results[1] as Map<String, int>?;
 
-    if (!mounted) return;
+    if (!mounted || gen != _loadGen) return;
     if (selected != _selectedCat) return;
 
     if (raw != null) {
       final page = ApiService.trimFeedPage(raw, _pageSize);
       await _persistFeed(selected, page.items, page.hasMore);
-      if (!mounted || selected != _selectedCat) return;
+      if (!mounted || gen != _loadGen || selected != _selectedCat) return;
       setState(() {
         _recentReports = page.items;
         _hasMore = page.hasMore;
@@ -197,9 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         _isLoading = false;
       });
-      return;
-    }
-    if (mounted && selected == _selectedCat) {
+    } else if (mounted && selected == _selectedCat) {
       setState(() {
         if (stats != null) {
           _nearbyCount = stats['nearby'] ?? 0;
@@ -209,6 +210,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     }
+
+    // Same warm path as pull-to-refresh: visible tab first, then the rest.
+    if (!mounted || gen != _loadGen) return;
+    unawaited(_warmSecondaryCaches(gen: gen, skipCategory: selected));
   }
 
   Future<void> _loadMore() async {
@@ -311,10 +316,35 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted || gen != _loadGen) return;
     await _loadLocation(forceRefresh: true);
     if (!mounted || gen != _loadGen) return;
-    unawaited(_prefetchOtherCategoryFeeds(
-      gen: gen,
-      skipCategory: activeCat,
-    ));
+    unawaited(_warmSecondaryCaches(gen: gen, skipCategory: activeCat));
+  }
+
+  /// After the visible home feed is on screen/cached, warm everything else
+  /// in the background (other categories, stat lists, updates, profile).
+  Future<void> _warmSecondaryCaches({
+    required int gen,
+    required String? skipCategory,
+  }) async {
+    await _prefetchOtherCategoryFeeds(gen: gen, skipCategory: skipCategory);
+    if (gen != _loadGen) return;
+
+    await Future.wait([
+      ApiService.getReportsByFilter('nearby'),
+      ApiService.getReportsByFilter('in_progress'),
+      ApiService.getReportsByFilter('resolved'),
+    ]);
+    if (gen != _loadGen) return;
+
+    final userId = ApiService.userId;
+    if (userId != null) {
+      await Future.wait([
+        ApiService.getDraftReports(userId),
+        ApiService.getSubmittedReports(userId),
+      ]);
+    }
+    if (gen != _loadGen) return;
+
+    await ApiService.getUpdates();
   }
 
   Future<void> _prefetchOtherCategoryFeeds({

@@ -44,14 +44,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _bootstrap() async {
     var ready = false;
     final init = _ensureInitialized().whenComplete(() => ready = true);
-    await Future<void>.delayed(_hold);
-    if (!ready && mounted) setState(() => _showWait = true);
+    // Brand hold for login path only — returning users go straight in.
+    if (!_isSignedIn) {
+      await Future<void>.delayed(_hold);
+      if (!ready && mounted) setState(() => _showWait = true);
+    }
     await init;
     if (!mounted) return;
 
-    // Orphan OAuth/email session with no profile → force a clean login.
+    // Orphan OAuth/email session with no profile → delete Auth + clean login.
+    var incompleteSignup = ApiService.clearedIncompleteSignup;
+    ApiService.clearedIncompleteSignup = false;
     if (!_isSignedIn && AuthService.isSignedIn) {
-      await AuthService.signOut();
+      await ApiService.abandonSignup();
+      incompleteSignup = true;
     }
 
     final Widget next;
@@ -68,7 +74,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     } else {
       final returning = await FirstRun.hasSignedInBefore();
       if (!mounted) return;
-      next = LoginScreen(startAsCreateAccount: !returning);
+      next = LoginScreen(
+        startAsCreateAccount: !returning,
+        startupNotice: incompleteSignup
+            ? 'You signed in but did not accept the Terms yet. '
+                'Sign in again and accept them to finish creating your account.'
+            : null,
+      );
     }
 
     Navigator.of(context).pushReplacement(

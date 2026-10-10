@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:street_sync/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io' show File, Platform;
 
 class ApiService {
@@ -20,6 +21,7 @@ class ApiService {
   static const _cacheTopUsers = 'cache_top_users';
   static const _cacheUserScopedId = 'cache_user_scoped_id';
   static const _cacheFilterReports = 'cache_filter_reports';
+  static const _cacheUpdates = 'cache_updates';
   static const filterCacheTtl = Duration(minutes: 3);
 
   /// Set when [submitReport] returns false. Cleared at the start of each submit.
@@ -118,6 +120,10 @@ class ApiService {
     await _saveSession();
   }
 
+  /// Set when startup clears an Auth session that never finished Terms.
+  /// Welcome/Login read this once to show a short notice.
+  static bool clearedIncompleteSignup = false;
+
   static Future<void> loadSession() async {
     if (AuthService.isConfigured) {
       final fresh = await AuthService.ensureFreshSession();
@@ -127,8 +133,17 @@ class ApiService {
         return;
       }
 
-      final error = await syncFromSupabase();
+      // Never create a StreetSync profile on cold start — that skips Terms.
+      final error = await syncFromSupabase(createIfMissing: false);
       if (error == null || userId != null) return;
+
+      if (error == 'user-not-found') {
+        // Google/Apple Auth exists but Terms were never accepted. Delete the
+        // orphan Auth row so the next sign-in can start clean.
+        await abandonSignup();
+        clearedIncompleteSignup = true;
+        return;
+      }
 
       print('loadSession sync error: $error');
       // API is down or slow — keep a previously cached profile so the app
@@ -299,50 +314,66 @@ class ApiService {
         return null;
       }
 
-      // Soft-fallback so the app can still open if the API is down.
-      // Skip inventing a profile when the caller asked not to create one.
+      // Soft-fallback only when we already have a real user_id (prior session).
+      // Never invent a profile without one — that opens a broken shell.
       if (!createIfMissing) {
         return _errorFromResponse(response, fallback: 'Could not sync profile');
       }
-      currentUser = {
-        'access_token': AuthService.accessToken ?? access,
-        'user_id': currentUser?['user_id'],
-        'first_name': firstName ??
-            AuthService.firstNameFromUser ??
-            currentUser?['first_name'] ??
-            'Citizen',
-        'last_name': lastName ??
-            AuthService.lastNameFromUser ??
-            currentUser?['last_name'] ??
-            '',
-        'email': authUser.email,
-        'picture': currentUser?['picture'] ??
-            authUser.userMetadata?['avatar_url'] ??
-            authUser.userMetadata?['picture'],
-        'ai_tour_completed': currentUser?['ai_tour_completed'] ?? true,
-        'is_new_user': false,
-      };
-      await _saveSession();
-      return _errorFromResponse(response, fallback: 'Could not sync profile');
+      return await _softFallbackProfile(
+        access: access,
+        authUser: authUser,
+        firstName: firstName,
+        lastName: lastName,
+        error: _errorFromResponse(response, fallback: 'Could not sync profile'),
+      );
     } catch (e) {
       print('syncFromSupabase Error ($url): $e');
       if (!createIfMissing) {
         return 'Cannot reach API at $baseUrl. Is the server running?';
       }
-      currentUser = {
-        'access_token': AuthService.accessToken ?? access,
-        'user_id': currentUser?['user_id'],
-        'first_name': firstName ?? AuthService.firstNameFromUser ?? 'Citizen',
-        'last_name': lastName ?? AuthService.lastNameFromUser ?? '',
-        'email': authUser.email,
-        'picture': authUser.userMetadata?['avatar_url'] ??
-            authUser.userMetadata?['picture'],
-        'ai_tour_completed': currentUser?['ai_tour_completed'] ?? true,
-        'is_new_user': false,
-      };
-      await _saveSession();
-      return 'Cannot reach API at $baseUrl. Is the server running?';
+      return await _softFallbackProfile(
+        access: access,
+        authUser: authUser,
+        firstName: firstName,
+        lastName: lastName,
+        error: 'Cannot reach API at $baseUrl. Is the server running?',
+      );
     }
+  }
+
+  /// Keeps an existing profile usable when the API is briefly down.
+  /// Returns [error] always; only writes currentUser when user_id is known.
+  static Future<String> _softFallbackProfile({
+    required String access,
+    required User authUser,
+    String? firstName,
+    String? lastName,
+    required String error,
+  }) async {
+    final existingId = currentUser?['user_id'];
+    if (existingId is! int && existingId is! num) {
+      return error;
+    }
+    currentUser = {
+      'access_token': AuthService.accessToken ?? access,
+      'user_id': existingId,
+      'first_name': firstName ??
+          AuthService.firstNameFromUser ??
+          currentUser?['first_name'] ??
+          'Citizen',
+      'last_name': lastName ??
+          AuthService.lastNameFromUser ??
+          currentUser?['last_name'] ??
+          '',
+      'email': authUser.email,
+      'picture': currentUser?['picture'] ??
+          authUser.userMetadata?['avatar_url'] ??
+          authUser.userMetadata?['picture'],
+      'ai_tour_completed': currentUser?['ai_tour_completed'] ?? true,
+      'is_new_user': false,
+    };
+    await _saveSession();
+    return error;
   }
 
   static Future<void> logout() async {
@@ -363,6 +394,7 @@ class ApiService {
     await prefs.remove(_cacheTopUsers);
     await prefs.remove(_cacheUserScopedId);
     await prefs.remove(_cacheFilterReports);
+    await prefs.remove(_cacheUpdates);
   }
 
   static Future<List<dynamic>?> _readListCache(String key) async {
@@ -542,9 +574,8 @@ class ApiService {
     return headers;
   }
 
-  /// Email/password signup through Supabase Auth only.
-  /// Returns null on success, 'confirm-email' when a link is required, or an
-  /// error message. A profile sync failure does not undo a real session.
+  /// Email/password signup via API (user is created already confirmed).
+  /// Then opens a Supabase session and syncs the profile.
   static Future<String?> signup({
     required String firstname,
     required String lastname,
@@ -556,13 +587,36 @@ class ApiService {
           'SUPABASE_ANON_KEY to assets/.env';
     }
 
-    final error = await AuthService.signUp(
-      email: email.trim(),
+    final trimmedEmail = email.trim();
+    final url = Uri.parse('$baseUrl/auth/signup');
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'first_name': firstname,
+              'last_name': lastname,
+              'email': trimmedEmail,
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        return _friendlyAuthMessage(
+          _errorFromResponse(response, fallback: 'Could not create account'),
+        );
+      }
+    } catch (e) {
+      debugPrint('signup API: $e');
+      return 'Cannot reach API at $baseUrl. Is the server running?';
+    }
+
+    final error = await AuthService.signIn(
+      email: trimmedEmail,
       password: password,
-      firstName: firstname,
-      lastName: lastname,
     );
-    if (error == kEmailConfirmPending) return 'confirm-email';
     if (error != null) return _friendlyAuthMessage(error);
 
     final syncError = await syncFromSupabase(
@@ -570,6 +624,10 @@ class ApiService {
       lastName: lastname,
     );
     if (userId != null) return null;
+    // Auth succeeded but profile did not — drop the half session.
+    await AuthService.signOut();
+    currentUser = null;
+    await _saveSession();
     if (syncError != null) {
       debugPrint('signup profile sync: $syncError');
       return syncError;
@@ -578,18 +636,18 @@ class ApiService {
   }
 
   /// Email/password login via Supabase Auth, then profile sync with the API.
-  /// Unconfirmed accounts stay blocked until the user opens the email link.
   static Future<String?> login({
     required String email,
     required String password,
   }) async {
     final error = await AuthService.signIn(email: email, password: password);
-    if (AuthService.isEmailConfirmBlocker(error)) {
-      return 'Confirm your email first. Open the link we sent to ${email.trim()}, then sign in.';
-    }
     if (error != null) return _friendlyAuthMessage(error);
     final syncError = await syncFromSupabase();
     if (userId != null) return null;
+    // Auth succeeded but profile did not — drop the half session.
+    await AuthService.signOut();
+    currentUser = null;
+    await _saveSession();
     if (syncError != null) {
       debugPrint('login profile sync: $syncError');
       return syncError;
@@ -648,11 +706,39 @@ class ApiService {
     if (!AuthService.isSignedIn) return 'OAuth sign-in did not complete';
     final syncError = await syncFromSupabase(createIfMissing: createIfMissing);
     if (syncError == 'user-not-found') return syncError;
+    if (userId != null) return null;
     if (syncError != null) {
       debugPrint('oauth profile sync: $syncError');
-      if (!createIfMissing) return syncError;
+      return syncError;
     }
-    return null;
+    return 'Could not finish sign-in. Try again.';
+  }
+
+  /// Deletes a Supabase Auth user with no StreetSync profile (orphaned OAuth).
+  static Future<void> abandonSignup() async {
+    if (!AuthService.isSignedIn) return;
+    final access = AuthService.accessToken;
+    if (access == null || access.isEmpty) return;
+    final url = Uri.parse('$baseUrl/auth/abandon-signup');
+    try {
+      await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $access',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      debugPrint('abandonSignup: $e');
+    } finally {
+      currentUser = null;
+      await _saveSession();
+      try {
+        await AuthService.signOut();
+      } catch (_) {}
+    }
   }
 
   /// Persist that the home AI tour was finished or skipped.
@@ -894,6 +980,7 @@ class ApiService {
     await prefs.remove(_cacheRecentReports);
     await prefs.remove(_cacheReportStats);
     await prefs.remove(_cacheFilterReports);
+    await prefs.remove(_cacheUpdates);
   }
 
   /// Home pull-to-refresh: drop feed + stats caches so the next load is fresh.
@@ -905,7 +992,6 @@ class ApiService {
     await prefs.remove(_cacheReportStats);
   }
 
-  /// Returns null on network/HTTP failure so callers can keep cached UI.
   static Future<List<dynamic>?> getRecentReports({int amount = 3}) async {
     final url = Uri.parse('$baseUrl/reports/recent?amount=$amount');
     try {
@@ -924,9 +1010,6 @@ class ApiService {
     return null;
   }
 
-  /// Cursor feed for Home "Show more". Pass [before] as the oldest loaded
-  /// report's `time` to fetch the next older page.
-  /// Returns null on network/HTTP failure so callers can keep cached UI.
   static Future<List<dynamic>?> getReportsFeed({
     int amount = 10,
     String? category,
@@ -1217,6 +1300,12 @@ class ApiService {
     return null;
   }
 
+  static Future<List<dynamic>?> getCachedUpdates() =>
+      _readListCache(_cacheUpdates);
+
+  static Future<void> cacheUpdates(List<dynamic> items) =>
+      _writeListCache(_cacheUpdates, items);
+
   /// Status-change feed for the logged-in user (Updates tab).
   static Future<List<dynamic>?> getUpdates({int amount = 50}) async {
     final url = Uri.parse('$baseUrl/updates?amount=$amount');
@@ -1228,10 +1317,15 @@ class ApiService {
       );
       if (response == null) return null;
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        final list = jsonDecode(response.body) as List<dynamic>;
+        await cacheUpdates(list);
+        return list;
       }
       // Production may not have /updates deployed yet.
-      if (response.statusCode == 404) return [];
+      if (response.statusCode == 404) {
+        await cacheUpdates(const []);
+        return [];
+      }
       print('getUpdates: ${response.statusCode} ${response.body}');
       return null;
     } catch (e) {

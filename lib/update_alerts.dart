@@ -25,6 +25,10 @@ class UpdateAlerts {
   static Timer? _timer;
   static bool _polling = false;
   static bool _loaded = false;
+  static int? _loadedForUserId;
+
+  static String _scopedReadKey(int? userId) =>
+      userId == null ? _readKey : '${_readKey}_u$userId';
 
   static bool isRead(int id) => _readIds.contains(id);
 
@@ -38,6 +42,17 @@ class UpdateAlerts {
     _timer = null;
   }
 
+  /// Clear in-memory state on logout so the next account starts clean.
+  static void reset() {
+    stop();
+    _readIds.clear();
+    _latest = [];
+    _signature = '';
+    _loaded = false;
+    _loadedForUserId = null;
+    unseen.value = 0;
+  }
+
   static int idOf(dynamic item) {
     if (item is! Map) return 0;
     final id = item['id'];
@@ -46,14 +61,26 @@ class UpdateAlerts {
   }
 
   static Future<void> _ensureLoaded() async {
-    if (_loaded) return;
+    final userId = ApiService.userId;
+    if (_loaded && _loadedForUserId == userId) return;
+    _readIds.clear();
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getStringList(_readKey) ?? const [];
+    final key = _scopedReadKey(userId);
+    var stored = prefs.getStringList(key) ?? const [];
+    // Migrate legacy device-wide key into the scoped one once.
+    if (stored.isEmpty && userId != null) {
+      stored = prefs.getStringList(_readKey) ?? const [];
+      if (stored.isNotEmpty) {
+        await prefs.setStringList(key, stored);
+        await prefs.remove(_readKey);
+      }
+    }
     for (final raw in stored) {
       final id = int.tryParse(raw);
       if (id != null) _readIds.add(id);
     }
     _loaded = true;
+    _loadedForUserId = userId;
   }
 
   static Future<void> markRead(Iterable<int> ids) async {
@@ -62,7 +89,7 @@ class UpdateAlerts {
     if (fresh.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
-      _readKey,
+      _scopedReadKey(ApiService.userId),
       _readIds.map((id) => id.toString()).toList(),
     );
     _publish(notify: false);
@@ -84,7 +111,7 @@ class UpdateAlerts {
       if (id > 0 && id <= legacy) _readIds.add(id);
     }
     await prefs.setStringList(
-      _readKey,
+      _scopedReadKey(ApiService.userId),
       _readIds.map((id) => id.toString()).toList(),
     );
     await prefs.remove(_legacySeenKey);

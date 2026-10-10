@@ -173,10 +173,12 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   GoogleMapController? _controller;
   LatLng _center = const LatLng(40.3334, -74.6004); // Plainsboro, NJ
   bool _ready = false;
+  /// False while the app is backgrounded — turns off my-location (crash source).
+  bool _appResumed = true;
   Set<Marker> _markers = {};
   final TextEditingController _searchController = TextEditingController();
 
@@ -184,6 +186,9 @@ class _MapScreenState extends State<MapScreen> {
   bool _loadingReports = false;
 
   String? _selectedCategory;
+
+  bool get _trackLocation =>
+      _appResumed && widget.isActive == true;
 
   Future<void> _applyInitialSelection() async {
     final id = widget.initialReportId;
@@ -199,7 +204,7 @@ class _MapScreenState extends State<MapScreen> {
     if (match == null) return;
 
     await _selectReport(match, true);
-
+    if (!mounted) return;
     setState(() => _ready = true);
   }
 
@@ -294,14 +299,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _gotothingie(LatLng target, bool zoom) async {
+    if (!mounted) return;
     setState(() => _center = target);
-    final currentZoom = await _controller?.getZoomLevel()??0;
-    bool shouldzoom = false;
-    if(zoom||currentZoom<16){
-      shouldzoom = true;
-    }
+    final currentZoom = await _controller?.getZoomLevel() ?? 0;
+    if (!mounted) return;
+    final shouldzoom = zoom || currentZoom < 16;
     await _controller?.animateCamera(
-      shouldzoom ? CameraUpdate.newLatLngZoom(target, 16) : CameraUpdate.newLatLng(target)
+      shouldzoom
+          ? CameraUpdate.newLatLngZoom(target, 16)
+          : CameraUpdate.newLatLng(target),
     );
   }
   void _clearSelection() {
@@ -359,6 +365,7 @@ class _MapScreenState extends State<MapScreen> {
             return major == _selectedCategory;
           });
 
+    if (!mounted) return;
     setState(() {
       _markers = reports.map<Marker>((report) {
         final id = report["id"].toString();
@@ -483,6 +490,7 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     final response = await http.get(url);
+    if (!mounted) return;
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -496,10 +504,28 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-
+    WidgetsBinding.instance.addObserver(this);
     _loadMarkerIcons().then((_) {
-      _goToUser();
+      if (mounted) _goToUser();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final map = _controller;
+    _controller = null;
+    map?.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final resumed = state == AppLifecycleState.resumed;
+    if (resumed == _appResumed) return;
+    _appResumed = resumed;
+    if (mounted) setState(() {});
   }
 
   @override
@@ -518,8 +544,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _goToUser() async {
-
     await _loadRecentReports();
+    if (!mounted) return;
 
     if (widget.initialReportId != null) {
       await _applyInitialSelection();
@@ -528,16 +554,30 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     var permission = await Geolocator.checkPermission();
+    if (!mounted) return;
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
+    if (!mounted) return;
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      setState(() => _ready = true);
+      if (mounted) setState(() => _ready = true);
       return;
     }
 
-    final currentLocation = await Geolocator.getCurrentPosition();
+    late final Position currentLocation;
+    try {
+      currentLocation = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _ready = true);
+      return;
+    }
+    if (!mounted || !_appResumed) return;
     final userLatLng = LatLng(
       currentLocation.latitude,
       currentLocation.longitude,
@@ -555,15 +595,27 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _recenterOnUser() async {
     var permission = await Geolocator.checkPermission();
+    if (!mounted) return;
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
+    if (!mounted) return;
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       return;
     }
-    final currentLocation = await Geolocator.getCurrentPosition();
-    if (!mounted) return;
+    late final Position currentLocation;
+    try {
+      currentLocation = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      return;
+    }
+    if (!mounted || !_appResumed) return;
     await _controller?.animateCamera(
       CameraUpdate.newLatLngZoom(
         LatLng(currentLocation.latitude, currentLocation.longitude),
@@ -587,7 +639,8 @@ class _MapScreenState extends State<MapScreen> {
               target: _center,
               zoom: 14,
             ),
-            myLocationEnabled: true,
+            // Keep location off when backgrounded / off-tab — common iOS crash.
+            myLocationEnabled: _trackLocation,
             myLocationButtonEnabled: false,
             markers: _markers,
             onTap: (_) => _clearSelection(),

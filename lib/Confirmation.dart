@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:street_sync/Mainshell.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/error_popup.dart';
+import 'package:street_sync/geocoding_utils.dart';
 import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/report_severity.dart';
@@ -113,6 +114,20 @@ class _ConfirmationState extends State<Confirmation> {
     if (_busy) return;
     if (!_validateEditableFields()) return;
     setState(() => _submitting = true);
+    final inTown = await isLocationInPlainsboro(
+      widget.latitude,
+      widget.longitude,
+    );
+    if (!mounted) return;
+    if (!inTown) {
+      setState(() => _submitting = false);
+      await showErrorPopup(
+        context,
+        'Not in Plainsboro — cannot submit. '
+        'Go back and move the pin into Plainsboro.',
+      );
+      return;
+    }
     final judgment =
         await reviewReportText(context, _description, rewrite: false);
     if (!mounted) return;

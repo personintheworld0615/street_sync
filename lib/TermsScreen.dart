@@ -128,8 +128,9 @@ class TermsScreen extends StatelessWidget {
 class TermsAgreementScreen extends StatefulWidget {
   const TermsAgreementScreen({super.key, this.onAgree});
 
-  /// Runs the real signup. Return null on success, `confirm-email` when a
-  /// link is required, or an error message. Omit this to only record agreement.
+  /// Runs the real signup. Return null on success, `signed-in-existing` when
+  /// the email already had an account, or an error message. Omit to only
+  /// record agreement.
   final Future<String?> Function()? onAgree;
 
   @override
@@ -182,8 +183,8 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
       Navigator.of(context).pop('ok');
       return;
     }
-    // Special outcomes the login screen handles (not plain errors).
-    if (error == 'confirm-email' || error == 'signed-in-existing') {
+    // Special outcome the login screen handles (not a plain error).
+    if (error == 'signed-in-existing') {
       Navigator.of(context).pop(error);
       return;
     }
@@ -233,7 +234,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Nothing is created until you scroll to the end and agree.',
+                  'Your StreetSync account is only created after you scroll to the end and agree.',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: _muted,

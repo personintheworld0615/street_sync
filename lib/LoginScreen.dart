@@ -13,16 +13,23 @@ import 'package:street_sync/first_run.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.startAsCreateAccount = false});
+  const LoginScreen({
+    super.key,
+    this.startAsCreateAccount = false,
+    this.startupNotice,
+  });
 
   /// First open lands on account creation. Sign-out still opens sign-in.
   final bool startAsCreateAccount;
+
+  /// Shown once after cold start (e.g. left Terms without finishing signup).
+  final String? startupNotice;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   // Match Home: charcoal as primary, grey secondary.
   static const _ink = Color(0xFF111827);
   static const _muted = Color(0xFF5E5D5D);
@@ -39,7 +46,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _didRoute = false;
   /// True while we are finishing an OAuth redirect (login or create).
   bool _oauthInFlight = false;
+  /// Guards against double completion from redirect + already-signed-in path.
+  bool _oauthCompleting = false;
   String _passwordText = '';
+  Timer? _oauthTimeout;
+  Timer? _oauthResumeCheck;
+  /// Bumped to abort in-flight OAuth resume polls after cancel/dispose.
+  int _oauthGeneration = 0;
 
   static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -60,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isLogin = !widget.startAsCreateAccount;
     if (AuthService.isConfigured) {
       _authSub = AuthService.auth.onAuthStateChange.listen((data) async {
@@ -71,19 +85,76 @@ class _LoginScreenState extends State<LoginScreen> {
             !mounted) {
           return;
         }
+        _cancelOauthTimers();
         await _completeOAuthAfterRedirect();
+      });
+    }
+    final notice = widget.startupNotice;
+    if (notice != null && notice.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await showAppDialog(context, notice);
       });
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cancelOauthTimers();
     _authSub?.cancel();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _nameCtrl.dispose();
     _lastNameCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (!_oauthInFlight || _oauthCompleting || _didRoute) return;
+    // Coming back from the browser: either the deep-link session is still
+    // exchanging (can take several seconds) or the user hit X. Poll for a
+    // session first — only treat as cancel after that window.
+    _oauthResumeCheck?.cancel();
+    _oauthResumeCheck = Timer(Duration.zero, _pollSessionAfterOauthResume);
+  }
+
+  /// After Google/Apple returns, wait for PKCE/session before giving up.
+  Future<void> _pollSessionAfterOauthResume() async {
+    final gen = _oauthGeneration;
+    for (var i = 0; i < 20; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted || gen != _oauthGeneration) return;
+      if (!_oauthInFlight || _didRoute || _oauthCompleting) return;
+      if (AuthService.isSignedIn) {
+        _cancelOauthTimers();
+        await _completeOAuthAfterRedirect();
+        return;
+      }
+    }
+    // ~8s with no session → user cancelled (X) or deep link failed.
+    if (!mounted || gen != _oauthGeneration) return;
+    if (_oauthInFlight && !_oauthCompleting && !_didRoute) {
+      _cancelOauth();
+    }
+  }
+
+  void _cancelOauthTimers() {
+    _oauthGeneration++;
+    _oauthTimeout?.cancel();
+    _oauthTimeout = null;
+    _oauthResumeCheck?.cancel();
+    _oauthResumeCheck = null;
+  }
+
+  /// Back to a normal login screen — no error toast (user cancelled).
+  void _cancelOauth() {
+    _cancelOauthTimers();
+    _oauthInFlight = false;
+    _oauthCompleting = false;
+    if (mounted && _loading) setState(() => _loading = false);
   }
 
   Future<void> _handleSubmit() async {
@@ -126,16 +197,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     setState(() => _loading = false);
-
-    if (error == 'confirm-email') {
-      setState(() => _isLogin = true);
-      if (!mounted) return;
-      await showAppDialog(
-        context,
-        'We sent a confirmation link to ${_emailCtrl.text.trim()}. Open it, then sign in.',
-      );
-      return;
-    }
 
     if (error != null) {
       if (ApiService.isInvalidCredentials(error)) {
@@ -183,14 +244,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
     if (!mounted || outcome == null) return;
-    if (outcome == 'confirm-email') {
-      setState(() => _isLogin = true);
-      await showAppDialog(
-        context,
-        'We sent a confirmation link to $email. Open it, then sign in.',
-      );
-      return;
-    }
     if (outcome == 'signed-in-existing' && ApiService.userId != null) {
       await _finishAuth(firstRun: ApiService.needsAiTour);
       return;
@@ -284,6 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ApiService.userId == null) return;
     _didRoute = true;
     _oauthInFlight = false;
+    _cancelOauthTimers();
     await FirstRun.markSignedInBefore();
     if (!mounted) return;
 
@@ -320,9 +374,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Google/Apple: OAuth first. Existing profile → sign in. New → terms, then
-  /// create profile and AI tour.
+  /// Google/Apple from login or create. Supabase Auth may exist after OAuth;
+  /// the StreetSync users table is the real account (created only after terms).
   Future<void> _oauth(OAuthProvider provider) async {
+    _cancelOauthTimers();
     setState(() {
       _loading = true;
       _oauthInFlight = true;
@@ -334,82 +389,111 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
+    if (error == kOAuthCanceled) {
+      _cancelOauth();
+      return;
+    }
+
     if (error != null) {
-      _oauthInFlight = false;
-      setState(() => _loading = false);
+      _cancelOauth();
       await showErrorPopup(context, error);
       return;
     }
 
-    // Session already present (rare / native). Otherwise wait for redirect.
+    // Native Google (or rare already-signed-in) — session is ready now.
     if (AuthService.isSignedIn) {
+      _cancelOauthTimers();
       await _completeOAuthAfterRedirect();
       return;
     }
 
-    Future<void>.delayed(const Duration(seconds: 45), () async {
-      if (mounted && _loading && _oauthInFlight) {
-        _oauthInFlight = false;
-        setState(() => _loading = false);
-        await showErrorPopup(
-          context,
-          'Sign-in took too long. Close the browser and try again.',
-        );
-      }
+    // Safety net if the browser never returns a cancel/resume signal.
+    _oauthTimeout = Timer(const Duration(seconds: 45), () async {
+      if (!mounted || !_loading || !_oauthInFlight || _oauthCompleting) return;
+      _cancelOauth();
+      await showErrorPopup(
+        context,
+        'Sign-in took too long. Close the browser and try again.',
+      );
     });
   }
 
   Future<void> _completeOAuthAfterRedirect() async {
-    if (_didRoute || !mounted) return;
-    setState(() => _loading = true);
+    if (_didRoute || _oauthCompleting || !mounted) return;
+    _oauthCompleting = true;
+    _cancelOauthTimers();
+    if (mounted) setState(() => _loading = true);
 
-    // Look up profile without creating — new users must accept terms first.
-    final lookup = await ApiService.completeOAuthSession(createIfMissing: false);
-    if (!mounted) return;
-
-    if (lookup == 'user-not-found') {
-      setState(() => _loading = false);
-      final outcome = await Navigator.of(context).push<String>(
-        MaterialPageRoute(
-          builder: (_) => TermsAgreementScreen(
-            onAgree: () =>
-                ApiService.completeOAuthSession(createIfMissing: true),
-          ),
-        ),
-      );
-      if (!mounted) return;
-      if (outcome == 'ok' && ApiService.userId != null) {
-        await _finishAuth(firstRun: true);
-      } else {
-        _oauthInFlight = false;
-        // User backed out of terms — drop the orphan OAuth session.
-        await AuthService.signOut();
-        if (mounted) {
-          setState(() => _loading = false);
-          if (outcome != null && outcome != 'ok') {
-            await showErrorPopup(context, outcome);
-          }
+    try {
+      // Brief wait — session can land a tick after the signedIn event.
+      if (!AuthService.isSignedIn) {
+        for (var i = 0; i < 10 && mounted && !AuthService.isSignedIn; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
         }
       }
-      return;
-    }
+      if (!mounted) return;
+      if (!AuthService.isSignedIn) {
+        _oauthInFlight = false;
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
 
-    setState(() => _loading = false);
+      // Users table is source of truth — look up only; never invent a profile.
+      final lookup =
+          await ApiService.completeOAuthSession(createIfMissing: false);
+      if (!mounted) return;
 
-    if (lookup != null && ApiService.userId == null) {
-      _oauthInFlight = false;
-      await showErrorPopup(context, lookup);
-      return;
-    }
+      if (lookup == 'user-not-found') {
+        // Auth exists, no StreetSync account yet → terms, then create users row.
+        setState(() => _loading = false);
+        final outcome = await Navigator.of(context).push<String>(
+          MaterialPageRoute(
+            builder: (_) => TermsAgreementScreen(
+              onAgree: () =>
+                  ApiService.completeOAuthSession(createIfMissing: true),
+            ),
+          ),
+        );
+        if (!mounted) return;
+        if (outcome == 'ok' && ApiService.userId != null) {
+          await _finishAuth(firstRun: true);
+        } else {
+          _oauthInFlight = false;
+          // Disagreed / backed out: delete orphan Auth so Google can redo it.
+          await ApiService.abandonSignup();
+          if (mounted) {
+            setState(() => _loading = false);
+            if (outcome != null && outcome != 'ok') {
+              await showErrorPopup(context, outcome);
+            }
+          }
+        }
+        return;
+      }
 
-    if (ApiService.userId != null) {
-      await _finishAuth(firstRun: ApiService.needsAiTour);
-    } else {
-      _oauthInFlight = false;
-      await showErrorPopup(
-        context,
-        'Could not finish sign-in. Try again.',
-      );
+      if (lookup != null && ApiService.userId == null) {
+        _oauthInFlight = false;
+        if (mounted) setState(() => _loading = false);
+        await ApiService.abandonSignup();
+        if (mounted) await showErrorPopup(context, lookup);
+        return;
+      }
+
+      if (ApiService.userId != null) {
+        await _finishAuth(firstRun: ApiService.needsAiTour);
+      } else {
+        _oauthInFlight = false;
+        if (mounted) setState(() => _loading = false);
+        await ApiService.abandonSignup();
+        if (mounted) {
+          await showErrorPopup(
+            context,
+            'Could not finish sign-in. Try again.',
+          );
+        }
+      }
+    } finally {
+      _oauthCompleting = false;
     }
   }
 

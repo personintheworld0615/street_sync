@@ -14,14 +14,12 @@ from api.schemas.auth import (
     TokenResponse,
 )
 from api.services.auth import (
-    admin_confirm_user_email,
     admin_create_confirmed_user,
     admin_find_user_id_by_email,
     create_access_token,
     delete_supabase_user,
     ensure_email_confirmed_for_login,
     fetch_supabase_user,
-    send_signup_confirmation_email,
     get_current_user,
     hash_password,
     is_supabase_user_id,
@@ -41,7 +39,6 @@ def _token_for(
     user: User,
     access_token: str | None = None,
     *,
-    email_confirmation_required: bool = False,
     is_new_user: bool = False,
 ) -> TokenResponse:
     return TokenResponse(
@@ -52,7 +49,6 @@ def _token_for(
         last_name=user.last_name,
         email=user.email,
         picture=user.picture,
-        email_confirmation_required=email_confirmation_required,
         is_new_user=is_new_user,
         ai_tour_completed=bool(getattr(user, "ai_tour_completed", False)),
     )
@@ -60,7 +56,7 @@ def _token_for(
 
 @router.post("/signup", response_model=TokenResponse)
 def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db)):
-    """Create a Supabase user and email a confirmation link when mail can be sent."""
+    """Create a confirmed Supabase user — no signup confirmation email."""
     hit("auth-signup", client_ip(request), limit=5, window_seconds=3600)
     email = str(body.email).strip().lower()
     password = body.password
@@ -86,7 +82,7 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
             password=body.password,
             first_name=body.first_name,
             last_name=body.last_name,
-            email_confirm=False,
+            email_confirm=True,
         )
     except HTTPException:
         raise
@@ -106,11 +102,7 @@ def signup(body: SignupRequest, request: Request, db: Session = Depends(get_db))
     db.add(user)
     db.commit()
     db.refresh(user)
-    sent = send_signup_confirmation_email(email)
-    if not sent:
-        # Mail is not configured. Confirm the account so signup is not a dead end.
-        admin_confirm_user_email(email)
-    return _token_for(user, email_confirmation_required=sent, is_new_user=True)
+    return _token_for(user, is_new_user=True)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -187,6 +179,45 @@ def sync_supabase_user(
         create_if_missing=body.create_if_missing,
     )
     return _token_for(user, access_token=token, is_new_user=created)
+
+
+@router.post("/abandon-signup", response_model=dict)
+def abandon_signup(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Delete a Supabase Auth user that has no StreetSync profile yet.
+
+    Used when Google/Apple created an Auth row but the person never finished
+    terms / profile creation. Refuses to delete if a local profile exists.
+    """
+    token = credentials.credentials
+    sb_user = fetch_supabase_user(token)
+    raw_id = sb_user.get("id")
+    supabase_uid = raw_id if isinstance(raw_id, str) else None
+    if not is_supabase_user_id(supabase_uid):
+        supabase_uid = supabase_user_id_from_access_token(token)
+    if not is_supabase_user_id(supabase_uid):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not resolve Auth user",
+        )
+
+    email = (sb_user.get("email") or "").strip().lower()
+    if email:
+        existing = db.query(User).filter(User.email == email).first()
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Account already has a profile; sign out instead.",
+            )
+
+    if not delete_supabase_user(supabase_uid):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not delete the unfinished sign-in account.",
+        )
+    return {"ok": True, "supabase_auth_deleted": True}
 
 
 @router.post("/tour-complete", response_model=TokenResponse)
