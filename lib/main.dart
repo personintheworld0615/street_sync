@@ -47,10 +47,12 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
   StreamSubscription<AuthState>? _authSub;
   bool _listening = false;
   int _authAttachAttempts = 0;
+  bool _isSignedIn = AuthService.isSignedIn;
 
   @override
   void initState() {
     super.initState();
+    _isSignedIn = AuthService.isSignedIn;
     // Auth may not be ready until WelcomeScreen finishes init.
     WidgetsBinding.instance.addPostFrameCallback((_) => _attachAuthListener());
   }
@@ -67,6 +69,11 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
 
     _listening = true;
     _authSub = AuthService.auth.onAuthStateChange.listen((data) {
+      final signedIn = AuthService.isSignedIn;
+      if (signedIn != _isSignedIn) {
+        if (mounted) setState(() => _isSignedIn = signedIn);
+      }
+
       if (data.event == AuthChangeEvent.passwordRecovery) {
         _navKey.currentState?.push(
           MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
@@ -107,8 +114,24 @@ class _StreetSyncAppState extends State<StreetSyncApp> {
     return MaterialApp(
       navigatorKey: _navKey,
       debugShowCheckedModeBanner: false,
+      themeMode: _isSignedIn ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2196F3)),
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2196F3),
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+        textTheme: GoogleFonts.interTextTheme(),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7C9CFF),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xFF0B1220),
+        cardColor: const Color(0xFF111827),
         useMaterial3: true,
         textTheme: GoogleFonts.interTextTheme(),
       ),

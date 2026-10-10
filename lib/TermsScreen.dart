@@ -45,25 +45,36 @@ class TermsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final pageBg = scheme.surface;
+    final cardBg = scheme.surface;
+    final softCard = scheme.surfaceVariant;
+    final ink = scheme.onSurface;
+    final muted = scheme.onSurfaceVariant;
+    final border = scheme.outlineVariant;
+    final accent = scheme.primary;
+    final accentSoft = scheme.primaryContainer;
+
     final body = GoogleFonts.inter(
       fontSize: 15,
       height: 1.55,
-      color: _ink,
+      color: ink,
     );
     return Scaffold(
-      backgroundColor: _pageBg,
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: _pageBg,
+        backgroundColor: pageBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: _ink,
+        foregroundColor: ink,
         title: Text(
           'Terms',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 18,
             letterSpacing: -0.3,
-            color: _ink,
+            color: ink,
           ),
         ),
       ),
@@ -73,11 +84,12 @@ class TermsScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardBg,
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: border, width: 0.7),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF111827).withValues(alpha: 0.04),
+                  color: Colors.black.withValues(alpha: 0.12),
                   blurRadius: 18,
                   offset: const Offset(0, 10),
                 ),
@@ -92,7 +104,7 @@ class TermsScreen extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: accentSoft,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -101,7 +113,7 @@ class TermsScreen extends StatelessWidget {
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
-                      color: const Color(0xFF4338CA),
+                      color: accent,
                     ),
                   ),
                 ),
@@ -111,7 +123,7 @@ class TermsScreen extends StatelessWidget {
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 28,
                     fontWeight: FontWeight.w600,
-                    color: _ink,
+                    color: ink,
                     height: 1.15,
                     letterSpacing: -0.3,
                   ),
@@ -121,7 +133,7 @@ class TermsScreen extends StatelessWidget {
                   'Last updated: September 28, 2026',
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: _muted,
+                    color: muted,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -140,9 +152,9 @@ class TermsScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(color: border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +164,7 @@ class TermsScreen extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: _ink,
+                      color: ink,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -165,9 +177,9 @@ class TermsScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: softCard,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,7 +189,7 @@ class TermsScreen extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: _ink,
+                    color: ink,
                     letterSpacing: -0.2,
                   ),
                 ),
@@ -187,7 +199,7 @@ class TermsScreen extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     height: 1.5,
-                    color: _muted,
+                    color: muted,
                   ),
                 ),
               ],
@@ -268,25 +280,36 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final pageBg = scheme.surface;
+    final cardBg = scheme.surface;
+    final softCard = scheme.surfaceVariant;
+    final ink = scheme.onSurface;
+    final muted = scheme.onSurfaceVariant;
+    final border = scheme.outlineVariant;
+    final accent = scheme.primary;
+    final accentSoft = scheme.primaryContainer;
+
     final body = GoogleFonts.inter(
       fontSize: 15,
       height: 1.55,
-      color: TermsScreen._ink,
+      color: ink,
     );
     return Scaffold(
-      backgroundColor: _pageBg,
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: _pageBg,
+        backgroundColor: pageBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: _ink,
+        foregroundColor: ink,
         title: Text(
           'Terms',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 18,
             letterSpacing: -0.3,
-            color: _ink,
+            color: ink,
           ),
         ),
       ),
@@ -300,8 +323,9 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: border, width: 0.7),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFF111827).withValues(alpha: 0.04),
@@ -319,7 +343,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
+                          color: accentSoft,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -328,7 +352,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.8,
-                            color: const Color(0xFF4338CA),
+                            color: accent,
                           ),
                         ),
                       ),
@@ -338,7 +362,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                         style: GoogleFonts.playfairDisplay(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
-                          color: _ink,
+                          color: ink,
                           height: 1.15,
                           letterSpacing: -0.3,
                         ),
@@ -348,7 +372,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                         'Nothing is created until you scroll to the end and agree.',
                         style: GoogleFonts.inter(
                           fontSize: 14,
-                          color: _muted,
+                          color: muted,
                           fontWeight: FontWeight.w500,
                           height: 1.4,
                         ),
@@ -368,9 +392,9 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      border: Border.all(color: border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,7 +404,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
-                            color: _ink,
+                            color: ink,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -393,9 +417,9 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: softCard,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,7 +429,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                         style: GoogleFonts.inter(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: _ink,
+                          color: ink,
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -431,7 +455,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                             padding: EdgeInsets.zero,
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            foregroundColor: _ink,
+                            foregroundColor: ink,
                           ),
                           child: const Text(
                             'Privacy Policy',
@@ -453,7 +477,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           height: 1.5,
-                          color: _muted,
+                          color: muted,
                         ),
                       ),
                     ],
@@ -470,8 +494,8 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
               16 + MediaQuery.paddingOf(context).bottom,
             ),
             decoration: BoxDecoration(
-              color: _pageBg,
-              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              color: pageBg,
+              border: Border(top: BorderSide(color: border)),
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF111827).withValues(alpha: 0.04),
@@ -491,7 +515,7 @@ class _TermsAgreementScreenState extends State<TermsAgreementScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _muted,
+                    color: muted,
                   ),
                 ),
                 const SizedBox(height: 10),

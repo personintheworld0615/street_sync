@@ -42,63 +42,142 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _pageBg = Color(0xFFF7F8FA);
-  static const _ink = Color(0xFF111827);
-  static const _muted = Color(0xFF757575);
-  static const _cta = Color(0xFF111827);
+  static const _pageBgLight = Color(0xFFF7F8FA);
+  static const _inkLight = Color(0xFF111827);
+  static const _mutedLight = Color(0xFF757575);
+  static const _ctaLight = Color(0xFF111827);
 
-  static TextStyle get _tBrand => GoogleFonts.nunito(
-        fontSize: 50,
-        fontWeight: FontWeight.w700,
-        color: Colors.black,
-        height: 1.0,
-        letterSpacing: 1.2,
+  static const _pageBgDark = Color(0xFF0B1220);
+  static const _surfaceDark = Color(0xFF111827);
+  static const _surfaceAltDark = Color(0xFF172236);
+  static const _strokeDark = Color(0xFF2A3547);
+  static const _inkDark = Color(0xFFF8FAFC);
+  static const _mutedDark = Color(0xFFA0AEC0);
+  static const _ctaDark = Color(0xFF172236);
+  static const _accentDark = Color(0xFF79AFFF);
+
+  _HomePalette _palette(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      return _HomePalette(
+        pageBg: _pageBgDark,
+        card: _surfaceDark,
+        cardAlt: _surfaceAltDark,
+        stroke: _strokeDark,
+        ink: _inkDark,
+        muted: _mutedDark,
+        cta: _ctaDark,
+        accent: _accentDark,
+        accentSoft: const Color(0xFF1E2B3D),
+        chipSelected: const Color(0xFFE8EDF3),
+        chipUnselected: Colors.transparent,
+        heroFadeStart: const Color(0xFF17243A),
+        heroFadeMid: const Color(0xFF17243A).withValues(alpha: 0.66),
+        heroFadeEnd: _pageBgDark,
       );
-  static TextStyle get _tGreeting => GoogleFonts.inter(
-        fontSize: 20,
-        fontWeight: FontWeight.w400,
-        color: Colors.black,
-        height: 1.2,
-        letterSpacing: -0.2,
-      );
-  static TextStyle get _tLocation => GoogleFonts.inter(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        color: _muted,
-        height: 1.25,
-      );
-  static TextStyle get _tStatValue => GoogleFonts.inter(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: _ink,
-        height: 1.1,
-        letterSpacing: -0.3,
-      );
-  static TextStyle get _tStatLabel => GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w400,
-        color: const Color(0xFF6B7280),
-        height: 1.2,
-      );
-  static TextStyle get _tNearYou => GoogleFonts.inter(
-        fontSize: 27,
-        fontWeight: FontWeight.w700,
-        color: _ink,
-        height: 1.1,
-        letterSpacing: -0.5,
-      );
-  static TextStyle get _tFilter => GoogleFonts.inter(
-        fontSize: 15,
-        fontWeight: FontWeight.w400,
-        color: _muted,
-        height: 1.2,
-      );
-  static TextStyle get _tFilterSelected => GoogleFonts.inter(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        color: _ink,
-        height: 1.2,
-      );
+    }
+    return _HomePalette(
+      pageBg: _pageBgLight,
+      card: Colors.white,
+      cardAlt: const Color(0xFFF9FAFB),
+      stroke: const Color(0xFFE5E7EB),
+      ink: _inkLight,
+      muted: _mutedLight,
+      cta: _ctaLight,
+      accent: _inkLight,
+      accentSoft: const Color(0xFFE8EAED),
+      chipSelected: const Color(0xFFE8EAED),
+      chipUnselected: Colors.transparent,
+      heroFadeStart: Colors.white.withValues(alpha: 0.22),
+      heroFadeMid: Colors.white.withValues(alpha: 0.08),
+      heroFadeEnd: _pageBgLight,
+    );
+  }
+
+  TextStyle _tBrand(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.nunito(
+      fontSize: 50,
+      fontWeight: FontWeight.w700,
+      color: palette.ink,
+      height: 1.0,
+      letterSpacing: 1.2,
+    );
+  }
+
+  TextStyle _tGreeting(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 20,
+      fontWeight: FontWeight.w400,
+      color: palette.ink,
+      height: 1.2,
+      letterSpacing: -0.2,
+    );
+  }
+
+  TextStyle _tLocation(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+      color: palette.muted,
+      height: 1.25,
+    );
+  }
+
+  TextStyle _tStatValue(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: palette.ink,
+      height: 1.1,
+      letterSpacing: -0.3,
+    );
+  }
+
+  TextStyle _tStatLabel(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 13,
+      fontWeight: FontWeight.w400,
+      color: palette.muted,
+      height: 1.2,
+    );
+  }
+
+  TextStyle _tNearYou(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 27,
+      fontWeight: FontWeight.w700,
+      color: palette.ink,
+      height: 1.1,
+      letterSpacing: -0.5,
+    );
+  }
+
+  TextStyle _tFilter(BuildContext context) {
+    final palette = _palette(context);
+    return GoogleFonts.inter(
+      fontSize: 15,
+      fontWeight: FontWeight.w400,
+      color: palette.muted,
+      height: 1.2,
+    );
+  }
+
+  TextStyle _tFilterSelected(BuildContext context) {
+    final palette = _palette(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GoogleFonts.inter(
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      color: isDark ? const Color(0xFF111827) : palette.ink,
+      height: 1.2,
+    );
+  }
 
   final List<String> cat = ReportCategories.all;
   String? _selectedCat;
@@ -420,8 +499,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = _palette(context);
     return Scaffold(
-      backgroundColor: _pageBg,
+      backgroundColor: palette.pageBg,
       body: RefreshIndicator(
         onRefresh: _fetchReports,
         child: SingleChildScrollView(
@@ -439,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Near you', style: _tNearYou),
+                          Text('Near you', style: _tNearYou(context)),
                           const SizedBox(height: 22),
                           _buildCategoryFilters(),
                         ],
@@ -480,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Text(
                             'No reports in this category',
                             style: GoogleFonts.inter(
-                              color: _muted,
+                              color: palette.muted,
                               fontSize: 14,
                             ),
                           ),
@@ -491,7 +571,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.only(top: 12, bottom: 4),
                         child: Center(
                           child: Material(
-                            color: const Color(0xFFE8EAED),
+                            color: palette.cardAlt,
                             borderRadius: BorderRadius.circular(999),
                             child: InkWell(
                               onTap: _isLoadingMore ? null : _loadMore,
@@ -507,7 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: -0.2,
-                                    color: _isLoadingMore ? _muted : _ink,
+                                    color: _isLoadingMore ? palette.muted : palette.ink,
                                   ),
                                 ),
                               ),
@@ -526,6 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryFilters() {
+    final palette = _palette(context);
     final options = ['All', ...cat];
 
     return SizedBox(
@@ -552,12 +633,18 @@ class _HomeScreenState extends State<HomeScreen> {
               curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: selected ? const Color(0xFFE8EAED) : Colors.transparent,
+                color: selected ? palette.chipSelected : palette.chipUnselected,
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? palette.stroke
+                      : Colors.transparent,
+                  width: selected ? 1 : 0,
+                ),
               ),
               child: Text(
                 label,
-                style: selected ? _tFilterSelected : _tFilter,
+                style: selected ? _tFilterSelected(context) : _tFilter(context),
               ),
             ),
           );
@@ -567,14 +654,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget twocardsection(BuildContext context) {
+    final palette = _palette(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return KeyedSubtree(
       key: widget.quickActionsTourKey,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(25, 14, 10, 14),
         decoration: BoxDecoration(
-          color: _cta,
+          color: palette.cta,
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isDark ? palette.stroke : Colors.white.withValues(alpha: 0.18),
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -582,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               'Report an issue',
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: isDark ? palette.ink : Colors.white,
                 fontSize: 16,
                 letterSpacing: -0.2,
                 fontWeight: FontWeight.w500,
@@ -593,7 +685,11 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: isDark
+                      ? palette.stroke
+                      : Colors.white.withValues(alpha: 0.35),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -614,7 +710,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     width: 1,
                     height: 18,
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: isDark
+                        ? palette.stroke
+                        : Colors.white.withValues(alpha: 0.3),
                   ),
                   _reportModeChip(
                     icon: Icons.photo_camera_outlined,
@@ -643,6 +741,9 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.white : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.white;
     return InkWell(
       key: key,
       onTap: onTap,
@@ -652,12 +753,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: Colors.white),
+            Icon(icon, size: 16, color: iconColor),
             const SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: textColor,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -669,6 +770,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget threecard() {
+    final palette = _palette(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return KeyedSubtree(
       key: widget.statsTourKey,
       child: ClipRRect(
@@ -679,9 +782,15 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
+              color: isDark
+                  ? const Color(0xFF30394A).withValues(alpha: 0.82)
+                  : Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF465268).withValues(alpha: 0.78)
+                    : Colors.white.withValues(alpha: 0.55),
+              ),
             ),
             child: Row(
               children: [
@@ -720,10 +829,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _statDivider() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 1,
       height: 34,
-      color: Colors.white.withValues(alpha: 0.55),
+      color: isDark
+          ? const Color(0xFF4A586E)
+          : Colors.white.withValues(alpha: 0.55),
     );
   }
 
@@ -732,6 +844,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final palette = _palette(context);
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -743,12 +856,17 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 value,
-                style: _tStatValue,
+                style: _tStatValue(context),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
-                style: _tStatLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: palette.muted,
+                  height: 1.2,
+                ),
               ),
             ],
           ),
@@ -768,6 +886,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget header() {
     final topInset = MediaQuery.paddingOf(context).top;
+    final palette = _palette(context);
 
     return Stack(
       children: [
@@ -796,11 +915,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.white.withValues(alpha: 0.22),
-                  Colors.white.withValues(alpha: 0.08),
-                  _pageBg.withValues(alpha: 0.4),
-                  _pageBg.withValues(alpha: 0.88),
-                  _pageBg,
+                  palette.heroFadeStart,
+                  palette.heroFadeMid,
+                  palette.heroFadeEnd.withValues(alpha: 0.7),
+                  palette.heroFadeEnd.withValues(alpha: 0.92),
+                  palette.pageBg,
                 ],
                 stops: const [0.0, 0.3, 0.58, 0.84, 1.0],
               ),
@@ -816,19 +935,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 scaleX: 1.0,
                 scaleY: 1.0,
                 alignment: Alignment.centerLeft,
-                child: Text('StreetSync', style: _tBrand),
+                child: Text('StreetSync', style: _tBrand(context)),
               ),
               const SizedBox(height: 8),
               Text(
                 '$_greeting, ${ApiService.firstName}',
-                style: _tGreeting,
+                style: _tGreeting(context),
               ),
               const SizedBox(height: 4),
               KeyedSubtree(
                 key: widget.locationTourKey,
                 child: Text(
                   _locationLabel,
-                  style: _tLocation,
+                  style: _tLocation(context),
                 ),
               ),
               const SizedBox(height: 28),
@@ -841,4 +960,38 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+}
+
+class _HomePalette {
+  const _HomePalette({
+    required this.pageBg,
+    required this.card,
+    required this.cardAlt,
+    required this.stroke,
+    required this.ink,
+    required this.muted,
+    required this.cta,
+    required this.accent,
+    required this.accentSoft,
+    required this.chipSelected,
+    required this.chipUnselected,
+    required this.heroFadeStart,
+    required this.heroFadeMid,
+    required this.heroFadeEnd,
+  });
+
+  final Color pageBg;
+  final Color card;
+  final Color cardAlt;
+  final Color stroke;
+  final Color ink;
+  final Color muted;
+  final Color cta;
+  final Color accent;
+  final Color accentSoft;
+  final Color chipSelected;
+  final Color chipUnselected;
+  final Color heroFadeStart;
+  final Color heroFadeMid;
+  final Color heroFadeEnd;
 }

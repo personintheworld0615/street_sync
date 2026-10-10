@@ -31,9 +31,9 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   static const _cta = Color(0xFF111827);
   static const _ink = Color(0xFF111827);
-  static const _muted = Color(0xFF757575);
-  static const _dockBg = Color(0xFFFFFFF8);
-  static const _selectedPill = Color(0xFFE8EAED);
+  static const _muted = Color(0xFF6F7B8B);
+  static const _dockBg = Color(0xFFFFFDF7);
+  static const _selectedPill = Color(0xFFE9EDF2);
 
   int _index = 0;
   int? _focusReportId;
@@ -296,7 +296,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: FloatingActionButton.small(
                     onPressed: _startTour,
                     tooltip: 'Start AI tour',
-                    backgroundColor: const Color(0xFF152033),
+                    backgroundColor: const Color(0xFF111827),
                     foregroundColor: Colors.white,
                     child: const Icon(Icons.auto_awesome),
                   ),
