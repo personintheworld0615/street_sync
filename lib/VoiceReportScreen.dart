@@ -10,6 +10,7 @@ import 'config.dart';
 import 'package:street_sync/ConfirmationVoiceReport.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
+import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/error_popup.dart';
 
@@ -234,6 +235,56 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
     }
   }
 
+  /// Street light reports need the pole tag. Returns null if they back out.
+  Future<String?> _askPoleNumber() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('What is the pole number?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'It is on a metal tag or sticker on the side of the pole facing the street, about head height. If it is missing, use the closest pole\'s number.',
+              style: TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'e.g., A1234 or 56789',
+              ),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  Navigator.of(dialogContext).pop(value.trim());
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.of(dialogContext).pop(value);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
   String _fixSomeTypeos(String text) {
     return text.replaceAllMapped(
       RegExp(r'\bbottle\b', caseSensitive: false),
@@ -354,6 +405,13 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
       final judgment = await reviewReportText(context, _transcript);
       if (!mounted || judgment == null) return;
 
+      var poleNumber = judgment.fields['pole_number'];
+      if (judgment.category == ReportCategories.streetLight &&
+          judgment.missingFields.contains('pole_number')) {
+        poleNumber = await _askPoleNumber();
+        if (!mounted || poleNumber == null) return;
+      }
+
       final lat = _lat;
       final lng = _long;
       final location = (lat != null && lng != null)
@@ -362,10 +420,16 @@ class _VoiceReportScreenState extends State<VoiceReportScreen>
 
       if (!mounted) return;
 
-      final aiDescription =
+      var aiDescription =
           (judgment.description != null && judgment.description!.isNotEmpty)
               ? judgment.description!
               : _transcript;
+      // Same format the photo report uses, so edit screens can split it back out.
+      if (poleNumber != null &&
+          poleNumber.isNotEmpty &&
+          !aiDescription.toLowerCase().contains('pole number')) {
+        aiDescription = 'Pole Number: $poleNumber\n\n$aiDescription';
+      }
 
       await Navigator.push(
         context,

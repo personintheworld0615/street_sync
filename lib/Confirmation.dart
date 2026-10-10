@@ -113,7 +113,8 @@ class _ConfirmationState extends State<Confirmation> {
     if (_busy) return;
     if (!_validateEditableFields()) return;
     setState(() => _submitting = true);
-    final judgment = await reviewReportText(context, _description);
+    final judgment =
+        await reviewReportText(context, _description, rewrite: false);
     if (!mounted) return;
     if (judgment == null) {
       setState(() => _submitting = false);

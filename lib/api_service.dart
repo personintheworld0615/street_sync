@@ -1075,15 +1075,20 @@ class ApiService {
     return [];
   }
 
-  /// Calls POST /reports/analyze-voice → AI title, description, severity, category.
-  static Future<Map<String, dynamic>> analyzeVoiceReport(String description) async {
+  /// Calls POST /reports/analyze-voice → title, description, category, plus
+  /// category fields and a spoken place. [rewrite] false skips the paid
+  /// cleanup when only the emergency / detail checks are needed.
+  static Future<Map<String, dynamic>> analyzeVoiceReport(
+    String description, {
+    bool rewrite = true,
+  }) async {
     final url = Uri.parse('$baseUrl/reports/analyze-voice');
     final response = await _authorized(
       () => http
           .post(
             url,
             headers: _headers,
-            body: jsonEncode({'description': description}),
+            body: jsonEncode({'description': description, 'rewrite': rewrite}),
           )
           .timeout(const Duration(seconds: 60)),
     );
@@ -1122,8 +1127,21 @@ class ApiService {
       'rationale': (data['rationale'] as String?)?.trim() ?? '',
       'emergency': data['emergency'] == true,
       'needsDetail': data['needs_detail'] == true,
+      'needsDetailReasons': _stringList(data['needs_detail_reasons']),
+      'fields': data['fields'] is Map
+          ? Map<String, String?>.from(
+              (data['fields'] as Map).map(
+                (k, v) => MapEntry(k.toString(), v?.toString()),
+              ),
+            )
+          : <String, String?>{},
+      'missingFields': _stringList(data['missing_fields']),
+      'mentionedLocation': (data['mentioned_location'] as String?)?.trim(),
     };
   }
+
+  static List<String> _stringList(Object? value) =>
+      value is List ? value.map((e) => e.toString()).toList() : <String>[];
 
   static Future<String> generateAITitle(String description) async {
     final result = await analyzeVoiceReport(description);

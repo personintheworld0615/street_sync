@@ -71,8 +71,8 @@ def normalize_category(category: Optional[str]) -> str:
     return value
 
 
-def analyze_voice_report(description: str) -> ModelOutput:
-    return _analyze_voice_report(description)
+def analyze_voice_report(description: str, rewrite: bool = True) -> ModelOutput:
+    return _analyze_voice_report(description, rewrite=rewrite)
 
 
 def generate_ai_title(description: str) -> str:

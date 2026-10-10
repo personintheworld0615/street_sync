@@ -345,9 +345,9 @@ def analyze_voice_report(
     request: Request,
     current_user: User = Depends(get_current_user),
 ):
-    """Pick a category for this description and flag 911 or a vague report."""
+    """Pick a category, flag 911 or a vague report, and pull out fields and place."""
     _limit_ai(request, current_user)
-    return reports_service.analyze_voice_report(body.description)
+    return reports_service.analyze_voice_report(body.description, rewrite=body.rewrite)
 
 
 @router.post("/reports/generate-title")
