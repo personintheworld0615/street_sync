@@ -305,18 +305,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               const Profile(),
             ],
           ),
-          floatingActionButton: _showTour || _index == 1
-              ? null
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: 72),
-                  child: FloatingActionButton.small(
-                    onPressed: _startTour,
-                    tooltip: 'Start AI tour',
-                    backgroundColor: const Color(0xFF152033),
-                    foregroundColor: Colors.white,
-                    child: const Icon(Icons.auto_awesome),
-                  ),
-                ),
           bottomNavigationBar: _FloatingNavDock(
             currentIndex: _index,
             onSelect: _onNavTap,
