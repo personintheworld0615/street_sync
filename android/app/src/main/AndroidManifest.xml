@@ -42,7 +42,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="com.streetsync.app"
+                    android:scheme="com.streetsync.mobile"
                     android:host="login-callback" />
             </intent-filter>
         </activity>

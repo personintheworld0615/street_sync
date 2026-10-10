@@ -1,4 +1,4 @@
-package com.streetsync.app;
+package com.streetsync.mobile;
 
 import io.flutter.embedding.android.FlutterActivity;
 

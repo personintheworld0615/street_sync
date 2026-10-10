@@ -226,7 +226,7 @@ def send_signup_confirmation_email(email: str) -> bool:
         {
             "type": "signup",
             "email": email.strip().lower(),
-            "options": {"email_redirect_to": "com.streetsync.app://login-callback"},
+            "options": {"email_redirect_to": "com.streetsync.mobile://login-callback"},
         }
     ).encode("utf-8")
     req = urllib.request.Request(

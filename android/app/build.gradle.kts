@@ -17,7 +17,7 @@ val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")?.trim() ?: 
 val mapsMapId: String = localProperties.getProperty("MAP_ID")?.trim() ?: ""
 
 android {
-    namespace = "com.streetsync.app"
+    namespace = "com.streetsync.mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.streetsync.app"
+        applicationId = "com.streetsync.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
