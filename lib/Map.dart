@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -17,6 +18,150 @@ enum IssueCategory {
   environmental,
   ada,
   other,
+}
+
+Future<BitmapDescriptor> createStreetSyncMarker({
+  required Color color,
+  required IconData icon,
+  bool selected = false,
+}) async {
+  const double baseWidth = 32;
+  const double baseHeight = 42;
+
+  final double scale = selected ? 1.4 : 1.0;
+  final double width = baseWidth * scale;
+  final double height = baseHeight * scale;
+
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(
+    recorder,
+    Rect.fromLTWH(0, 0, width, height),
+  );
+
+  final center = Offset(width / 2, 16 * scale);
+  final radius = 16 * scale;
+
+  final tailPath = Path()
+    ..moveTo(center.dx - 7 * scale, 25 * scale)
+    ..lineTo(center.dx, 42 * scale)
+    ..lineTo(center.dx + 7 * scale, 25 * scale)
+    ..close();
+
+  final shadowPaint = Paint()
+    ..color = Colors.black.withValues(alpha: 0.30)
+    ..maskFilter = MaskFilter.blur(
+      BlurStyle.normal,
+      4 * scale,
+    );
+
+  canvas.drawPath(tailPath, shadowPaint);
+
+  final tailPaint = Paint()
+    ..color = color
+    ..style = PaintingStyle.fill;
+
+  canvas.drawPath(tailPath, tailPaint);
+
+  final circleShadow = Paint()
+    ..color = Colors.black.withValues(alpha: 0.30)
+    ..maskFilter = MaskFilter.blur(
+      BlurStyle.normal,
+      4 * scale,
+    );
+
+  canvas.drawCircle(center, radius, circleShadow);
+
+  final circlePaint = Paint()
+    ..color = color
+    ..style = PaintingStyle.fill;
+
+  canvas.drawCircle(center, radius, circlePaint);
+
+  final borderPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2 * scale;
+
+  canvas.drawCircle(center, radius, borderPaint);
+
+  final textPainter = TextPainter(
+    text: TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(
+        fontFamily: icon.fontFamily,
+        package: icon.fontPackage,
+        fontSize: 14 * scale,
+        color: Colors.white,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  );
+
+  textPainter.layout();
+  textPainter.paint(
+    canvas,
+    Offset(
+      center.dx - textPainter.width / 2,
+      center.dy - textPainter.height / 2,
+    ),
+  );
+
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(
+    width.ceil(),
+    height.ceil(),
+  );
+  final byteData = await image.toByteData(
+    format: ui.ImageByteFormat.png,
+  );
+
+  return BitmapDescriptor.bytes(
+    byteData!.buffer.asUint8List(),
+    width: width,
+    height: height,
+  );
+}
+
+Future<BitmapDescriptor> createStreetSyncCategoryMarker({
+  required String category,
+  bool selected = false,
+}) async {
+  Color color;
+  IconData icon;
+
+  switch (category) {
+    case ReportCategories.streetsAndTransportation:
+      color = const Color(0xFFEA4335);
+      icon = Icons.directions_car;
+      break;
+
+    case ReportCategories.trashAndEnvironment:
+      color = const Color(0xFFFBBC05);
+      icon = Icons.delete_outline_rounded;
+      break;
+
+    case ReportCategories.natureAndWater:
+      color = const Color(0xFF34A853);
+      icon = Icons.water_drop_outlined;
+      break;
+
+    case ReportCategories.buildingsAndPublicSpaces:
+      color = const Color(0xFF4285F4);
+      icon = Icons.business_outlined;
+      break;
+
+    case ReportCategories.other:
+    default:
+      color = const Color(0xFF9334E6);
+      icon = Icons.location_on_outlined;
+      break;
+  }
+
+  return createStreetSyncMarker(
+    color: color,
+    icon: icon,
+    selected: selected,
+  );
 }
 
 class MapScreen extends StatefulWidget {
@@ -98,54 +243,44 @@ class _MapScreenState extends State<MapScreen> {
   String? _selectedMarkerId;
 
   Future<void> _loadMarkerIcons() async {
-    redSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(19, 24.5)),
-      'assets/images/markers/Small_Red.png',
+    redSmall = await createStreetSyncCategoryMarker(
+      category: ReportCategories.streetsAndTransportation,
+    );
+    redLarge = await createStreetSyncCategoryMarker(
+      category: ReportCategories.streetsAndTransportation,
+      selected: true,
     );
 
-    redLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(25, 30)),
-      'assets/images/markers/Big_Red.png',
+    orangeSmall = await createStreetSyncCategoryMarker(
+      category: ReportCategories.trashAndEnvironment,
+    );
+    orangeLarge = await createStreetSyncCategoryMarker(
+      category: ReportCategories.trashAndEnvironment,
+      selected: true,
     );
 
-    orangeSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(19, 24.5)),
-      'assets/images/markers/Small_Orange.png',
+    greenSmall = await createStreetSyncCategoryMarker(
+      category: ReportCategories.natureAndWater,
+    );
+    greenLarge = await createStreetSyncCategoryMarker(
+      category: ReportCategories.natureAndWater,
+      selected: true,
     );
 
-    orangeLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(25, 30)),
-      'assets/images/markers/Big_Orange.png',
+    blueSmall = await createStreetSyncCategoryMarker(
+      category: ReportCategories.buildingsAndPublicSpaces,
+    );
+    blueLarge = await createStreetSyncCategoryMarker(
+      category: ReportCategories.buildingsAndPublicSpaces,
+      selected: true,
     );
 
-    greenSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(19, 24.5)),
-      'assets/images/markers/Small_Green.png',
+    purpleSmall = await createStreetSyncCategoryMarker(
+      category: ReportCategories.other,
     );
-
-    greenLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(25, 30)),
-      'assets/images/markers/Big_Green.png',
-    );
-
-    blueSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(19, 24.5)),
-      'assets/images/markers/Small_Blue.png',
-    );
-
-    blueLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(25, 30)),
-      'assets/images/markers/Big_Blue.png',
-    );
-
-    purpleSmall = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(19, 24.5)),
-      'assets/images/markers/Small_Purple.png',
-    );
-
-    purpleLarge = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(25, 30)),
-      'assets/images/markers/Big_Purple.png',
+    purpleLarge = await createStreetSyncCategoryMarker(
+      category: ReportCategories.other,
+      selected: true,
     );
   }
 
