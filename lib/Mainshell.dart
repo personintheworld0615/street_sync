@@ -296,8 +296,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: FloatingActionButton.small(
                     onPressed: _startTour,
                     tooltip: 'Start AI tour',
-                    backgroundColor: const Color(0xFF111827),
+                    backgroundColor: const Color(0xFF263B59),
                     foregroundColor: Colors.white,
+                    shape: const CircleBorder(
+                      side: BorderSide(color: Color(0xFF526D91), width: 1),
+                    ),
                     child: const Icon(Icons.auto_awesome),
                   ),
                 ),

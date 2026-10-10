@@ -47,13 +47,13 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _mutedLight = Color(0xFF757575);
   static const _ctaLight = Color(0xFF111827);
 
-  static const _pageBgDark = Color(0xFF0B1220);
+  static const _pageBgDark = Color(0xFF0D1526);
   static const _surfaceDark = Color(0xFF111827);
-  static const _surfaceAltDark = Color(0xFF172236);
-  static const _strokeDark = Color(0xFF2A3547);
+  static const _surfaceAltDark = Color(0xFF182438);
+  static const _strokeDark = Color(0xFF4A5F7D);
   static const _inkDark = Color(0xFFF8FAFC);
-  static const _mutedDark = Color(0xFFA0AEC0);
-  static const _ctaDark = Color(0xFF172236);
+  static const _mutedDark = Color(0xFFA7B4C8);
+  static const _ctaDark = Color(0xFF182438);
   static const _accentDark = Color(0xFF79AFFF);
 
   _HomePalette _palette(BuildContext context) {
@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         chipSelected: const Color(0xFFE8EDF3),
         chipUnselected: Colors.transparent,
         heroFadeStart: const Color(0xFF17243A),
-        heroFadeMid: const Color(0xFF17243A).withValues(alpha: 0.66),
+        heroFadeMid: const Color(0xFF17243A).withValues(alpha: 0.72),
         heroFadeEnd: _pageBgDark,
       );
     }
@@ -783,12 +783,12 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
             decoration: BoxDecoration(
               color: isDark
-                  ? const Color(0xFF30394A).withValues(alpha: 0.82)
+                  ? const Color(0xFF202D42).withValues(alpha: 0.9)
                   : Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: isDark
-                    ? const Color(0xFF465268).withValues(alpha: 0.78)
+                    ? const Color(0xFF53657C).withValues(alpha: 0.6)
                     : Colors.white.withValues(alpha: 0.55),
               ),
             ),
@@ -834,7 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
       width: 1,
       height: 34,
       color: isDark
-          ? const Color(0xFF4A586E)
+          ? const Color(0xFF566A85)
           : Colors.white.withValues(alpha: 0.55),
     );
   }
