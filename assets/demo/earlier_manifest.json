@@ -1,0 +1,76 @@
+{
+  "tiles": [
+    {
+      "z": 17,
+      "x": 38373,
+      "y": 49461,
+      "asset": "assets/demo/earlier/17_38373_49461.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38373,
+      "y": 49462,
+      "asset": "assets/demo/earlier/17_38373_49462.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38373,
+      "y": 49463,
+      "asset": "assets/demo/earlier/17_38373_49463.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38374,
+      "y": 49461,
+      "asset": "assets/demo/earlier/17_38374_49461.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38374,
+      "y": 49462,
+      "asset": "assets/demo/earlier/17_38374_49462.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38374,
+      "y": 49463,
+      "asset": "assets/demo/earlier/17_38374_49463.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38375,
+      "y": 49461,
+      "asset": "assets/demo/earlier/17_38375_49461.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38375,
+      "y": 49462,
+      "asset": "assets/demo/earlier/17_38375_49462.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    },
+    {
+      "z": 17,
+      "x": 38375,
+      "y": 49463,
+      "asset": "assets/demo/earlier/17_38375_49463.jpg",
+      "captured": "2019-07-17",
+      "source": "Esri Wayback"
+    }
+  ]
+}

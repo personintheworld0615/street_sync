@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:street_sync/first_run.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
+import 'package:street_sync/vision/street_vision_screen.dart';
 import 'package:street_sync/ViewReportsScreen.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/report_categories.dart';
@@ -606,8 +607,8 @@ class _HomeScreenState extends State<HomeScreen> {
           color: _cta,
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Report an issue',
@@ -618,45 +619,60 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _reportModeChip(
-                    key: widget.voiceActionTourKey,
-                    icon: Icons.graphic_eq_rounded,
-                    label: 'Voice',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const VoiceReportScreen(),
-                        ),
-                      );
-                    },
+                  Expanded(
+                    child: _reportModeChip(
+                      icon: Icons.center_focus_strong_rounded,
+                      label: 'Scan',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const StreetVisionScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  Container(
-                    width: 1,
-                    height: 18,
-                    color: Colors.white.withValues(alpha: 0.3),
+                  _chipDivider(),
+                  Expanded(
+                    child: _reportModeChip(
+                      key: widget.voiceActionTourKey,
+                      icon: Icons.graphic_eq_rounded,
+                      label: 'Voice',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const VoiceReportScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  _reportModeChip(
-                    icon: Icons.photo_camera_outlined,
-                    label: 'Photo',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CommunityReportScreen(),
-                        ),
-                      );
-                    },
+                  _chipDivider(),
+                  Expanded(
+                    child: _reportModeChip(
+                      icon: Icons.photo_camera_outlined,
+                      label: 'Photo',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CommunityReportScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -664,6 +680,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _chipDivider() {
+    return Container(
+      width: 1,
+      height: 18,
+      color: Colors.white.withValues(alpha: 0.3),
     );
   }
 
@@ -678,9 +702,9 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 16, color: Colors.white),
             const SizedBox(width: 6),

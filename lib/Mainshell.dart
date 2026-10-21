@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:street_sync/CommunityReportScreen.dart';
 import 'package:street_sync/VoiceReportScreen.dart';
+import 'package:street_sync/vision/street_vision_screen.dart';
 import 'package:street_sync/ai_tour.dart';
 import 'package:street_sync/api_service.dart';
 import 'package:street_sync/first_run.dart';
@@ -245,6 +246,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   style: TextStyle(fontSize: 14, color: _muted),
                 ),
                 const SizedBox(height: 18),
+                _ReportSheetOption(
+                  icon: Icons.center_focus_strong_rounded,
+                  title: 'Scan',
+                  subtitle: 'On-device detection from a photo',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const StreetVisionScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
                 _ReportSheetOption(
                   icon: Icons.graphic_eq_rounded,
                   title: 'Voice report',

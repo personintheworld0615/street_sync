@@ -53,6 +53,9 @@ dependencies:
   flutter_native_splash: ^2.4.6
   flutter_svg: ^2.2.0
   liquid_glass_widgets: ^0.29.4
+  camera: ^0.11.2
+  tflite_flutter: ^0.11.0
+  image: ^4.5.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -100,6 +103,11 @@ flutter:
     - assets/images/tour_guide.jpg
     - assets/images/google_g.svg
     - assets/.env
+    - assets/models/urban_multi.tflite
+    - assets/models/labels.txt
+    - assets/demo/sample_street.jpg
+    - assets/demo/earlier_manifest.json
+    - assets/demo/earlier/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

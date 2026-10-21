@@ -17,6 +17,7 @@ import 'package:street_sync/report_categories.dart';
 import 'package:street_sync/report_judgment.dart';
 import 'package:street_sync/report_severity.dart';
 import 'package:street_sync/voice_mic_control.dart';
+import 'package:street_sync/vision/street_vision_screen.dart';
 class CommunityReportScreen extends StatefulWidget {
   
   CommunityReportScreen({super.key});
@@ -183,7 +184,7 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
   Widget _buildComingSoonforAI() {
     return _section(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         child: Column(
           children: [
             Container(
@@ -193,14 +194,14 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(
-                Icons.auto_awesome_rounded,
+                Icons.center_focus_strong_rounded,
                 size: 28,
                 color: _cta,
               ),
             ),
             const SizedBox(height: 16),
             const Text(
-              'Coming soon',
+              'Scan the street',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -209,13 +210,30 @@ class _CommunityReportScreenState extends State<CommunityReportScreen>
             ),
             const SizedBox(height: 6),
             Text(
-              'Auto will fill in report details from your photo.',
+              'Auto runs the on-device model on one photo and drafts the report from the boxes it finds.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.4,
                 color: Colors.grey[600],
               ),
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StreetVisionScreen(),
+                  ),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: _cta,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+              ),
+              child: const Text('Open scanner'),
             ),
           ],
         ),
